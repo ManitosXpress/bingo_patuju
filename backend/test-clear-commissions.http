@@ -1,0 +1,43 @@
+### Archivo de pruebas para el endpoint de limpieza de comisiones
+### Usar con extensiones como "REST Client" en VS Code
+
+### 1. Verificar que el servidor esté funcionando
+GET http://localhost:4001/health
+
+### 2. Modo Dry Run (Recomendado para pruebas)
+POST http://localhost:4001/api/reports/clear-commissions
+Content-Type: application/json
+
+{
+  "confirm": "ELIMINAR_DATOS_2024",
+  "dryRun": true
+}
+
+### 3. Ejecución Real (IRREVERSIBLE)
+POST http://localhost:4001/api/reports/clear-commissions
+Content-Type: application/json
+
+{
+  "confirm": "ELIMINAR_DATOS_2024",
+  "dryRun": false
+}
+
+### 4. Probar con confirmación incorrecta (debe fallar)
+POST http://localhost:4001/api/reports/clear-commissions
+Content-Type: application/json
+
+{
+  "confirm": "CONFIRMACION_INCORRECTA",
+  "dryRun": false
+}
+
+### 5. Probar sin confirmación (debe fallar)
+POST http://localhost:4001/api/reports/clear-commissions
+Content-Type: application/json
+
+{
+  "dryRun": false
+}
+
+### 6. Verificar el estado después de la limpieza
+GET http://localhost:4001/api/reports/vendors-summary
