@@ -1,1 +1,39 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"bingo-baitty","appId":"1:683937933911:android:6482c2d953a56765381112","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"bingo-baitty","configurations":{"android":"1:683937933911:android:6482c2d953a56765381112","ios":"1:683937933911:ios:4cf98ec1942d32f9381112","web":"1:683937933911:web:4ca2bff07c9a01a8381112"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "bingo-baitty",
+          "appId": "1:683937933911:android:6482c2d953a56765381112",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "bingo-baitty",
+          "configurations": {
+            "android": "1:683937933911:android:6482c2d953a56765381112",
+            "ios": "1:683937933911:ios:4cf98ec1942d32f9381112",
+            "web": "1:683937933911:web:4ca2bff07c9a01a8381112"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ]
+}

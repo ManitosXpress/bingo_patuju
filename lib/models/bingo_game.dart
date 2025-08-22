@@ -602,4 +602,62 @@ class BingoGame {
           : 'No hay bingo aún'
     };
   }
+
+  /// Verifica si hay bingo para patrones específicos de una ronda
+  Map<String, dynamic> checkBingoForRoundPatterns(List<String> roundPatterns) {
+    if (cartillas.isEmpty) {
+      return {
+        'hasBingo': false,
+        'completedPatterns': {},
+        'winningCards': [],
+        'message': 'No hay cartillas para verificar'
+      };
+    }
+    
+    if (calledNumbers.isEmpty) {
+      return {
+        'hasBingo': false,
+        'completedPatterns': {},
+        'winningCards': [],
+        'message': 'No se han llamado números aún'
+      };
+    }
+    
+    // Obtener solo los patrones de la ronda actual
+    final completedPatterns = getCompletedPatterns(calledNumbers);
+    final roundCompletedPatterns = <String, bool>{};
+    
+    for (final pattern in roundPatterns) {
+      roundCompletedPatterns[pattern] = completedPatterns[pattern] ?? false;
+    }
+    
+    final hasRoundBingo = roundCompletedPatterns.values.any((completed) => completed);
+    
+    // Buscar cartillas ganadoras solo para los patrones de la ronda
+    final winningCards = <Map<String, dynamic>>[];
+    for (int i = 0; i < cartillas.length; i++) {
+      final cartilla = cartillas[i];
+      final pattern = getBingoPattern(cartilla, calledNumbers);
+      
+      if (pattern != null && roundPatterns.contains(pattern)) {
+        winningCards.add({
+          'cardIndex': i,
+          'pattern': pattern,
+          'numbers': cartilla,
+          'assignedVendor': getAssignedVendor(cartilla),
+        });
+      }
+    }
+    
+    return {
+      'hasBingo': hasRoundBingo,
+      'completedPatterns': roundCompletedPatterns,
+      'winningCards': winningCards,
+      'totalWinningCards': winningCards.length,
+      'roundPatterns': roundPatterns,
+      'message': hasRoundBingo 
+          ? '¡BINGO! Se completaron patrones de la ronda actual'
+          : 'No hay bingo para la ronda actual aún'
+    };
+  }
 } 

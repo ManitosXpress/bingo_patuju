@@ -5,6 +5,7 @@ import '../models/bingo_game.dart';
 import '../models/firebase_cartilla.dart';
 import 'cartillas_dialog.dart';
 import 'control_panel_sections.dart';
+import 'bingo_games_panel.dart';
 
 class ControlPanel extends StatefulWidget {
   final BingoGame bingoGame;
@@ -127,240 +128,411 @@ class _ControlPanelState extends State<ControlPanel> {
 
   void _showBingoVerificationDialog(BuildContext context) {
     final appProvider = Provider.of<AppProvider>(context, listen: false);
-    final bingoCheck = appProvider.checkBingoInRealTime();
     
-    if (bingoCheck['hasBingo'] == true) {
-      // Mostrar directamente el diálogo de BINGO con buscador de cartilla
-      showDialog(
-        context: context,
-        builder: (context) => _BingoVerificationDialog(
-          bingoCheck: bingoCheck,
-          appProvider: appProvider,
-        ),
-      );
-    } else {
-      // Mostrar mensaje de que no hay bingo
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.info, color: Colors.blue, size: 28),
-              const SizedBox(width: 8),
-              const Text('Verificación de BINGO'),
-            ],
+    print('DEBUG: === INICIANDO VERIFICACIÓN DE BINGO ===');
+    
+    // Obtener los patrones de la ronda actual desde el panel de juegos
+    List<String> currentRoundPatterns = _getCurrentRoundPatternsFromContext(context);
+    
+    print('DEBUG: - Patrones de ronda obtenidos: $currentRoundPatterns');
+    print('DEBUG: - Cantidad de patrones: ${currentRoundPatterns.length}');
+    
+    if (currentRoundPatterns.isNotEmpty) {
+      print('DEBUG: ✅ Hay patrones de ronda, verificando bingo específico...');
+      
+      // Verificar bingo SOLO para los patrones de la ronda actual
+      final bingoCheck = appProvider.checkBingoForSpecificRoundPatterns(currentRoundPatterns);
+      
+      print('DEBUG: - Resultado de verificación: ${bingoCheck['hasBingo']}');
+      print('DEBUG: - Mensaje: ${bingoCheck['message']}');
+      print('DEBUG: - Patrones completados: ${bingoCheck['completedPatterns']}');
+      
+      if (bingoCheck['hasBingo'] == true) {
+        print('DEBUG: 🎉 ¡BINGO detectado para la ronda actual!');
+        // Mostrar directamente el diálogo de BINGO con buscador de cartilla
+        showDialog(
+          context: context,
+          builder: (context) => _BingoVerificationDialog(
+            bingoCheck: bingoCheck,
+            appProvider: appProvider,
+            currentRoundPatterns: currentRoundPatterns,
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                bingoCheck['message'],
-                style: const TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.tips_and_updates, color: Colors.blue.shade700, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Continúa llamando números para completar patrones de BINGO',
-                        style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Entendido'),
+        );
+      } else {
+        print('DEBUG: ❌ No hay bingo para la ronda actual');
+        // Mostrar mensaje de que no hay bingo para la ronda actual
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.info, color: Colors.blue, size: 28),
+                const SizedBox(width: 8),
+                const Text('Verificación de BINGO - Ronda Actual'),
+              ],
             ),
-          ],
-        ),
-      );
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No hay BINGO para los patrones de la ronda actual:',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                ...currentRoundPatterns.map((pattern) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      Icon(Icons.radio_button_unchecked, color: Colors.grey, size: 16),
+                      const SizedBox(width: 8),
+                      Text(pattern, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                )),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.tips_and_updates, color: Colors.blue.shade700, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Continúa llamando números para completar los patrones de esta ronda',
+                          style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
+      }
+    } else {
+      print('DEBUG: ❌ No hay patrones de ronda específica, usando verificación general');
+      // Si no hay patrones de ronda específica, usar verificación general
+      final bingoCheck = appProvider.checkBingoInRealTime();
+      
+      print('DEBUG: - Resultado de verificación general: ${bingoCheck['hasBingo']}');
+      print('DEBUG: - Mensaje: ${bingoCheck['message']}');
+      
+      if (bingoCheck['hasBingo'] == true) {
+        showDialog(
+          context: context,
+          builder: (context) => _BingoVerificationDialog(
+            bingoCheck: bingoCheck,
+            appProvider: appProvider,
+            currentRoundPatterns: [],
+          ),
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.info, color: Colors.blue, size: 28),
+                const SizedBox(width: 8),
+                const Text('Verificación de BINGO'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  bingoCheck['message'],
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.tips_and_updates, color: Colors.blue.shade700, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Continúa llamando números para completar patrones de BINGO',
+                          style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+    
+    print('DEBUG: === FINALIZADA VERIFICACIÓN DE BINGO ===');
+  }
+
+  // Método para obtener los patrones de la ronda actual desde el contexto
+  List<String> _getCurrentRoundPatternsFromContext(BuildContext context) {
+    // Importar la clase estática del BingoGamesPanel
+    try {
+      // Usar la variable estática del BingoGamesPanel
+      final patterns = BingoGamesPanelState.getCurrentRoundPatterns();
+      final roundIndex = BingoGamesPanelState.getCurrentRoundIndex();
+      final gameId = BingoGamesPanelState.getSelectedGameId();
+      
+      print('DEBUG: === OBTENIENDO PATRONES DE RONDA ACTUAL ===');
+      print('DEBUG: - Patrones obtenidos: $patterns');
+      print('DEBUG: - Índice de ronda: $roundIndex');
+      print('DEBUG: - ID del juego: $gameId');
+      print('DEBUG: ===========================================');
+      
+      return patterns;
+    } catch (e) {
+      print('DEBUG: Error al obtener patrones de ronda actual: $e');
+      return [];
     }
   }
 
-  void _verifyBingo(BuildContext context) {
-    final appProvider = Provider.of<AppProvider>(context, listen: false);
-    final bingoCheck = appProvider.checkBingoInRealTime();
-    
-    if (bingoCheck['hasBingo'] == true) {
-      // Mostrar diálogo de BINGO con buscador de cartilla
-      showDialog(
-        context: context,
-        builder: (context) => _BingoVerificationDialog(
-          bingoCheck: bingoCheck,
-          appProvider: appProvider,
-        ),
-      );
-    } else {
-      // Mostrar mensaje de que no hay bingo
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.info, color: Colors.blue, size: 28),
-              const SizedBox(width: 8),
-              const Text('Verificación de BINGO'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                bingoCheck['message'],
-                style: const TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.tips_and_updates, color: Colors.blue.shade700, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Continúa llamando números para completar patrones de BINGO',
-                        style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Entendido'),
-            ),
-          ],
-        ),
-      );
-    }
-  }
 
   void _checkBingoInRealTime(BuildContext context) {
-    final bingoCheck = Provider.of<AppProvider>(context, listen: false).checkBingoInRealTime();
+    // Obtener la ronda actual desde el contexto del juego
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
     
-    if (bingoCheck['hasBingo'] == true) {
-      // Mostrar solo patrones completados, NO cartillas ganadoras
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.auto_awesome, color: Colors.amber, size: 28),
-              const SizedBox(width: 8),
-              const Text('Patrones Completados'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Se han completado los siguientes patrones:',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              ...(bingoCheck['completedPatterns'] as Map<String, bool>).entries.map((entry) {
-                if (entry.value == true) {
+    // Obtener los patrones de la ronda actual
+    final currentRoundPatterns = _getCurrentRoundPatternsFromContext(context);
+    
+    if (currentRoundPatterns.isNotEmpty) {
+      print('DEBUG: Verificando bingo en tiempo real para patrones de ronda: $currentRoundPatterns');
+      
+      // Verificar bingo SOLO para los patrones de la ronda actual
+      final bingoCheck = appProvider.checkBingoForSpecificRoundPatterns(currentRoundPatterns);
+      
+      if (bingoCheck['hasBingo'] == true) {
+        // Mostrar solo patrones completados de la ronda actual
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.auto_awesome, color: Colors.amber, size: 28),
+                const SizedBox(width: 8),
+                const Text('Patrones Completados - Ronda Actual'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '¡BINGO! Se completaron patrones de la ronda actual:',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                ...currentRoundPatterns.map((pattern) {
+                  final isCompleted = (bingoCheck['completedPatterns'] as Map<String, bool>)[pattern] ?? false;
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 4),
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle, color: Colors.green, size: 20),
-                        const SizedBox(width: 12),
-                        Text(
-                          entry.key, 
-                          style: const TextStyle(
-                            fontSize: 16, 
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green,
-                          ),
+                        Icon(
+                          isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+                          color: isCompleted ? Colors.green : Colors.grey,
+                          size: 16
                         ),
+                        const SizedBox(width: 8),
+                        Text(
+                          pattern, 
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: isCompleted ? Colors.green.shade700 : Colors.grey.shade600,
+                            decoration: isCompleted ? TextDecoration.lineThrough : null,
+                          )
+                        ),
+                        if (isCompleted) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.green.shade300),
+                            ),
+                            child: Text(
+                              'COMPLETADO',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   );
-                }
-                return const SizedBox.shrink();
-              }),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info, color: Colors.blue.shade700, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Los patrones se marcan automáticamente en la sección "Figuras de Bingo"',
-                        style: TextStyle(
-                          color: Colors.blue.shade700, 
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                }),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info, color: Colors.blue.shade700, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Progreso de la ronda: ${(bingoCheck['completedPatterns'] as Map<String, bool>).entries.where((e) => currentRoundPatterns.contains(e.key) && e.value).length}/${currentRoundPatterns.length} patrones completados',
+                          style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cerrar'),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Entendido'),
-            ),
-          ],
-        ),
-      );
+        );
+      } else {
+        // Mostrar mensaje de que no hay bingo para la ronda actual
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ No hay BINGO para los patrones de la ronda actual'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } else {
-      // Mostrar mensaje de que no hay patrones completados
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(bingoCheck['message']),
-          backgroundColor: Colors.blue,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      // Si no hay patrones de ronda específica, usar verificación general
+      print('DEBUG: No hay patrones de ronda específica, usando verificación general');
+      final bingoCheck = appProvider.checkBingoInRealTime();
+      
+      if (bingoCheck['hasBingo'] == true) {
+        // Mostrar solo patrones completados, NO cartillas ganadoras
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.auto_awesome, color: Colors.amber, size: 28),
+                const SizedBox(width: 8),
+                const Text('Patrones Completados'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  bingoCheck['message'],
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                ...(bingoCheck['completedPatterns'] as Map<String, bool>).entries.map((entry) {
+                  if (entry.value == true) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green, size: 16),
+                          const SizedBox(width: 8),
+                          Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                }),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info, color: Colors.blue.shade700, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Total de patrones completados: ${(bingoCheck['completedPatterns'] as Map<String, bool>).entries.where((e) => e.value).length}',
+                          style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cerrar'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ ${bingoCheck['message']}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
+
+
 } 
 
 // Diálogo personalizado para verificación de BINGO con buscador
 class _BingoVerificationDialog extends StatefulWidget {
   final Map<String, dynamic> bingoCheck;
   final AppProvider appProvider;
+  final List<String> currentRoundPatterns;
   
   const _BingoVerificationDialog({
     required this.bingoCheck,
     required this.appProvider,
+    required this.currentRoundPatterns,
   });
 
   @override
@@ -389,8 +561,13 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
       _isSearching = true;
     });
 
-    // Buscar la cartilla
-    final result = widget.appProvider.checkSpecificCartilla(cardNumber);
+    // Obtener los patrones de la ronda actual desde el widget
+    final currentRoundPatterns = widget.currentRoundPatterns;
+    
+    // Buscar la cartilla con patrones específicos de la ronda si están disponibles
+    final result = currentRoundPatterns.isNotEmpty
+        ? widget.appProvider.checkSpecificCartilla(cardNumber, roundPatterns: currentRoundPatterns)
+        : widget.appProvider.checkSpecificCartilla(cardNumber);
     
     setState(() {
       _searchResult = result;
@@ -612,44 +789,118 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
             ],
             
             const SizedBox(height: 20),
-            Text('Patrones completados:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 8),
-            ...(widget.bingoCheck['completedPatterns'] as Map<String, bool>).entries.map((entry) {
-              if (entry.value == true) {
+            // Mostrar solo patrones de la ronda actual si están disponibles
+            if (widget.currentRoundPatterns.isNotEmpty) ...[
+              Text(
+                'Patrones completados de la ronda actual:', 
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue.shade700)
+              ),
+              const SizedBox(height: 8),
+              ...widget.currentRoundPatterns.map((pattern) {
+                final isCompleted = (widget.bingoCheck['completedPatterns'] as Map<String, bool>)[pattern] ?? false;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green, size: 16),
+                      Icon(
+                        isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+                        color: isCompleted ? Colors.green : Colors.grey,
+                        size: 16
+                      ),
                       const SizedBox(width: 8),
-                      Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w500)),
+                      Text(
+                        pattern, 
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: isCompleted ? Colors.green.shade700 : Colors.grey.shade600,
+                          decoration: isCompleted ? TextDecoration.lineThrough : null,
+                        )
+                      ),
+                      if (isCompleted) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.green.shade300),
+                          ),
+                          child: Text(
+                            'COMPLETADO',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 );
-              }
-              return const SizedBox.shrink();
-            }),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info, color: Colors.blue.shade700, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Total de patrones completados: ${(widget.bingoCheck['completedPatterns'] as Map<String, bool>).entries.where((e) => e.value).length}',
-                      style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+              }),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: Colors.blue.shade700, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Progreso de la ronda: ${(widget.bingoCheck['completedPatterns'] as Map<String, bool>).entries.where((e) => widget.currentRoundPatterns.contains(e.key) && e.value).length}/${widget.currentRoundPatterns.length} patrones completados',
+                        style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ] else ...[
+              // Mostrar todos los patrones si no hay ronda específica
+              Text('Patrones completados:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 8),
+              ...(widget.bingoCheck['completedPatterns'] as Map<String, bool>).entries.map((entry) {
+                if (entry.value == true) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green, size: 16),
+                        const SizedBox(width: 8),
+                        Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: Colors.blue.shade700, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Total de patrones completados: ${(widget.bingoCheck['completedPatterns'] as Map<String, bool>).entries.where((e) => e.value).length}',
+                        style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -7,6 +7,7 @@ import 'package:screenshot/screenshot.dart';
 import 'dart:typed_data';
 import '../config/backend_config.dart';
 import '../widgets/cartilla_widget.dart';
+import '../block_assignment.dart';
 
 class CrmScreen extends StatefulWidget {
   const CrmScreen({super.key});
@@ -150,7 +151,7 @@ class _CrmScreenState extends State<CrmScreen> {
                           Icon(Icons.info_outline, color: Colors.blue.shade600, size: 16),
                           const SizedBox(width: 4),
                           Text(
-                            'Haz clic en el ícono de descarga para obtener la cartilla en PNG',
+                            'Haz clic en el ícono de descarga para obtener la cartilla en PNG (720x1020)',
                             style: TextStyle(
                               color: Colors.blue.shade700,
                               fontSize: 12,
@@ -291,7 +292,7 @@ class _CrmScreenState extends State<CrmScreen> {
     }
   }
 
-  // Método para descargar cartilla en PNG
+  // Método para descargar cartilla en PNG con resolución optimizada (720x1020)
   Future<void> _downloadCartilla(Map<String, dynamic> card) async {
     try {
       // Crear un ScreenshotController para capturar la cartilla
@@ -303,8 +304,8 @@ class _CrmScreenState extends State<CrmScreen> {
           backgroundColor: Colors.white,
           body: Center(
             child: Container(
-              width: 612, // Ancho de hoja carta (8.5" x 72 DPI)
-              height: 792, // Alto de hoja carta (11" x 72 DPI)
+              width: 720, // Ancho optimizado para mejor calidad (720 píxeles)
+              height: 1020, // Alto optimizado para mejor calidad (1020 píxeles)
               child: SingleChildScrollView(
                 child: CartillaWidget(
                   numbers: _convertNumbersToIntList(card['numbers'] ?? []),
@@ -319,11 +320,12 @@ class _CrmScreenState extends State<CrmScreen> {
         ),
       );
       
-      // Capturar la cartilla
+      // Capturar la cartilla con resolución optimizada
       final imageBytes = await screenshotController.captureFromWidget(
         cartillaWidget,
         context: context,
         delay: const Duration(milliseconds: 500),
+        pixelRatio: 2.0, // Aumentar la densidad de píxeles para mejor calidad
       );
       
       if (imageBytes.isNotEmpty) {
@@ -940,8 +942,14 @@ class _CrmScreenState extends State<CrmScreen> {
     final endRangeCtrl = TextEditingController();
     final stepCtrl = TextEditingController(text: '10');
     
+    // Controladores para asignación por bloques
+    final blockSizeCtrl = TextEditingController(text: '5');
+    final skipBlocksCtrl = TextEditingController(text: '0');
+    final startCardCtrl = TextEditingController(text: '1');
+    final totalCardsCtrl = TextEditingController(text: '1000');
+    
     // Estado para el tipo de asignación
-    String assignmentType = 'specific'; // 'specific' o 'range'
+    String assignmentType = 'specific'; // 'specific', 'range', o 'blocks'
     
     await showDialog(context: context, builder: (_) {
       return StatefulBuilder(builder: (context, setDialogState) {
@@ -971,27 +979,32 @@ class _CrmScreenState extends State<CrmScreen> {
                         onChanged: (value) => setDialogState(() => assignmentType = value!),
                       ),
                     ),
+                    Expanded(
+                      child: RadioListTile<String>(
+                        title: const Text('Por bloques'),
+                        value: 'blocks',
+                        groupValue: assignmentType,
+                        onChanged: (value) => setDialogState(() => assignmentType = value!),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 
-                // Campo para vendedor/líder
-                DropdownButtonFormField<String>(
-                  value: vendorId,
-                  items: _vendorsAll
-                      .map((v) => DropdownMenuItem<String>(
-                            value: (v['id'] as String),
-                            child: Text('${v['role'] == 'LEADER' ? 'Líder' : 'Vendedor'}: ${v['name']}'),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setDialogState(() => vendorId = v),
-                  decoration: const InputDecoration(
-                    labelText: 'Vendedor/Líder',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
+                // Campo para vendedor/líder (solo para asignación específica y por rango)
+                if (assignmentType != 'blocks') ...[
+                  DropdownButtonFormField<String>(
+                    value: vendorId,
+                    items: _buildVendorDropdownItems(),
+                    onChanged: (v) => setDialogState(() => vendorId = v),
+                    decoration: const InputDecoration(
+                      labelText: 'Vendedor/Líder',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
                 
                 // Campos según el tipo de asignación
                 if (assignmentType == 'specific') ...[
@@ -1004,7 +1017,7 @@ class _CrmScreenState extends State<CrmScreen> {
                       prefixIcon: Icon(Icons.numbers),
                     ),
                   ),
-                ] else ...[
+                ] else if (assignmentType == 'range') ...[
                   Row(
                     children: [
                       Expanded(
@@ -1043,6 +1056,47 @@ class _CrmScreenState extends State<CrmScreen> {
                     ),
                     keyboardType: TextInputType.number,
                   ),
+                ] else if (assignmentType == 'blocks') ...[
+                  // Botón para abrir el modal de asignación por bloques
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.grid_on, color: Colors.blue[700], size: 24),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Asignación por Bloques',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Haz clic en "Asignar Cartillas" para configurar la asignación por bloques con el nuevo sistema.',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Los campos de configuración se manejan en el nuevo modal
                 ],
                 
                 const SizedBox(height: 16),
@@ -1087,6 +1141,13 @@ class _CrmScreenState extends State<CrmScreen> {
       });
     });
     
+    // Para asignación por bloques, no necesitamos vendedor específico
+    if (assignmentType == 'blocks') {
+      await _showBlockAssignmentModal(context);
+      return;
+    }
+    
+    // Para otros tipos de asignación, sí necesitamos vendedor específico
     if (vendorId == null) return;
     
     // Procesar la asignación según el tipo
@@ -1105,7 +1166,7 @@ class _CrmScreenState extends State<CrmScreen> {
       
       await _assignMultipleCards(vendorId!, cardNumbers: numbers);
       
-    } else {
+    } else if (assignmentType == 'range') {
       if (startRangeCtrl.text.isEmpty || endRangeCtrl.text.isEmpty) return;
       
       final start = int.tryParse(startRangeCtrl.text);
@@ -1134,13 +1195,42 @@ class _CrmScreenState extends State<CrmScreen> {
       numbers.add(i);
     }
     
-         if (numbers.length <= 10) {
-       return 'Se asignarán $count cartillas: ${numbers.join(', ')}';
-     } else {
-       final firstFew = numbers.take(5).join(', ');
-       final lastFew = numbers.skip(numbers.length - 3).join(', ');
-       return 'Se asignarán $count cartillas: $firstFew, ..., $lastFew';
-     }
+    if (numbers.length <= 10) {
+      return 'Se asignarán $count cartillas: ${numbers.join(', ')}';
+    } else {
+      final firstFew = numbers.take(5).join(', ');
+      final lastFew = numbers.skip(numbers.length - 3).join(', ');
+      return 'Se asignarán $count cartillas: $firstFew, ..., $lastFew';
+    }
+  }
+  
+  /// Mostrar modal de asignación por bloques
+  Future<void> _showBlockAssignmentModal(BuildContext context, [String? vendorId]) async {
+    final vendor = vendorId != null 
+        ? _vendorsAll.firstWhere(
+            (v) => v['id'] == vendorId,
+            orElse: () => {'name': 'Vendedor'},
+          )
+        : {'name': 'Todos los vendedores'};
+
+    await showDialog(
+      context: context,
+      builder: (context) => BlockAssignmentModal(
+        apiBase: _apiBase,
+        vendorId: vendorId ?? '',
+        vendorName: vendor['name'] ?? 'Vendedor',
+        allVendors: _vendorsAll, // Pasar la lista completa de vendedores
+        onSuccess: () {
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cartillas asignadas exitosamente por bloques'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        },
+      ),
+    );
   }
   
   Future<void> _assignMultipleCards(String vendorId, {
@@ -1198,7 +1288,7 @@ class _CrmScreenState extends State<CrmScreen> {
         )
       );
     }
-    }
+  }
   
   Future<void> _showAssignmentSummary(Map<String, dynamic> result) async {
     final assignedCount = result['assignedCount'] ?? 0;
@@ -1436,6 +1526,58 @@ class _CrmScreenState extends State<CrmScreen> {
                     color: Colors.green.shade700,
                   ),
                 ),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.blue.shade600, size: 16),
+                            SizedBox(width: 6),
+                            Text(
+                              'Haz clic en el botón rojo para eliminar cartillas individuales',
+                              style: TextStyle(
+                                color: Colors.blue.shade700,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                                         SizedBox(width: 12),
+                     ElevatedButton.icon(
+                       onPressed: () => _downloadAllAssignedCards(cards, vendorId),
+                       icon: Icon(Icons.download, color: Colors.white),
+                       label: Text('Descargar Todas (${cards.length})'),
+                       style: ElevatedButton.styleFrom(
+                         backgroundColor: Colors.green,
+                         foregroundColor: Colors.white,
+                         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                       ),
+                     ),
+                     SizedBox(width: 8),
+                     ElevatedButton.icon(
+                       onPressed: () => _deleteAllAssignedCards(cards, vendorId),
+                       icon: Icon(Icons.delete_forever, color: Colors.white),
+                       label: Text('Eliminar Todas (${cards.length})'),
+                       style: ElevatedButton.styleFrom(
+                         backgroundColor: Colors.red,
+                         foregroundColor: Colors.white,
+                         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                       ),
+                     ),
+                  ],
+                ),
                 SizedBox(height: 16),
                 Expanded(
                   child: GridView.builder(
@@ -1450,44 +1592,80 @@ class _CrmScreenState extends State<CrmScreen> {
                       final card = cards[index];
                       final cardNumber = card['cardNo']?.toString() ?? card['id'];
                       
-                      return GestureDetector(
-                        onTap: () => _openCartilla(card),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green.shade300),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.green.shade200,
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  cardNumber,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: Colors.green.shade800,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Cartilla',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.green.shade600,
-                                  ),
-                                ),
-                              ],
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade300),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.green.shade200,
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
                             ),
-                          ),
+                          ],
+                        ),
+                        child: Stack(
+                          children: [
+                            // Botón de eliminación en la esquina superior derecha
+                            Positioned(
+                              top: 2,
+                              right: 2,
+                              child: Tooltip(
+                                message: 'Eliminar cartilla $cardNumber',
+                                child: GestureDetector(
+                                  onTap: () => _deleteIndividualCard(card, vendorId),
+                                  child: Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      borderRadius: BorderRadius.circular(10),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.red.shade300,
+                                          blurRadius: 2,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Icon(
+                                      Icons.close,
+                                      size: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Contenido principal de la cartilla
+                            GestureDetector(
+                              onTap: () => _openCartilla(card),
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      cardNumber,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Colors.green.shade800,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Cartilla',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.green.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
@@ -1632,12 +1810,7 @@ class _CrmScreenState extends State<CrmScreen> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: vendorId,
-                        items: _vendorsAll
-                            .map((v) => DropdownMenuItem<String>(
-                                  value: (v['id'] as String),
-                                  child: Text('${v['role'] == 'LEADER' ? 'Líder' : 'Vendedor'}: ${v['name']}'),
-                                ))
-                            .toList(),
+                        items: _buildVendorDropdownItems(),
                         onChanged: (v) => setSt(() => vendorId = v),
                         decoration: const InputDecoration(labelText: 'Asignar a'),
                       ),
@@ -1696,6 +1869,152 @@ class _CrmScreenState extends State<CrmScreen> {
     });
   }
 
+  // Método para eliminar vendor (líder o vendedor)
+  Future<void> _deleteVendor(Map<String, dynamic> vendor) async {
+    final vendorId = vendor['vendorId'] ?? vendor['id'];
+    final vendorName = vendor['name'] ?? 'Vendor';
+    final vendorRole = vendor['role'] ?? 'VENDOR';
+    
+    // Mostrar diálogo de confirmación
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.delete_forever, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Eliminar ${vendorRole == 'LEADER' ? 'Líder' : 'Vendedor'}'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Estás seguro de que quieres eliminar a "$vendorName"?',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '⚠️ Esta acción es IRREVERSIBLE',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  if (vendorRole == 'LEADER') ...[
+                    Text('• Se eliminará el líder y todos sus datos'),
+                    Text('• Los vendedores quedarán sin líder asignado'),
+                  ] else ...[
+                    Text('• Se eliminará el vendedor y todos sus datos'),
+                    Text('• Las cartillas asignadas quedarán sin asignar'),
+                  ],
+                  Text('• No se pueden eliminar vendors con historial de ventas'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('ELIMINAR'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Mostrar indicador de progreso
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Eliminando...'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Eliminando $vendorName...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Llamar al endpoint de eliminación
+      final response = await http.delete(
+        Uri.parse('$_apiBase/vendors/$vendorId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      // Cerrar diálogo de progreso
+      Navigator.pop(context);
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final result = json.decode(response.body);
+        
+        // Mostrar mensaje de éxito
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${vendorRole == 'LEADER' ? 'Líder' : 'Vendedor'} eliminado exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Refrescar la interfaz
+        setState(() { _refreshTick++; });
+      } else {
+        final error = json.decode(response.body);
+        final errorMessage = error['error'] ?? 'Error desconocido';
+        
+        // Mostrar error específico
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $errorMessage'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      // Cerrar diálogo de progreso
+      Navigator.pop(context);
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error de conexión: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _reassignLeader(Map<String, dynamic> seller) async {
     await _load(withLeaders: true);
     String? selected = (seller['leaderId'] as String?);
@@ -1735,6 +2054,149 @@ class _CrmScreenState extends State<CrmScreen> {
     }
   }
 
+  // Método para eliminar una cartilla individual
+  Future<void> _deleteIndividualCard(Map<String, dynamic> card, String vendorId) async {
+    final cardNumber = card['cardNo']?.toString() ?? card['id'];
+    
+    // Mostrar diálogo de confirmación
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.delete_forever, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Eliminar Cartilla'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Estás seguro de que quieres eliminar la cartilla $cardNumber?',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '⚠️ Esta acción es IRREVERSIBLE',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text('• La cartilla se eliminará permanentemente del sistema'),
+                  Text('• No se podrá recuperar'),
+                  Text('• Se liberará el número para futuras asignaciones'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('ELIMINAR'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Mostrar indicador de progreso
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Eliminando...'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Eliminando cartilla $cardNumber...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Llamar al endpoint de eliminación
+      final response = await http.delete(
+        Uri.parse('$_apiBase/cards/${card['id']}'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      // Cerrar diálogo de progreso
+      Navigator.pop(context);
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        // Mostrar mensaje de éxito
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cartilla $cardNumber eliminada exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Cerrar el diálogo de cartillas asignadas y refrescar
+        Navigator.pop(context);
+        
+        // Mostrar el diálogo actualizado
+        await _showAssignedCardsDialog(vendorId);
+        
+        // Refrescar la interfaz principal
+        setState(() { _refreshTick++; });
+      } else {
+        final error = json.decode(response.body);
+        final errorMessage = error['error'] ?? 'Error desconocido';
+        
+        // Mostrar error específico
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $errorMessage'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      // Cerrar diálogo de progreso
+      Navigator.pop(context);
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error de conexión: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1764,7 +2226,8 @@ class _CrmScreenState extends State<CrmScreen> {
             return Center(child: Text('Error: ${snap.error}'));
           }
           final vendors = List<Map<String, dynamic>>.from(snap.data!['vendors'] as List);
-          vendors.sort((a, b) => (b['soldCount'] as int).compareTo(a['soldCount'] as int));
+          // Ordenar por nombre alfabéticamente
+          vendors.sort((a, b) => (a['name'] ?? '').toString().toLowerCase().compareTo((b['name'] ?? '').toString().toLowerCase()));
 
           return Column(
             children: [
@@ -1919,6 +2382,16 @@ class _CrmScreenState extends State<CrmScreen> {
                                     icon: const Icon(Icons.sell_outlined),
                                     label: const Text('Vender todo'),
                                   ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _deleteVendor(leader),
+                                    icon: const Icon(Icons.delete_forever, color: Colors.white),
+                                    label: const Text('Eliminar'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1961,6 +2434,16 @@ class _CrmScreenState extends State<CrmScreen> {
                                     icon: const Icon(Icons.sell_outlined),
                                     label: const Text('Vender todo'),
                                   ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _deleteVendor(s),
+                                    icon: const Icon(Icons.delete_forever, color: Colors.white),
+                                    label: const Text('Eliminar'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
                                 ],
                               ),
                             )),
@@ -1975,10 +2458,25 @@ class _CrmScreenState extends State<CrmScreen> {
                         title: Text(s['name'] ?? '—'),
                         subtitle: const Text('Vendedor'),
                         onTap: () => _showVendorDetail(s),
-                        trailing: OutlinedButton.icon(
-                          onPressed: () => _reassignLeader(s),
-                          icon: const Icon(Icons.person_add_alt),
-                          label: const Text('Asignar líder'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _reassignLeader(s),
+                              icon: const Icon(Icons.person_add_alt),
+                              label: const Text('Asignar líder'),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: () => _deleteVendor(s),
+                              icon: const Icon(Icons.delete_forever, color: Colors.white),
+                              label: const Text('Eliminar'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     )),
@@ -2007,6 +2505,69 @@ class _CrmScreenState extends State<CrmScreen> {
 
   int _getTotalUnassigned(List<Map<String, dynamic>> vendors, int totalCards) {
     return totalCards - _getTotalAssigned(vendors);
+  }
+
+  // Método para construir items del dropdown ordenados por líderes y vendedores
+  List<DropdownMenuItem<String>> _buildVendorDropdownItems() {
+    final items = <DropdownMenuItem<String>>[];
+    
+    // Ordenar vendedores por nombre alfabéticamente
+    final sortedVendors = List<Map<String, dynamic>>.from(_vendorsAll);
+    sortedVendors.sort((a, b) => (a['name'] ?? '').toString().toLowerCase().compareTo((b['name'] ?? '').toString().toLowerCase()));
+    
+    // Agrupar por líderes
+    final leaders = sortedVendors.where((v) => (v['role'] ?? '') == 'LEADER').toList();
+    
+    for (final leader in leaders) {
+      // Agregar el líder
+      items.add(DropdownMenuItem<String>(
+        value: leader['id'] as String,
+        child: Text('👑 Líder: ${leader['name']}'),
+      ));
+      
+      // Agregar sus vendedores
+      final leaderId = leader['vendorId'] ?? leader['id'];
+      final sellers = sortedVendors.where((v) => 
+        (v['role'] ?? '') != 'LEADER' && 
+        (v['leaderId'] == leaderId || v['leaderId'] == leaderId.toString())
+      ).toList();
+      
+      for (final seller in sellers) {
+        items.add(DropdownMenuItem<String>(
+          value: seller['id'] as String,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 20),
+            child: Text('👤 Vendedor: ${seller['name']}'),
+          ),
+        ));
+      }
+    }
+    
+    // Agregar vendedores sin líder (huérfanos)
+    final orphanSellers = sortedVendors.where((v) => 
+      (v['role'] ?? '') != 'LEADER' && 
+      (v['leaderId'] == null || v['leaderId'] == '' || v['leaderId'] == 'null')
+    ).toList();
+    
+    if (orphanSellers.isNotEmpty) {
+      items.add(DropdownMenuItem<String>(
+        value: 'divider',
+        child: Text('--- Vendedores sin líder ---', style: TextStyle(color: Colors.grey.shade600)),
+        enabled: false,
+      ));
+      
+      for (final seller in orphanSellers) {
+        items.add(DropdownMenuItem<String>(
+          value: seller['id'] as String,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 20),
+            child: Text('👤 Vendedor: ${seller['name']}'),
+          ),
+        ));
+      }
+    }
+    
+    return items;
   }
 
   // Método helper para convertir valores de Firebase a int
@@ -2099,5 +2660,638 @@ class _CrmScreenState extends State<CrmScreen> {
         ),
       ],
     );
+  }
+
+  // Método para descargar todas las cartillas asignadas de una vez con resolución optimizada (720x1020)
+  Future<void> _downloadAllAssignedCards(List<Map<String, dynamic>> cards, String vendorId) async {
+    if (cards.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay cartillas para descargar'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Mostrar diálogo de confirmación
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.download, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Descargar Todas las Cartillas'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '¿Quieres descargar todas las ${cards.length} cartillas asignadas?',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '📋 Información de la descarga:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 8),
+                  Text('• Se descargarán ${cards.length} cartillas en formato PNG'),
+                  Text('• Cada cartilla tendrá su número único'),
+                  Text('• Resolución optimizada: 720x1020 píxeles'),
+                  Text('• Las descargas se realizarán secuencialmente'),
+                  Text('• El proceso puede tomar varios segundos'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('DESCARGAR TODAS'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Mostrar diálogo de progreso
+    final total = cards.length;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('Descargando Cartillas...'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            LinearProgressIndicator(
+              value: 0,
+              backgroundColor: Colors.grey.shade300,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Descargadas: 0 / $total',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Descargando cartilla 1 de $total...',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      int successCount = 0;
+      int errorCount = 0;
+      
+      // Crear un ScreenshotController para capturar las cartillas con resolución optimizada
+      final screenshotController = ScreenshotController();
+      
+      for (int i = 0; i < cards.length; i++) {
+        final card = cards[i];
+        final cardNumber = card['cardNo']?.toString() ?? card['id'];
+        
+        try {
+          // Crear un widget temporal con la cartilla para capturar
+          final cartillaWidget = MaterialApp(
+            home: Scaffold(
+              backgroundColor: Colors.white,
+              body: Center(
+                child: Container(
+                  width: 720, // Ancho optimizado para mejor calidad (720 píxeles)
+                  height: 1020, // Alto optimizado para mejor calidad (1020 píxeles)
+                  child: SingleChildScrollView(
+                    child: CartillaWidget(
+                      numbers: _convertNumbersToIntList(card['numbers'] ?? []),
+                      cardNumber: cardNumber,
+                      date: DateTime.now().toString().split(' ')[0],
+                      price: "Bs. 20",
+                      compact: false,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+          
+          // Capturar la cartilla con resolución optimizada
+          final imageBytes = await screenshotController.captureFromWidget(
+            cartillaWidget,
+            context: context,
+            delay: const Duration(milliseconds: 300),
+            pixelRatio: 2.0, // Aumentar la densidad de píxeles para mejor calidad
+          );
+          
+          if (imageBytes.isNotEmpty) {
+            // Descargar la imagen
+            await _saveImageToDevice(imageBytes, 'cartilla_$cardNumber.png');
+            successCount++;
+          } else {
+            errorCount++;
+          }
+          
+          // Actualizar progreso
+          if (mounted) {
+            // Cerrar diálogo anterior y mostrar uno nuevo con progreso actualizado
+            Navigator.pop(context);
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: Text('Descargando Cartillas...'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LinearProgressIndicator(
+                      value: (i + 1) / total,
+                      backgroundColor: Colors.grey.shade300,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Descargadas: ${i + 1} / $total',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Descargando cartilla ${i + 2 > total ? total : i + 2} de $total...',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '✅ Exitosas: $successCount  •  ❌ Errores: $errorCount',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          
+          // Pequeña pausa para evitar sobrecargar el sistema
+          await Future.delayed(const Duration(milliseconds: 200));
+          
+        } catch (e) {
+          errorCount++;
+          debugPrint('Error descargando cartilla $cardNumber: $e');
+        }
+      }
+      
+      // Cerrar diálogo de progreso
+      if (mounted) Navigator.pop(context);
+      
+      // Mostrar resumen final
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(
+                  successCount > 0 ? Icons.check_circle : Icons.error,
+                  color: successCount > 0 ? Colors.green : Colors.red,
+                ),
+                SizedBox(width: 8),
+                Text('Descarga Completada'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: successCount > 0 ? Colors.green.shade50 : Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: successCount > 0 ? Colors.green.shade200 : Colors.red.shade200,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Resumen de Descarga:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 8),
+                      Text('• Total de cartillas: $total'),
+                      Text(
+                        '• Descargadas exitosamente: $successCount',
+                        style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (errorCount > 0)
+                        Text(
+                          '• Errores: $errorCount',
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (successCount > 0) ...[
+                  SizedBox(height: 16),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue.shade600),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Las cartillas se han descargado en tu carpeta de descargas. Cada archivo tiene el formato "cartilla_[número].png"',
+                            style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Aceptar'),
+              ),
+            ],
+          ),
+        );
+      }
+      
+    } catch (e) {
+      // Cerrar diálogo de progreso
+      if (mounted) Navigator.pop(context);
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error durante la descarga masiva: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
+  // Método para eliminar todas las cartillas asignadas de una vez
+  Future<void> _deleteAllAssignedCards(List<Map<String, dynamic>> cards, String vendorId) async {
+    if (cards.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay cartillas para eliminar'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Mostrar diálogo de confirmación
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.delete_forever, color: Colors.red),
+            SizedBox(width: 8),
+            Text('ELIMINAR TODAS LAS CARTILLAS'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '🚨 ADVERTENCIA CRÍTICA: Esta operación es IRREVERSIBLE',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            SizedBox(height: 16),
+            Text(
+              '¿Estás seguro de que quieres eliminar TODAS las ${cards.length} cartillas asignadas?',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '⚠️ CONSECUENCIAS DE ESTA ACCIÓN:',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text('• Se ELIMINARÁN PERMANENTEMENTE ${cards.length} cartillas'),
+                  Text('• NO se podrán recuperar'),
+                  Text('• Los números quedarán disponibles para futuras asignaciones'),
+                  Text('• Se liberará todo el inventario del vendedor/líder'),
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade600),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Esta operación es útil para limpiar completamente el inventario de un vendedor o líder.',
+                      style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('CANCELAR'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('ELIMINAR TODAS'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Mostrar diálogo de progreso
+    final total = cards.length;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text('ELIMINANDO CARTILLAS...'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            LinearProgressIndicator(
+              value: 0,
+              backgroundColor: Colors.grey.shade300,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Eliminadas: 0 / $total',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Eliminando cartilla 1 de $total...',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      int successCount = 0;
+      int errorCount = 0;
+      
+      for (int i = 0; i < cards.length; i++) {
+        final card = cards[i];
+        final cardNumber = card['cardNo']?.toString() ?? card['id'];
+        
+        try {
+          // Llamar al endpoint de eliminación
+          final response = await http.delete(
+            Uri.parse('$_apiBase/cards/${card['id']}'),
+            headers: {'Content-Type': 'application/json'},
+          );
+          
+          if (response.statusCode == 200) {
+            successCount++;
+          } else {
+            errorCount++;
+            debugPrint('Error eliminando cartilla $cardNumber: ${response.body}');
+          }
+          
+          // Actualizar progreso
+          if (mounted) {
+            // Cerrar diálogo anterior y mostrar uno nuevo con progreso actualizado
+            Navigator.pop(context);
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => AlertDialog(
+                title: Text('ELIMINANDO CARTILLAS...'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LinearProgressIndicator(
+                      value: (i + 1) / total,
+                      backgroundColor: Colors.grey.shade300,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Eliminadas: ${i + 1} / $total',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Eliminando cartilla ${i + 2 > total ? total : i + 2} de $total...',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '✅ Exitosas: $successCount  •  ❌ Errores: $errorCount',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          
+          // Pequeña pausa para evitar sobrecargar el sistema
+          await Future.delayed(const Duration(milliseconds: 100));
+          
+        } catch (e) {
+          errorCount++;
+          debugPrint('Error eliminando cartilla $cardNumber: $e');
+        }
+      }
+      
+      // Cerrar diálogo de progreso
+      if (mounted) Navigator.pop(context);
+      
+      // Mostrar resumen final
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(
+                  successCount > 0 ? Icons.check_circle : Icons.error,
+                  color: successCount > 0 ? Colors.green : Colors.red,
+                ),
+                SizedBox(width: 8),
+                Text('Eliminación Completada'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: successCount > 0 ? Colors.green.shade50 : Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: successCount > 0 ? Colors.green.shade200 : Colors.red.shade200,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Resumen de Eliminación:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 8),
+                      Text('• Total de cartillas: $total'),
+                      Text(
+                        '• Eliminadas exitosamente: $successCount',
+                        style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (errorCount > 0)
+                        Text(
+                          '• Errores: $errorCount',
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (successCount > 0) ...[
+                  SizedBox(height: 16),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue.shade600),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'El inventario ha sido limpiado completamente. Los números de cartilla están disponibles para futuras asignaciones.',
+                            style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Aceptar'),
+              ),
+            ],
+          ),
+        );
+      }
+      
+      // Refrescar la interfaz principal
+      if (mounted) {
+        setState(() { _refreshTick++; });
+      }
+      
+    } catch (e) {
+      // Cerrar diálogo de progreso
+      if (mounted) Navigator.pop(context);
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error durante la eliminación masiva: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
   }
 }

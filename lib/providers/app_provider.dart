@@ -35,8 +35,12 @@ class AppProvider extends ChangeNotifier {
     try {
       await loadVendors();
       print('DEBUG: Vendedores cargados automáticamente: ${vendors.length}');
+      
+      // Cargar cartillas automáticamente al inicializar
+      await loadFirebaseCartillas();
+      print('DEBUG: Cartillas cargadas automáticamente: ${_allFirebaseCartillas.length}');
     } catch (e) {
-      print('DEBUG: Error cargando vendedores automáticamente: $e');
+      print('DEBUG: Error cargando datos automáticamente: $e');
     }
   }
   
@@ -557,7 +561,46 @@ class AppProvider extends ChangeNotifier {
   Map<String, dynamic> checkBingoInRealTime() {
     return _gameState.checkBingoInRealTime();
   }
+
+  // Método para verificar bingo con patrones de la ronda actual
+  Map<String, dynamic> checkBingoForRoundPatterns() {
+    // Obtener los patrones de la ronda actual desde el panel de juegos
+    // Por ahora, usar la verificación general hasta que se conecte con el panel de juegos
+    // TODO: Implementar obtención de patrones de ronda actual desde BingoGamesPanel
+    return checkBingoInRealTime();
+  }
   
+  // Método para verificar bingo con patrones específicos de una ronda
+  Map<String, dynamic> checkBingoForSpecificRoundPatterns(List<String> roundPatterns) {
+    if (roundPatterns.isEmpty) {
+      print('DEBUG: No hay patrones de ronda para verificar, usando verificación general');
+      return checkBingoInRealTime();
+    }
+    
+    print('DEBUG: Verificando bingo para patrones específicos de ronda: $roundPatterns');
+    return _gameState.checkBingoForRoundPatterns(roundPatterns);
+  }
+  
+  // Método para obtener patrones completados solo de la ronda actual
+  Map<String, bool> getCompletedPatternsForCurrentRound(List<String> currentRoundPatterns) {
+    if (currentRoundPatterns.isEmpty) {
+      print('DEBUG: No hay patrones de ronda actual, devolviendo mapa vacío');
+      return {};
+    }
+    
+    final allCompletedPatterns = _gameState.bingoGame.getCompletedPatterns(_gameState.bingoGame.calledNumbers);
+    final roundCompletedPatterns = <String, bool>{};
+    
+    for (final pattern in currentRoundPatterns) {
+      roundCompletedPatterns[pattern] = allCompletedPatterns[pattern] ?? false;
+    }
+    
+    print('DEBUG: Patrones de ronda actual: $currentRoundPatterns');
+    print('DEBUG: Patrones completados de ronda: $roundCompletedPatterns');
+    
+    return roundCompletedPatterns;
+  }
+
   // Método para obtener patrones completados
   Map<String, bool> getCompletedPatterns() {
     return _gameState.bingoGame.getCompletedPatterns(_gameState.bingoGame.calledNumbers);
@@ -607,7 +650,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   // Método para verificar si una cartilla específica es ganadora
-  Map<String, dynamic> checkSpecificCartilla(int cardNumber) {
+  Map<String, dynamic> checkSpecificCartilla(int cardNumber, {List<String>? roundPatterns}) {
     try {
       final cartilla = findCartillaByNumber(cardNumber);
       if (cartilla == null) {
@@ -618,7 +661,10 @@ class AppProvider extends ChangeNotifier {
       }
 
       // Verificar si la cartilla tiene un patrón completado
-      final bingoCheck = checkBingoInRealTime();
+      final bingoCheck = roundPatterns != null && roundPatterns.isNotEmpty
+          ? checkBingoForSpecificRoundPatterns(roundPatterns)
+          : checkBingoInRealTime();
+      
       final winningCards = bingoCheck['winningCards'] as List<Map<String, dynamic>>;
       
       // Buscar si esta cartilla específica es ganadora
@@ -642,21 +688,30 @@ class AppProvider extends ChangeNotifier {
       );
 
       if (winningCard.isNotEmpty) {
+        final pattern = winningCard['pattern'] as String;
+        final message = roundPatterns != null && roundPatterns.isNotEmpty
+            ? '¡Cartilla $cardNumber es GANADORA para la ronda actual!'
+            : '¡Cartilla $cardNumber es GANADORA!';
+            
         return {
           'found': true,
           'isWinning': true,
           'cartilla': cartilla,
-          'message': '¡Cartilla $cardNumber es GANADORA!',
-          'pattern': winningCard['pattern'] as String,
+          'message': message,
+          'pattern': pattern,
           'winningNumbers': winningCard['numbers'] as List<List<int>>,
           'calledNumbers': bingoGame.calledNumbers,
         };
       } else {
+        final message = roundPatterns != null && roundPatterns.isNotEmpty
+            ? 'Cartilla $cardNumber no es ganadora para la ronda actual aún'
+            : 'Cartilla $cardNumber no es ganadora aún';
+            
         return {
           'found': true,
           'isWinning': false,
           'cartilla': cartilla,
-          'message': 'Cartilla $cardNumber no es ganadora aún',
+          'message': message,
         };
       }
     } catch (e) {

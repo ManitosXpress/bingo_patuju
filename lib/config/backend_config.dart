@@ -1,6 +1,15 @@
 class BackendConfig {
-  // Configuración del backend
-  static const String baseUrl = 'http://localhost:4001';
+  // Configuración del backend - Firebase Functions
+  // Para desarrollo local, usa el emulador de Firebase Functions
+  // Para producción, usa la URL real de Firebase Functions
+  static const bool useLocalEmulator = false; // ✅ PRODUCCIÓN: Firebase Functions en la nube
+  
+  static String get baseUrl {
+    if (useLocalEmulator) {
+      return 'http://localhost:5001/bingo-baitty/us-central1/api';
+    }
+    return 'https://us-central1-bingo-baitty.cloudfunctions.net/api';
+  }
   
   // Endpoints de la API
   static const String cardsEndpoint = '/cards';
@@ -29,10 +38,10 @@ class BackendConfig {
   static String get reportsUrl => '$baseUrl$reportsEndpoint';
   
   // URL base para compatibilidad con GameStateProvider
-  static String get apiBase => '$baseUrl/api';
+  static String get apiBase => baseUrl;
   
   // Verificar si estamos en modo desarrollo
-  static bool get isDevelopment => baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
+  static bool get isDevelopment => useLocalEmulator || baseUrl.contains('localhost') || baseUrl.contains('127.0.0.1');
   
   // Configuración para diferentes entornos
   static String get environment {

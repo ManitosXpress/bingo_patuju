@@ -365,4 +365,9 @@ class GameStateProvider extends ChangeNotifier {
   Map<String, dynamic> checkBingoInRealTime() {
     return _bingoGame.checkBingoInRealTime();
   }
+
+  // Método para verificar bingo solo para patrones de una ronda específica
+  Map<String, dynamic> checkBingoForRoundPatterns(List<String> roundPatterns) {
+    return _bingoGame.checkBingoForRoundPatterns(roundPatterns);
+  }
 } 

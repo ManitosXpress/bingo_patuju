@@ -23,6 +23,8 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
   bool _isShuffling = false;
   bool _isAutoCalling = false;
   bool _showPrizeWheel = false;
+  
+
 
   @override
   void initState() {

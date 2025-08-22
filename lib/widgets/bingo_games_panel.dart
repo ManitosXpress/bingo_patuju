@@ -6,15 +6,49 @@ import '../models/bingo_game.dart';
 import '../providers/app_provider.dart';
 
 class BingoGamesPanel extends StatefulWidget {
-  const BingoGamesPanel({super.key});
+  final VoidCallback? onGameStateChanged;
+  
+  const BingoGamesPanel({
+    super.key,
+    this.onGameStateChanged,
+  });
 
   @override
   State<BingoGamesPanel> createState() => _BingoGamesPanelState();
 }
 
+// Variable global para acceder a los patrones de la ronda actual
+class BingoGamesPanelState {
+  static List<String> _currentRoundPatterns = [];
+  static int _currentRoundIndex = 0;
+  static String? _selectedGameId;
+  
+  static void updateCurrentRoundPatterns(List<String> patterns, int roundIndex, String? gameId) {
+    _currentRoundPatterns = patterns;
+    _currentRoundIndex = roundIndex;
+    _selectedGameId = gameId;
+    print('DEBUG: Patrones de ronda actual actualizados: $_currentRoundPatterns (Ronda $_currentRoundIndex del juego $_selectedGameId)');
+  }
+  
+  static List<String> getCurrentRoundPatterns() {
+    return List.from(_currentRoundPatterns);
+  }
+  
+  static int getCurrentRoundIndex() {
+    return _currentRoundIndex;
+  }
+  
+  static String? getSelectedGameId() {
+    return _selectedGameId;
+  }
+}
+
 class _BingoGamesPanelState extends State<BingoGamesPanel> {
   BingoGameConfig? _selectedGame;
   int _currentRoundIndex = 0;
+  
+  // Lista de juegos disponibles
+  List<BingoGameConfig> _games = [];
   
   // Mapa local para patrones marcados manualmente por el usuario
   final Map<String, bool> _manuallyMarkedPatterns = {};
@@ -22,11 +56,33 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   @override
   void initState() {
     super.initState();
+    
+    // Cargar juegos predefinidos
+    _loadDefaultGames();
+    
     // Seleccionar el primer juego por defecto
-    if (BingoGamePresets.defaultGames.isNotEmpty) {
-      _selectedGame = BingoGamePresets.defaultGames.first;
+    if (_games.isNotEmpty) {
+      _selectedGame = _games.first;
+      // Actualizar la variable estática con los patrones del primer juego
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _updateCurrentRoundIndex(0);
+      });
     }
   }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+
+
+  // Método para cargar juegos predefinidos
+  void _loadDefaultGames() {
+    _games = BingoGamePresets.defaultGames;
+  }
+
+
 
   void _showPatternsDialog(BuildContext context) {
     // Crear un BingoGame temporal para mostrar en el diálogo
@@ -58,8 +114,9 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
           onGameSelected: (game) {
             setState(() {
               _selectedGame = game;
-              _currentRoundIndex = 0;
             });
+            // Usar el método que actualiza la variable estática
+            _updateCurrentRoundIndex(0);
             Navigator.of(context).pop();
           },
         );
@@ -75,8 +132,9 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
           onGameCreated: (newGame) {
             setState(() {
               _selectedGame = newGame;
-              _currentRoundIndex = 0;
             });
+            // Usar el método que actualiza la variable estática
+            _updateCurrentRoundIndex(0);
             Navigator.of(context).pop();
           },
         );
@@ -93,8 +151,9 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
           onGameUpdated: (updatedGame) {
             setState(() {
               _selectedGame = updatedGame;
-              _currentRoundIndex = 0;
             });
+            // Usar el método que actualiza la variable estática
+            _updateCurrentRoundIndex(0);
             Navigator.of(context).pop();
           },
         );
@@ -110,9 +169,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       
       // Avanzar automáticamente a la siguiente ronda si no es la última
       if (_currentRoundIndex < _selectedGame!.rounds.length - 1) {
-        setState(() {
-          _currentRoundIndex++;
-        });
+        _updateCurrentRoundIndex(_currentRoundIndex + 1);
       }
     }
   }
@@ -123,8 +180,13 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         for (var round in _selectedGame!.rounds) {
           round.isCompleted = false;
         }
-        _currentRoundIndex = 0;
       });
+      
+      // Limpiar todos los patrones marcados manualmente
+      _clearAllManuallyMarkedPatterns();
+      
+      // Usar el método que actualiza la variable estática
+      _updateCurrentRoundIndex(0);
     }
   }
 
@@ -140,34 +202,109 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     }
   }
 
-  // Método para verificar si una ronda se completó automáticamente
-  bool _isRoundCompletedAutomatically(BingoGameRound round) {
-    try {
-      final appProvider = Provider.of<AppProvider>(context, listen: false);
-      final completedPatterns = appProvider.getCompletedPatterns();
+  // Método para actualizar la variable estática cuando cambie la ronda
+  void _updateCurrentRoundIndex(int newIndex) {
+    print('DEBUG: Cambiando ronda de $_currentRoundIndex a $newIndex');
+    
+    // Limpiar patrones marcados manualmente de la ronda anterior
+    _clearManuallyMarkedPatternsForRound(_currentRoundIndex);
+    
+    setState(() {
+      _currentRoundIndex = newIndex;
+    });
+    
+    // Actualizar la variable estática después de cambiar la ronda
+    final patterns = getCurrentRoundPatterns();
+    print('DEBUG: Patrones actualizados después del cambio de ronda: $patterns');
+  }
+
+  // Método para limpiar patrones marcados manualmente de una ronda específica
+  void _clearManuallyMarkedPatternsForRound(int roundIndex) {
+    if (_selectedGame == null || roundIndex >= _selectedGame!.rounds.length) return;
+    
+    final round = _selectedGame!.rounds[roundIndex];
+    final allRoundPatterns = _getAllPatternsForRound(round);
+    
+    print('DEBUG: Limpiando patrones marcados manualmente de ronda ${round.name}');
+    
+    // Limpiar solo los patrones de esta ronda específica
+    for (var pattern in allRoundPatterns) {
+      final patternName = _getPatternName(pattern);
+      if (_manuallyMarkedPatterns.containsKey(patternName)) {
+        print('DEBUG: Limpiando patrón manual: $patternName');
+        _manuallyMarkedPatterns.remove(patternName);
+      }
+    }
+    
+    print('DEBUG: Patrones manuales limpiados para ronda ${round.name}');
+  }
+
+  // Método para limpiar todos los patrones marcados manualmente
+  void _clearAllManuallyMarkedPatterns() {
+    print('DEBUG: Limpiando todos los patrones marcados manualmente');
+    _manuallyMarkedPatterns.clear();
+    setState(() {});
+  }
+
+  // Método para obtener todos los patrones de una ronda (incluyendo consuelo si existe)
+  List<BingoPattern> _getAllPatternsForRound(BingoGameRound round) {
+    List<BingoPattern> allPatterns = List.from(round.patterns);
+    
+    // Buscar si hay un juego consuelo para esta ronda
+    if (_selectedGame != null) {
+      final roundIndex = _selectedGame!.rounds.indexOf(round);
+      if (roundIndex != -1 && roundIndex + 1 < _selectedGame!.rounds.length) {
+        final nextRound = _selectedGame!.rounds[roundIndex + 1];
+        if (nextRound.name.toLowerCase().contains('consuelo')) {
+          allPatterns.addAll(nextRound.patterns);
+          print('DEBUG: Agregando patrones de consuelo para ${round.name}: ${nextRound.patterns}');
+        }
+      }
+    }
+    
+    return allPatterns;
+  }
+
+  // Método para obtener los patrones de la ronda actual
+  List<String> getCurrentRoundPatterns() {
+    if (_selectedGame != null && _currentRoundIndex < _selectedGame!.rounds.length) {
+      final currentRound = _selectedGame!.rounds[_currentRoundIndex];
+      final patterns = currentRound.patterns.map((p) => _getPatternDisplayName(p)).toList();
       
-      print('DEBUG: Verificando patrones completados para ronda "${round.name}"');
-      print('DEBUG: Patrones de la ronda: ${round.patterns.map((p) => _getPatternName(p)).join(', ')}');
-      
-      // Verificar si todos los patrones de la ronda están completados
-      for (var pattern in round.patterns) {
-        final patternName = _getPatternName(pattern);
-        final isCompleted = completedPatterns[patternName] ?? false;
-        
-        print('DEBUG: Patrón "$patternName" - Estado: ${isCompleted ? "COMPLETADO" : "NO COMPLETADO"}');
-        
-        if (!isCompleted) {
-          print('DEBUG: Ronda "${round.name}" - Patrón "$patternName" NO está completado');
-          return false;
+      // Buscar si hay un juego consuelo para esta ronda
+      List<String> consueloPatterns = [];
+      if (_currentRoundIndex + 1 < _selectedGame!.rounds.length) {
+        final nextRound = _selectedGame!.rounds[_currentRoundIndex + 1];
+        if (nextRound.name.toLowerCase().contains('consuelo')) {
+          consueloPatterns = nextRound.patterns.map((p) => _getPatternDisplayName(p)).toList();
+          print('DEBUG: Juego consuelo encontrado para la ronda actual: $consueloPatterns');
         }
       }
       
-      print('DEBUG: Ronda "${round.name}" - TODOS los patrones están completados');
-      return true;
-    } catch (e) {
-      print('DEBUG: Error al verificar ronda "${round.name}": $e');
-      return false;
+      // Combinar patrones principales y de consuelo
+      final allPatterns = [...patterns, ...consueloPatterns];
+      
+      print('DEBUG: Obteniendo patrones de ronda actual:');
+      print('DEBUG: - Juego seleccionado: ${_selectedGame!.name}');
+      print('DEBUG: - Ronda actual: ${currentRound.name} (índice: $_currentRoundIndex)');
+      print('DEBUG: - Patrones principales: $patterns');
+      print('DEBUG: - Patrones de consuelo: $consueloPatterns');
+      print('DEBUG: - Patrones totales: $allPatterns');
+      
+      // Actualizar la variable estática para que esté disponible globalmente
+      BingoGamesPanelState.updateCurrentRoundPatterns(
+        allPatterns, 
+        _currentRoundIndex, 
+        _selectedGame!.id
+      );
+      
+      return allPatterns;
     }
+    
+    print('DEBUG: No hay juego seleccionado o ronda válida');
+    // Si no hay juego seleccionado, limpiar la variable estática
+    BingoGamesPanelState.updateCurrentRoundPatterns([], 0, null);
+    return [];
   }
 
   String _getPatternName(BingoPattern pattern) {
@@ -224,15 +361,12 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   Widget build(BuildContext context) {
     return Consumer<AppProvider>(
       builder: (context, appProvider, child) {
-        // Comentado para permitir solo control manual del usuario
-        // WidgetsBinding.instance.addPostFrameCallback((_) {
-        //   _checkAndUpdateRoundsAutomatically(appProvider);
-        // });
+
         
         return Card(
-          margin: const EdgeInsets.all(8.0),
+          margin: const EdgeInsets.all(4.0),
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(8.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -266,50 +400,183 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                                 const SizedBox(height: 8),
+                 
+                 // Botón para ver todas las figuras de bingo
+                 SizedBox(
+                   width: double.infinity,
+                   child: ElevatedButton.icon(
+                     onPressed: () => _showPatternsDialog(context),
+                     icon: const Icon(Icons.grid_view, size: 14),
+                     label: const Text(
+                       'Ver Todas las Figuras de Bingo',
+                       style: TextStyle(fontSize: 11),
+                     ),
+                     style: ElevatedButton.styleFrom(
+                       backgroundColor: Colors.purple.shade600,
+                       foregroundColor: Colors.white,
+                       padding: const EdgeInsets.symmetric(vertical: 6),
+                       minimumSize: const Size(0, 32),
+                     ),
+                   ),
+                 ),
+                 
+                 const SizedBox(height: 6),
                 
-                // Botón para ver todas las figuras de bingo
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showPatternsDialog(context),
-                    icon: const Icon(Icons.grid_view, size: 16),
-                    label: const Text(
-                      'Ver Todas las Figuras de Bingo',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.purple.shade600,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      minimumSize: const Size(0, 36),
-                    ),
-                  ),
+                // Indicador de estado de cartillas
+                Consumer<AppProvider>(
+                  builder: (context, appProvider, child) {
+                    if (appProvider.isLoadingFirebase) {
+                      return Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade600),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Cargando cartillas...',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.blue.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else if (appProvider.totalCartillas > 0) {
+                      return Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: Colors.green.shade600,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${appProvider.totalCartillas} cartillas disponibles',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            // Botón de actualizar
+                            IconButton(
+                              onPressed: () async {
+                                await appProvider.loadFirebaseCartillas(reset: true);
+                              },
+                              icon: Icon(
+                                Icons.refresh,
+                                color: Colors.green.shade600,
+                                size: 12,
+                              ),
+                              tooltip: 'Actualizar cartillas',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              iconSize: 12,
+                            ),
+                          ],
+                        ),
+                      );
+                    } else {
+                      return Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.warning,
+                              color: Colors.orange.shade600,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'No hay cartillas cargadas',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.orange.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            // Botón de cargar cartillas
+                            IconButton(
+                              onPressed: () async {
+                                await appProvider.loadFirebaseCartillas(reset: true);
+                              },
+                              icon: Icon(
+                                Icons.download,
+                                color: Colors.orange.shade600,
+                                size: 12,
+                              ),
+                              tooltip: 'Cargar cartillas',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              iconSize: 12,
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  },
                 ),
                 
-                const SizedBox(height: 8),
-                
-                // Información del juego seleccionado
-                if (_selectedGame != null) ...[
-                  _buildGameInfo(),
-                  const SizedBox(height: 8),
-                  
-                  // Lista de rondas - Hacer flexible
-                  Expanded(
-                    child: _buildRoundsList(),
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // Indicador de figuras necesarias para la ronda actual
-                  if (!_isGameCompleted && _selectedGame != null && _currentRoundIndex < _selectedGame!.rounds.length)
-                    _buildCurrentRoundInfo(),
-                  
-                  const SizedBox(height: 8),
-                  
-                  // Controles del juego
-                  _buildGameControls(),
-                ],
+                                 const SizedBox(height: 6),
+                 
+                 // Información del juego seleccionado
+                 if (_selectedGame != null) ...[
+                   _buildGameInfo(),
+                   const SizedBox(height: 6),
+                   
+                   // Lista de rondas - Hacer flexible
+                   Expanded(
+                     child: _buildRoundsList(),
+                   ),
+                   
+                   const SizedBox(height: 6),
+                   
+                   // Indicador de figuras necesarias para la ronda actual
+                   if (!_isGameCompleted && _selectedGame != null && _currentRoundIndex < _selectedGame!.rounds.length)
+                     _buildCurrentRoundInfo(),
+                   
+                   const SizedBox(height: 6),
+                   
+                   // Controles del juego
+                   _buildGameControls(),
+                 ],
               ],
             ),
           ),
@@ -318,54 +585,15 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     );
   }
 
-  void _checkAndUpdateRoundsAutomatically(AppProvider appProvider) {
-    if (_selectedGame == null || !mounted) return;
-    
-    // Solo verificar la ronda actual, no todas las rondas
-    if (_currentRoundIndex < _selectedGame!.rounds.length) {
-      final currentRound = _selectedGame!.rounds[_currentRoundIndex];
-      
-      print('DEBUG: Verificando ronda actual: "${currentRound.name}" (índice: $_currentRoundIndex)');
-      print('DEBUG: Estado actual de la ronda: ${currentRound.isCompleted ? "COMPLETADA" : "PENDIENTE"}');
-      
-      // Solo marcar como completada si NO está ya completada y si todas sus figuras están completadas
-      if (!currentRound.isCompleted && _isRoundCompletedAutomatically(currentRound)) {
-        print('DEBUG: Marcando ronda "${currentRound.name}" como completada automáticamente');
-        
-        // Crear una copia del juego para evitar mutaciones directas
-        final updatedGame = _selectedGame!.copyWith();
-        updatedGame.rounds[_currentRoundIndex] = updatedGame.rounds[_currentRoundIndex].copyWith(
-          isCompleted: true,
-        );
-        
-        // Avanzar automáticamente a la siguiente ronda si no es la última
-        int newCurrentRoundIndex = _currentRoundIndex;
-        if (_currentRoundIndex < updatedGame.rounds.length - 1) {
-          print('DEBUG: Avanzando automáticamente a la siguiente ronda');
-          newCurrentRoundIndex = _currentRoundIndex + 1;
-        } else {
-          print('DEBUG: Última ronda completada - Juego terminado');
-        }
-        
-        // Actualizar el estado de manera segura
-        if (mounted) {
-          setState(() {
-            _selectedGame = updatedGame;
-            _currentRoundIndex = newCurrentRoundIndex;
-          });
-        }
-      } else {
-        print('DEBUG: Ronda "${currentRound.name}" no cumple condiciones para completarse automáticamente');
-      }
-    }
-  }
+
+
 
   Widget _buildGameInfo() {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: _isGameCompleted ? Colors.green.shade50 : Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: _isGameCompleted ? Colors.green.shade200 : Colors.blue.shade200,
         ),
@@ -404,15 +632,29 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Fecha: ${_selectedGame!.date}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
-          ),
-          Text(
-            'Total de Rondas: ${_selectedGame!.rounds.length}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 11),
-          ),
+                     const SizedBox(height: 3),
+           Text(
+             'Fecha: ${_selectedGame!.date}',
+             style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+           ),
+           Text(
+             'Total de Rondas: ${_selectedGame!.rounds.length}',
+             style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 10),
+           ),
+           // Mostrar información de cartillas cargadas
+           Consumer<AppProvider>(
+             builder: (context, appProvider, child) {
+               final totalCartillas = appProvider.totalCartillas;
+               return Text(
+                 'Cartillas Cargadas: $totalCartillas',
+                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                   fontSize: 10,
+                   color: totalCartillas > 0 ? Colors.green.shade700 : Colors.orange.shade700,
+                   fontWeight: totalCartillas > 0 ? FontWeight.bold : FontWeight.normal,
+                 ),
+               );
+             },
+           ),
           if (_isGameCompleted)
             Container(
               margin: const EdgeInsets.only(top: 4),
@@ -461,161 +703,171 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
               border: Border.all(color: Colors.grey.shade300),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: ListView.builder(
-              shrinkWrap: true, // Importante para evitar overflow
-              physics: const ClampingScrollPhysics(), // Scroll suave
-              itemCount: _selectedGame!.rounds.length,
-              itemBuilder: (context, index) {
-                final round = _selectedGame!.rounds[index];
-                final isCurrentRound = index == _currentRoundIndex;
-                final isCompleted = round.isCompleted;
-                
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isCurrentRound 
-                      ? Colors.green.shade50 
-                      : isCompleted 
-                        ? Colors.grey.shade100
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isCurrentRound 
-                        ? Colors.green.shade300 
-                        : isCompleted
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade300,
-                      width: isCurrentRound ? 2 : 1,
-                    ),
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    leading: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: isCurrentRound 
-                          ? Colors.green.shade100 
-                          : isCompleted
-                            ? Colors.grey.shade300
-                            : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Center(
-                        child: isCompleted
-                          ? Icon(
-                              Icons.check_circle,
-                              color: Colors.grey.shade600,
-                              size: 20,
-                            )
-                          : Text(
-                              '${index + 1}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: isCurrentRound 
-                                  ? Colors.green.shade700 
-                                  : Colors.grey.shade700,
-                              ),
-                            ),
-                      ),
-                    ),
-                    title: Text(
-                      round.name,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: isCurrentRound 
-                          ? Colors.green.shade700 
-                          : isCompleted
-                            ? Colors.grey.shade600
-                            : Colors.black87,
-                        decoration: isCompleted ? TextDecoration.lineThrough : null,
-                      ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min, // No expandir más del necesario
-                      children: [
-                        Text(
-                          round.patternsDisplay,
-                          style: TextStyle(
-                            fontSize: 11,
+            child: _selectedGame!.rounds.isEmpty
+                ? _buildEmptyRoundsMessage()
+                : ListView.builder(
+                    shrinkWrap: true, // Importante para evitar overflow
+                    physics: const ClampingScrollPhysics(), // Scroll suave
+                    itemCount: _selectedGame!.rounds.length,
+                    itemBuilder: (context, index) {
+                      final round = _selectedGame!.rounds[index];
+                      final isCurrentRound = index == _currentRoundIndex;
+                      final isCompleted = round.isCompleted;
+                      
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isCurrentRound 
+                            ? Colors.green.shade50 
+                            : isCompleted 
+                              ? Colors.grey.shade100
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
                             color: isCurrentRound 
-                              ? Colors.green.shade600 
+                              ? Colors.green.shade300 
                               : isCompleted
-                                ? Colors.grey.shade500
-                                : Colors.grey.shade600,
-                            decoration: isCompleted ? TextDecoration.lineThrough : null,
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade300,
+                            width: isCurrentRound ? 2 : 1,
                           ),
                         ),
-                        if (round.description != null)
-                          Text(
-                            round.description!,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontStyle: FontStyle.italic,
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
                               color: isCurrentRound 
-                                ? Colors.green.shade600 
+                                ? Colors.green.shade100 
                                 : isCompleted
-                                  ? Colors.grey.shade500
-                                  : Colors.grey.shade600,
+                                  ? Colors.grey.shade300
+                                  : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Center(
+                              child: isCompleted
+                                ? Icon(
+                                    Icons.check_circle,
+                                    color: Colors.grey.shade600,
+                                    size: 20,
+                                  )
+                                : Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: isCurrentRound 
+                                        ? Colors.green.shade700 
+                                        : Colors.grey.shade700,
+                                    ),
+                                  ),
+                            ),
+                          ),
+                          title: Text(
+                            round.name,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: isCurrentRound 
+                                ? Colors.green.shade700 
+                                : isCompleted
+                                  ? Colors.grey.shade600
+                                  : Colors.black87,
                               decoration: isCompleted ? TextDecoration.lineThrough : null,
                             ),
                           ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Botón para editar esta ronda específica
-                        IconButton(
-                          onPressed: () => _showEditRoundDialog(context, round, index),
-                          icon: Icon(
-                            Icons.edit,
-                            color: isCurrentRound ? Colors.orange.shade600 : Colors.grey.shade600,
-                            size: 16,
-                          ),
-                          tooltip: 'Editar Ronda',
-                        ),
-                        // Botón para ver figuras de esta ronda
-                        IconButton(
-                          onPressed: () => _showRoundPatternsDialog(context, round),
-                          icon: Icon(
-                            Icons.visibility,
-                            color: isCurrentRound ? Colors.blue.shade600 : Colors.grey.shade600,
-                            size: 18,
-                          ),
-                          tooltip: 'Ver Figuras de esta Ronda',
-                        ),
-                        // Indicador de completado
-                        if (isCompleted)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade300,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '✓',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade700,
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min, // No expandir más del necesario
+                            children: [
+                              Text(
+                                round.patternsDisplay,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isCurrentRound 
+                                    ? Colors.green.shade600 
+                                    : isCompleted
+                                      ? Colors.grey.shade500
+                                      : Colors.grey.shade600,
+                                  decoration: isCompleted ? TextDecoration.lineThrough : null,
+                                ),
                               ),
-                            ),
+                              if (round.description != null)
+                                Text(
+                                  round.description!,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontStyle: FontStyle.italic,
+                                    color: isCurrentRound 
+                                      ? Colors.green.shade600 
+                                      : isCompleted
+                                        ? Colors.grey.shade500
+                                        : Colors.grey.shade600,
+                                    decoration: isCompleted ? TextDecoration.lineThrough : null,
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
-                    onTap: isCompleted ? null : () {
-                      setState(() {
-                        _currentRoundIndex = index;
-                      });
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Botón para editar esta ronda específica
+                              IconButton(
+                                onPressed: () => _showEditRoundDialog(context, round, index),
+                                icon: Icon(
+                                  Icons.edit,
+                                  color: isCurrentRound ? Colors.orange.shade600 : Colors.grey.shade600,
+                                  size: 16,
+                                ),
+                                tooltip: 'Editar Ronda',
+                              ),
+                              // Botón para ver figuras de esta ronda
+                              IconButton(
+                                onPressed: () => _showRoundPatternsDialog(context, round),
+                                icon: Icon(
+                                  Icons.visibility,
+                                  color: isCurrentRound ? Colors.blue.shade600 : Colors.grey.shade600,
+                                  size: 18,
+                                ),
+                                tooltip: 'Ver Figuras de esta Ronda',
+                              ),
+                              // Botón para eliminar esta ronda
+                              IconButton(
+                                onPressed: () => _deleteRound(index),
+                                icon: Icon(
+                                  Icons.delete,
+                                  color: isCurrentRound ? Colors.red.shade600 : Colors.grey.shade600,
+                                  size: 16,
+                                ),
+                                tooltip: 'Eliminar Ronda',
+                              ),
+                              // Indicador de completado
+                              if (isCompleted)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade300,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '✓',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          onTap: isCompleted ? null : () {
+                            _updateCurrentRoundIndex(index);
+                          },
+                        ),
+                      );
                     },
                   ),
-                );
-              },
-            ),
           ),
         ),
       ],
@@ -635,7 +887,166 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     );
   }
 
+  // Método para eliminar una ronda específica
+  void _deleteRound(int roundIndex) {
+    if (_selectedGame == null) return;
+    
+    // Mostrar diálogo de confirmación
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning, color: Colors.orange.shade600, size: 24),
+              const SizedBox(width: 8),
+              const Text('Confirmar Eliminación'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '¿Estás seguro de que quieres eliminar la ronda "${_selectedGame!.rounds[roundIndex].name}"?',
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange.shade700, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Esta acción no se puede deshacer. Se eliminarán todos los patrones y configuraciones de esta ronda.',
+                        style: TextStyle(color: Colors.orange.shade700, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _confirmDeleteRound(roundIndex);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Método para confirmar y ejecutar la eliminación de la ronda
+  void _confirmDeleteRound(int roundIndex) {
+    if (_selectedGame == null) return;
+    
+    try {
+      final roundToDelete = _selectedGame!.rounds[roundIndex];
+      print('DEBUG: Eliminando ronda: ${roundToDelete.name}');
+      
+      setState(() {
+        // Eliminar la ronda
+        _selectedGame!.rounds.removeAt(roundIndex);
+        
+        // Ajustar el índice de la ronda actual si es necesario
+        if (_currentRoundIndex >= _selectedGame!.rounds.length) {
+          _currentRoundIndex = _selectedGame!.rounds.length - 1;
+        }
+        if (_currentRoundIndex < 0) {
+          _currentRoundIndex = 0;
+        }
+        
+        // Actualizar la variable estática después de la eliminación
+        if (_selectedGame!.rounds.isNotEmpty) {
+          getCurrentRoundPatterns();
+        } else {
+          BingoGamesPanelState.updateCurrentRoundPatterns([], 0, null);
+        }
+      });
+      
+      // Mostrar notificación de éxito
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Ronda "${roundToDelete.name}" eliminada exitosamente'),
+          backgroundColor: Colors.green.shade600,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      
+      // Notificar cambios
+      if (widget.onGameStateChanged != null) {
+        widget.onGameStateChanged!();
+      }
+      
+    } catch (e) {
+      print('DEBUG: Error al eliminar ronda: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error al eliminar la ronda: $e'),
+          backgroundColor: Colors.red.shade600,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   Widget _buildGameControls() {
+    // Solo mostrar controles si hay rondas disponibles
+    if (_selectedGame == null || _selectedGame!.rounds.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.play_circle_outline, color: Colors.grey.shade600, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              'Sin rondas para jugar',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Agrega rondas para habilitar los controles del juego',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min, // No expandir más del necesario
       children: [
@@ -646,9 +1057,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
             ElevatedButton.icon(
               onPressed: _currentRoundIndex > 0
                   ? () {
-                      setState(() {
-                        _currentRoundIndex--;
-                      });
+                      _updateCurrentRoundIndex(_currentRoundIndex - 1);
                     }
                   : null,
               icon: const Icon(Icons.arrow_back, size: 14), // Reducir tamaño
@@ -679,9 +1088,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
             ElevatedButton.icon(
               onPressed: _currentRoundIndex < _selectedGame!.rounds.length - 1
                   ? () {
-                      setState(() {
-                        _currentRoundIndex++;
-                      });
+                      _updateCurrentRoundIndex(_currentRoundIndex + 1);
                     }
                   : null,
               icon: const Icon(Icons.arrow_forward, size: 14), // Reducir tamaño
@@ -711,28 +1118,40 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade600,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 6), // Reducir padding
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // Reducir padding
                 minimumSize: const Size(0, 32), // Reducir altura
               ),
             ),
           ),
         
-        // Botón para reiniciar el juego
-        if (_isGameCompleted)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _resetGame,
-              icon: const Icon(Icons.refresh, size: 14), // Reducir tamaño
-              label: const Text('Reiniciar Juego', style: TextStyle(fontSize: 11)), // Reducir tamaño
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange.shade600,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 6), // Reducir padding
-                minimumSize: const Size(0, 32), // Reducir altura
-              ),
+        // Botón para limpiar todos los patrones del juego
+        const SizedBox(height: 4),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              _clearAllManuallyMarkedPatterns();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('🧹 Todos los patrones del juego "${_selectedGame!.name}" han sido limpiados'),
+                  backgroundColor: Colors.orange.shade600,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            },
+            icon: const Icon(Icons.clear_all, size: 14),
+            label: const Text(
+              'Limpiar Todos los Patrones',
+              style: TextStyle(fontSize: 11),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              minimumSize: const Size(0, 32),
             ),
           ),
+        ),
       ],
     );
   }
@@ -772,6 +1191,42 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   }
 
   Widget _buildCurrentRoundInfo() {
+    // Solo mostrar información de ronda si hay rondas disponibles
+    if (_selectedGame == null || _selectedGame!.rounds.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blue.shade200),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_circle_outline, color: Colors.blue.shade600, size: 32),
+            const SizedBox(height: 8),
+            Text(
+              'No hay rondas disponibles',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.blue.shade700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Crea una nueva ronda para comenzar a jugar',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.blue.shade600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final round = _selectedGame!.rounds[_currentRoundIndex];
 
     return Container(
@@ -803,10 +1258,13 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
           ),
           const SizedBox(height: 4),
           
-          // Mostrar cada figura individualmente con botón de toggle manual
-          ...round.patterns.map((pattern) {
+          // Obtener todos los patrones de la ronda (incluyendo consuelo si existe)
+          ..._getAllPatternsForRound(round).map((pattern) {
             final patternName = _getPatternDisplayName(pattern);
-            final isCompleted = _manuallyMarkedPatterns[_getPatternName(pattern)] ?? false;
+            final patternKey = _getPatternName(pattern);
+            
+            // Solo usar el estado manual
+            final isCompleted = _manuallyMarkedPatterns[patternKey] ?? false;
             
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
@@ -857,7 +1315,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                       ),
                     ),
                   ),
-                  // Indicador de estado manual
+                  // Indicador de estado (solo Manual)
                   if (isCompleted)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
@@ -877,7 +1335,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                 ],
               ),
             );
-          }).toList(),
+          }),
           
           // Mostrar progreso general
           const SizedBox(height: 8),
@@ -887,24 +1345,61 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
               color: Colors.yellow.shade200,
               borderRadius: BorderRadius.circular(4),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Column(
               children: [
-                Text(
-                  'Progreso Manual: ',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.yellow.shade800,
-                  ),
+                // Progreso manual
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Progreso Manual: ',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.yellow.shade800,
+                      ),
+                    ),
+                    Text(
+                      '${_getAllPatternsForRound(round).where((p) => _manuallyMarkedPatterns[_getPatternName(p)] ?? false).length}/${_getAllPatternsForRound(round).length} figuras completadas',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.yellow.shade800,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  '${round.patterns.where((p) => _manuallyMarkedPatterns[_getPatternName(p)] ?? false).length}/${round.patterns.length} figuras tachadas',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.yellow.shade800,
-                  ),
+                
+                // Botón para limpiar patrones de la ronda actual
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        _clearManuallyMarkedPatternsForRound(_currentRoundIndex);
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('🧹 Patrones de "${round.name}" limpiados'),
+                            backgroundColor: Colors.blue.shade600,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.clear, size: 12),
+                      label: Text(
+                        'Limpiar Patrones',
+                        style: TextStyle(fontSize: 8),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        minimumSize: const Size(0, 20),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -952,6 +1447,59 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       
       print('DEBUG: Figura "$patternName" actualizada manualmente');
       
+      // Verificar si la ronda actual se puede completar después de este cambio
+      if (_selectedGame != null && _currentRoundIndex < _selectedGame!.rounds.length) {
+        final currentRound = _selectedGame!.rounds[_currentRoundIndex];
+        
+        // Verificar si todos los patrones de la ronda están completados manualmente
+        bool allPatternsCompleted = true;
+        final allRoundPatterns = _getAllPatternsForRound(currentRound);
+        
+        for (var roundPattern in allRoundPatterns) {
+          final roundPatternName = _getPatternName(roundPattern);
+          final isManuallyCompleted = _manuallyMarkedPatterns[roundPatternName] ?? false;
+          
+          if (!isManuallyCompleted) {
+            allPatternsCompleted = false;
+            break;
+          }
+        }
+        
+        // Si todos los patrones están completados, marcar la ronda como completada
+        if (allPatternsCompleted && !currentRound.isCompleted) {
+          print('DEBUG: Ronda "${currentRound.name}" completada después de toggle manual');
+          
+          final updatedGame = _selectedGame!.copyWith();
+          updatedGame.rounds[_currentRoundIndex] = updatedGame.rounds[_currentRoundIndex].copyWith(
+            isCompleted: true,
+          );
+          
+          // Avanzar automáticamente a la siguiente ronda si no es la última
+          int newCurrentRoundIndex = _currentRoundIndex;
+          if (_currentRoundIndex < updatedGame.rounds.length - 1) {
+            newCurrentRoundIndex = _currentRoundIndex + 1;
+          }
+          
+          if (mounted) {
+            setState(() {
+              _selectedGame = updatedGame;
+            });
+            
+            // Usar el método que actualiza la variable estática
+            _updateCurrentRoundIndex(newCurrentRoundIndex);
+            
+            // Mostrar notificación de ronda completada
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('🎉 ¡Ronda "${currentRound.name}" completada!'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      }
+      
       // Forzar la actualización del widget
       if (mounted) {
         setState(() {});
@@ -977,6 +1525,39 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       },
     );
   }
+
+  Widget _buildEmptyRoundsMessage() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.info_outline, color: Colors.grey.shade600, size: 40),
+          const SizedBox(height: 10),
+          Text(
+            'No hay rondas definidas para este juego. ¡Agrega una para comenzar!',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.grey.shade600,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () => _showCreateGameDialog(context),
+            icon: const Icon(Icons.add_circle_outline, size: 18),
+            label: const Text('Crear Nueva Ronda'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade600,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
 }
 
 // Diálogo para seleccionar un juego existente
@@ -1076,6 +1657,31 @@ class _GameSelectorDialog extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _getPatternName(BingoPattern pattern) {
+    switch (pattern) {
+      case BingoPattern.diagonalPrincipal:
+        return 'Diagonal Principal';
+      case BingoPattern.diagonalSecundaria:
+        return 'Diagonal Secundaria';
+      case BingoPattern.lineaHorizontal:
+        return 'Línea Horizontal';
+      case BingoPattern.marcoCompleto:
+        return 'Marco Completo';
+      case BingoPattern.marcoPequeno:
+        return 'Marco Pequeño';
+      case BingoPattern.spoutnik:
+        return 'Spoutnik';
+      case BingoPattern.corazon:
+        return 'Corazón';
+      case BingoPattern.cartonLleno:
+        return 'Cartón Lleno';
+      case BingoPattern.consuelo:
+        return 'Consuelo';
+      case BingoPattern.x:
+        return 'X';
+    }
   }
 }
 

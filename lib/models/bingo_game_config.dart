@@ -160,278 +160,43 @@ class BingoGamePresets {
       id: 'lunes',
       name: 'Partida de Bingo Lunes',
       date: 'Lunes',
-      rounds: [
-        BingoGameRound(
-          id: 'juego1',
-          name: 'Juego 1',
-          patterns: [BingoPattern.diagonalPrincipal, BingoPattern.marcoPequeno, BingoPattern.cartonLleno],
-          description: 'Diagonal Principal, Marco Pequeño, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego1_consuelo',
-          name: 'Consuelo (2do Cartón Lleno)',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2',
-          name: 'Juego 2',
-          patterns: [BingoPattern.diagonalSecundaria, BingoPattern.marcoCompleto, BingoPattern.cartonLleno],
-          description: 'Diagonal Secundaria, Marco Completo, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2_consuelo',
-          name: 'Consuelo (2do Cartón Lleno)',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego3',
-          name: 'Juego 3',
-          patterns: [BingoPattern.lineaHorizontal, BingoPattern.x, BingoPattern.marcoCompleto, BingoPattern.cartonLleno],
-          description: 'Línea Horizontal, X, Marco Completo, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego3_consuelo',
-          name: 'Consuelo (2do Cartón Lleno)',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego4',
-          name: 'Juego 4',
-          patterns: [BingoPattern.x, BingoPattern.spoutnik, BingoPattern.corazon, BingoPattern.cartonLleno],
-          description: 'X, Spoutnik, Corazón, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego4_consuelo',
-          name: 'Consuelo (2do Cartón Lleno)',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-      ],
+      rounds: [], // Sin rondas predefinidas - el usuario las crea desde cero
     ),
     BingoGameConfig(
       id: 'martes',
       name: 'Partida de Bingo Martes',
       date: 'Martes',
-      rounds: [
-        BingoGameRound(
-          id: 'juego1',
-          name: 'Juego 1',
-          patterns: [BingoPattern.marcoCompleto, BingoPattern.cartonLleno],
-          description: 'Marco Completo, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego1_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2',
-          name: 'Juego 2',
-          patterns: [BingoPattern.diagonalPrincipal, BingoPattern.corazon, BingoPattern.cartonLleno],
-          description: 'Diagonal Principal, Corazón, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-      ],
+      rounds: [], // Sin rondas predefinidas - el usuario las crea desde cero
     ),
     BingoGameConfig(
       id: 'miercoles',
       name: 'Partida de Bingo Miércoles',
       date: 'Miércoles',
-      rounds: [
-        BingoGameRound(
-          id: 'juego1',
-          name: 'Juego 1',
-          patterns: [BingoPattern.spoutnik, BingoPattern.marcoPequeno, BingoPattern.cartonLleno],
-          description: 'Spoutnik, Marco Pequeño, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego1_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2',
-          name: 'Juego 2',
-          patterns: [BingoPattern.lineaHorizontal, BingoPattern.x, BingoPattern.cartonLleno],
-          description: 'Línea Horizontal, X, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-      ],
+      rounds: [], // Sin rondas predefinidas - el usuario las crea desde cero
     ),
     BingoGameConfig(
       id: 'jueves',
       name: 'Partida de Bingo Jueves',
       date: 'Jueves',
-      rounds: [
-        BingoGameRound(
-          id: 'juego1',
-          name: 'Juego 1',
-          patterns: [BingoPattern.diagonalSecundaria, BingoPattern.marcoPequeno, BingoPattern.cartonLleno],
-          description: 'Diagonal Secundaria, Marco Pequeño, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego1_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2',
-          name: 'Juego 2',
-          patterns: [BingoPattern.x, BingoPattern.corazon, BingoPattern.marcoCompleto, BingoPattern.cartonLleno],
-          description: 'X, Corazón, Marco Completo, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego3',
-          name: 'Juego 3',
-          patterns: [BingoPattern.lineaHorizontal, BingoPattern.spoutnik, BingoPattern.cartonLleno],
-          description: 'Línea Horizontal, Spoutnik, Cartón Lleno',
-        ),
-      ],
+      rounds: [], // Sin rondas predefinidas - el usuario las crea desde cero
     ),
     BingoGameConfig(
       id: 'viernes',
       name: 'Partida de Bingo Viernes',
       date: 'Viernes',
-      rounds: [
-        BingoGameRound(
-          id: 'juego1',
-          name: 'Juego 1',
-          patterns: [BingoPattern.diagonalPrincipal, BingoPattern.marcoCompleto, BingoPattern.cartonLleno],
-          description: 'Diagonal Principal, Marco Completo, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego1_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2',
-          name: 'Juego 2',
-          patterns: [BingoPattern.corazon, BingoPattern.x, BingoPattern.cartonLleno],
-          description: 'Corazón, X, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego3',
-          name: 'Juego 3',
-          patterns: [BingoPattern.spoutnik, BingoPattern.lineaHorizontal, BingoPattern.marcoPequeno, BingoPattern.cartonLleno],
-          description: 'Spoutnik, Línea Horizontal, Marco Pequeño, Cartón Lleno',
-        ),
-      ],
+      rounds: [], // Sin rondas predefinidas - el usuario las crea desde cero
     ),
     BingoGameConfig(
       id: 'sabado',
       name: 'Partida de Bingo Sábado',
       date: 'Sábado',
-      rounds: [
-        BingoGameRound(
-          id: 'juego1',
-          name: 'Juego 1',
-          patterns: [BingoPattern.marcoPequeno, BingoPattern.diagonalSecundaria, BingoPattern.cartonLleno],
-          description: 'Marco Pequeño, Diagonal Secundaria, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego1_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2',
-          name: 'Juego 2',
-          patterns: [BingoPattern.lineaHorizontal, BingoPattern.corazon, BingoPattern.cartonLleno],
-          description: 'Línea Horizontal, Corazón, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego3',
-          name: 'Juego 3',
-          patterns: [BingoPattern.x, BingoPattern.marcoCompleto, BingoPattern.cartonLleno],
-          description: 'X, Marco Completo, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego3_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-      ],
+      rounds: [], // Sin rondas predefinidas - el usuario las crea desde cero
     ),
     BingoGameConfig(
       id: 'domingo',
       name: 'Partida de Bingo Domingo',
       date: 'Domingo',
-      rounds: [
-        BingoGameRound(
-          id: 'juego1',
-          name: 'Juego 1',
-          patterns: [BingoPattern.diagonalPrincipal, BingoPattern.x, BingoPattern.cartonLleno],
-          description: 'Diagonal Principal, X, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego1_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2',
-          name: 'Juego 2',
-          patterns: [BingoPattern.marcoCompleto, BingoPattern.spoutnik, BingoPattern.cartonLleno],
-          description: 'Marco Completo, Spoutnik, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego2_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-        BingoGameRound(
-          id: 'juego3',
-          name: 'Juego 3',
-          patterns: [BingoPattern.lineaHorizontal, BingoPattern.marcoPequeno, BingoPattern.corazon, BingoPattern.cartonLleno],
-          description: 'Línea Horizontal, Marco Pequeño, Corazón, Cartón Lleno',
-        ),
-        BingoGameRound(
-          id: 'juego3_consuelo',
-          name: 'Consuelo',
-          patterns: [BingoPattern.cartonLleno],
-          description: 'Segundo cartón lleno',
-        ),
-      ],
+      rounds: [], // Sin rondas predefinidas - el usuario las crea desde cero
     ),
   ];
 } 

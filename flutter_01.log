@@ -1,0 +1,90 @@
+Flutter crash report.
+Please report a bug at https://github.com/flutter/flutter/issues.
+
+## command
+
+flutter run
+
+## exception
+
+ArgumentError: Invalid argument(s): Uri org-dartlang-app:/web_plugin_registrant.dart must have scheme 'file:'.
+
+```
+#0      WindowsStyle.pathFromUri (package:path/src/style/windows.dart:86:7)
+#1      Context.fromUri (package:path/src/context.dart:1040:40)
+#2      FileSystem.getPath (package:file/src/interface/file_system.dart:158:24)
+#3      LocalFileSystem.file (package:file/src/backends/local/local_file_system.dart:26:54)
+#4      ErrorHandlingFileSystem.file (package:flutter_tools/src/base/error_handling_io.dart:134:24)
+#5      ProjectFileInvalidator.findInvalidated (package:flutter_tools/src/run_hot.dart:1613:25)
+#6      ResidentWebRunner._updateDevFS (package:flutter_tools/src/isolated/resident_web_runner.dart:570:80)
+#7      ResidentWebRunner.restart (package:flutter_tools/src/isolated/resident_web_runner.dart:423:43)
+<asynchronous suspension>
+#8      TerminalHandler._commonTerminalInputHandler (package:flutter_tools/src/resident_runner.dart:1746:40)
+<asynchronous suspension>
+#9      TerminalHandler.processTerminalInput (package:flutter_tools/src/resident_runner.dart:1786:7)
+<asynchronous suspension>
+```
+
+## flutter doctor
+
+```
+[32m[✓][39m Flutter (Channel stable, 3.27.0, on Microsoft Windows [Version 10.0.19045.6216], locale
+    en-US)
+    [32m•[39m Flutter version 3.27.0 on channel stable at C:\src\flutter
+    [32m•[39m Upstream repository https://github.com/flutter/flutter.git
+    [32m•[39m Framework revision 8495dee1fd (9 months ago), 2024-12-10 14:23:39 -0800
+    [32m•[39m Engine revision 83bacfc525
+    [32m•[39m Dart version 3.6.0
+    [32m•[39m DevTools version 2.40.2
+
+[32m[✓][39m Windows Version (Installed version of Windows is version 10 or higher)
+
+[33m[!][39m Android toolchain - develop for Android devices (Android SDK version 34.0.0)
+    [32m•[39m Android SDK at C:\Users\Administrador\AppData\Local\Android\sdk
+    [31m✗[39m cmdline-tools component is missing
+      Run `path/to/sdkmanager --install "cmdline-tools;latest"`
+      See https://developer.android.com/studio/command-line for more details.
+    [31m✗[39m Android license status unknown.
+      Run `flutter doctor --android-licenses` to accept the SDK licenses.
+      See https://flutter.dev/to/windows-android-setup for more details.
+
+[32m[✓][39m Chrome - develop for the web
+    [32m•[39m Chrome at C:\Program Files\Google\Chrome\Application\chrome.exe
+
+[32m[✓][39m Visual Studio - develop Windows apps (Visual Studio Community 2022 17.6.4)
+    [32m•[39m Visual Studio at E:\Program Files\Microsoft Visual Studio\2022\Community
+    [32m•[39m Visual Studio Community 2022 version 17.6.33815.320
+    [32m•[39m Windows 10 SDK version 10.0.22000.0
+
+[33m[!][39m Android Studio (version 2023.1)
+    [32m•[39m Android Studio at C:\Program Files\Android\Android Studio
+    [32m•[39m Flutter plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/9212-flutter
+    [32m•[39m Dart plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/6351-dart
+    [31m✗[39m Unable to determine bundled Java version.
+    [32m•[39m Try updating or re-installing Android Studio.
+
+[32m[✓][39m Android Studio (version 2024.1)
+    [32m•[39m Android Studio at C:\Program Files\Android\Android Studio1
+    [32m•[39m Flutter plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/9212-flutter
+    [32m•[39m Dart plugin can be installed from:
+      🔨 https://plugins.jetbrains.com/plugin/6351-dart
+    [32m•[39m Java version OpenJDK Runtime Environment (build 17.0.11+0--11852314)
+
+[32m[✓][39m VS Code (version 1.79.2)
+    [32m•[39m VS Code at C:\Users\Administrador\AppData\Local\Programs\Microsoft VS Code
+    [32m•[39m Flutter extension version 3.114.0
+
+[32m[✓][39m Connected device (3 available)
+    [32m•[39m Windows (desktop) • windows • windows-x64    • Microsoft Windows [Version
+      10.0.19045.6216]
+    [32m•[39m Chrome (web)      • chrome  • web-javascript • Google Chrome 139.0.7258.128
+    [32m•[39m Edge (web)        • edge    • web-javascript • Microsoft Edge 139.0.3405.102
+
+[32m[✓][39m Network resources
+    [32m•[39m All expected network resources are available.
+
+[33m![39m Doctor found issues in 2 categories.
+```
