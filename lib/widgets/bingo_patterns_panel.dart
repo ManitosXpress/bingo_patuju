@@ -48,6 +48,17 @@ class BingoPatternsPanel extends StatelessWidget {
                 _patternTile('ING', _ingPattern(), probs['ING']!, Colors.blueGrey, gridSize, cellSize, completed['ING'] ?? false),
                 _patternTile('NGO', _ngoPattern(), probs['NGO']!, Colors.deepOrange, gridSize, cellSize, completed['NGO'] ?? false),
                 _patternTile('Autopista', _highwayPattern(), probs['Autopista']!, Colors.grey, gridSize, cellSize, completed['Autopista'] ?? false),
+                
+                // Nuevas figuras legendarias
+                _patternTile('Reloj de Arena', _relojArenaPattern(), probs['Reloj de Arena']!, Colors.teal, gridSize, cellSize, completed['Reloj de Arena'] ?? false),
+                _patternTile('Doble Línea V', _dobleLineaVPattern(), probs['Doble Línea V']!, Colors.indigo, gridSize, cellSize, completed['Doble Línea V'] ?? false),
+                _patternTile('Figura la Suegra', _figuraSuegraPattern(), probs['Figura la Suegra']!, Colors.purple, gridSize, cellSize, completed['Figura la Suegra'] ?? false),
+                _patternTile('Figura Comodín', _figuraComodinPattern(), probs['Figura Comodín']!, Colors.orange, gridSize, cellSize, completed['Figura Comodín'] ?? false),
+                _patternTile('Letra FE', _letraFEPattern(), probs['Letra FE']!, Colors.blue, gridSize, cellSize, completed['Letra FE'] ?? false),
+                _patternTile('Figura C Loca', _figuraCLocaPattern(), probs['Figura C Loca']!, Colors.green, gridSize, cellSize, completed['Figura C Loca'] ?? false),
+                _patternTile('Figura Bandera', _figuraBanderaPattern(), probs['Figura Bandera']!, Colors.red, gridSize, cellSize, completed['Figura Bandera'] ?? false),
+                _patternTile('Figura Triple Línea', _figuraTripleLineaPattern(), probs['Figura Triple Línea']!, Colors.pink, gridSize, cellSize, completed['Figura Triple Línea'] ?? false),
+                _patternTile('Diagonal Derecha', _diagonalDerechaPattern(), probs['Diagonal Derecha']!, Colors.amber, gridSize, cellSize, completed['Diagonal Derecha'] ?? false),
                 const SizedBox(height: 8),
                 const Text(
                   'Probabilidad de que cada figura sea la próxima en salir (se actualiza en tiempo real).',
@@ -70,7 +81,10 @@ class BingoPatternsPanel extends StatelessWidget {
     final patterns = [
       'Línea Horizontal', 'Línea Vertical', 'Diagonal Principal', 'Diagonal Secundaria',
       'Cartón Lleno', '5 Casillas Diagonales', 'X', 'Marco Completo', 'Corazón',
-      'Caída de Nieve', 'Marco Pequeño', 'Árbol o Flecha', 'Spoutnik', 'ING', 'NGO', 'Autopista'
+      'Caída de Nieve', 'Marco Pequeño', 'Árbol o Flecha', 'Spoutnik', 'ING', 'NGO', 'Autopista',
+      // Nuevas figuras legendarias
+      'Reloj de Arena', 'Doble Línea V', 'Figura la Suegra', 'Figura Comodín', 'Letra FE',
+      'Figura C Loca', 'Figura Bandera', 'Figura Triple Línea', 'Diagonal Derecha'
     ];
     
     for (String pattern in patterns) {
@@ -126,6 +140,16 @@ class BingoPatternsPanel extends StatelessWidget {
       'ING': 16.0,                 // ~80 cartillas de 500
       'NGO': 16.0,                 // ~80 cartillas de 500
       'Autopista': 22.0,           // ~110 cartillas de 500
+      // Nuevas figuras legendarias
+      'Reloj de Arena': 12.0,      // ~60 cartillas de 500
+      'Doble Línea V': 10.0,      // ~50 cartillas de 500
+      'Figura la Suegra': 14.0,    // ~70 cartillas de 500
+      'Figura Comodín': 16.0,      // ~80 cartillas de 500
+      'Letra FE': 18.0,            // ~90 cartillas de 500
+      'Figura C Loca': 15.0,       // ~75 cartillas de 500
+      'Figura Bandera': 20.0,      // ~100 cartillas de 500
+      'Figura Triple Línea': 22.0, // ~110 cartillas de 500
+      'Diagonal Derecha': 8.0,     // ~40 cartillas de 500
     };
     
     final result = <String, String>{};
@@ -187,6 +211,34 @@ class BingoPatternsPanel extends StatelessWidget {
         break;
       case 'Autopista':
         patternMatrix = _highwayPattern();
+        break;
+      // Nuevas figuras legendarias
+      case 'Reloj de Arena':
+        patternMatrix = _relojArenaPattern();
+        break;
+      case 'Doble Línea V':
+        patternMatrix = _dobleLineaVPattern();
+        break;
+      case 'Figura la Suegra':
+        patternMatrix = _figuraSuegraPattern();
+        break;
+      case 'Figura Comodín':
+        patternMatrix = _figuraComodinPattern();
+        break;
+      case 'Letra FE':
+        patternMatrix = _letraFEPattern();
+        break;
+      case 'Figura C Loca':
+        patternMatrix = _figuraCLocaPattern();
+        break;
+      case 'Figura Bandera':
+        patternMatrix = _figuraBanderaPattern();
+        break;
+      case 'Figura Triple Línea':
+        patternMatrix = _figuraTripleLineaPattern();
+        break;
+      case 'Diagonal Derecha':
+        patternMatrix = _diagonalDerechaPattern();
         break;
       default:
         return false;
@@ -511,6 +563,89 @@ class BingoPatternsPanel extends StatelessWidget {
       [0,1,0,1,0],
       [0,1,0,1,0],
       [0,1,0,1,0],
+    ];
+  }
+
+  // Nuevas figuras legendarias
+  List<List<int>> _relojArenaPattern() {
+    return [
+      [1,1,1,1,1],
+      [1,0,0,0,1],
+      [0,0,1,0,0],
+      [1,0,0,0,1],
+      [1,1,1,1,1],
+    ];
+  }
+  List<List<int>> _dobleLineaVPattern() {
+    return [
+      [1,0,0,0,1],
+      [0,1,0,1,0],
+      [0,0,1,0,0],
+      [0,1,0,1,0],
+      [1,0,0,0,1],
+    ];
+  }
+  List<List<int>> _figuraSuegraPattern() {
+    return [
+      [1,0,1,0,1],
+      [0,1,0,1,0],
+      [1,0,1,0,1],
+      [0,1,0,1,0],
+      [1,0,1,0,1],
+    ];
+  }
+  List<List<int>> _figuraComodinPattern() {
+    return [
+      [1,0,1,0,1],
+      [0,1,0,1,0],
+      [1,1,1,1,1],
+      [0,1,0,1,0],
+      [1,0,1,0,1],
+    ];
+  }
+  List<List<int>> _letraFEPattern() {
+    return [
+      [1,1,1,1,1],
+      [1,0,0,0,0],
+      [1,1,1,1,0],
+      [1,0,0,0,0],
+      [1,0,0,0,0],
+    ];
+  }
+  List<List<int>> _figuraCLocaPattern() {
+    return [
+      [1,0,0,0,1],
+      [1,0,0,0,1],
+      [1,0,1,0,1],
+      [1,0,0,0,1],
+      [1,0,0,0,1],
+    ];
+  }
+  List<List<int>> _figuraBanderaPattern() {
+    return [
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [0,0,1,1,1],
+      [0,0,1,1,1],
+    ];
+  }
+  List<List<int>> _figuraTripleLineaPattern() {
+    return [
+      [1,1,1,1,1],
+      [0,0,0,0,0],
+      [1,1,1,1,1],
+      [0,0,0,0,0],
+      [1,1,1,1,1],
+    ];
+  }
+  List<List<int>> _diagonalDerechaPattern() {
+    return [
+      [1,0,0,0,0],
+      [0,1,0,0,0],
+      [0,0,1,0,0],
+      [0,0,0,1,0],
+      [0,0,0,0,1],
     ];
   }
 } 

@@ -259,8 +259,13 @@ class BingoGame {
   int get remainingNumbers => availableNumbers.length;
   int get totalCartillas => cartillas.length;
 
-  /// Devuelve el nombre de la figura lograda o null si no hay bingo
-  String? getBingoPattern(List<List<int>> cartilla, List<int> calledNumbers) {
+  /// Devuelve TODAS las figuras completadas para una cartilla específica
+  List<String> getAllCompletedPatternsForCard(List<List<int>> cartilla, List<int> calledNumbers) {
+    List<String> completedPatterns = [];
+    
+    print('DEBUG: Verificando TODAS las figuras para cartilla con números: $cartilla');
+    print('DEBUG: Números llamados: $calledNumbers');
+    
     // Horizontal
     for (int row = 0; row < 5; row++) {
       bool rowComplete = true;
@@ -270,8 +275,12 @@ class BingoGame {
           break;
         }
       }
-      if (rowComplete) return 'Línea Horizontal';
+      if (rowComplete) {
+        completedPatterns.add('Línea Horizontal');
+        print('DEBUG: Línea Horizontal completada en fila $row');
+      }
     }
+    
     // Vertical
     for (int col = 0; col < 5; col++) {
       bool colComplete = true;
@@ -281,8 +290,12 @@ class BingoGame {
           break;
         }
       }
-      if (colComplete) return 'Línea Vertical';
+      if (colComplete) {
+        completedPatterns.add('Línea Vertical');
+        print('DEBUG: Línea Vertical completada en columna $col');
+      }
     }
+    
     // Diagonal principal
     bool diagonal1Complete = true;
     for (int i = 0; i < 5; i++) {
@@ -290,7 +303,11 @@ class BingoGame {
         diagonal1Complete = false;
       }
     }
-    if (diagonal1Complete) return 'Diagonal Principal';
+    if (diagonal1Complete) {
+      completedPatterns.add('Diagonal Principal');
+      print('DEBUG: Diagonal Principal completada');
+    }
+    
     // Diagonal secundaria
     bool diagonal2Complete = true;
     for (int i = 0; i < 5; i++) {
@@ -298,7 +315,11 @@ class BingoGame {
         diagonal2Complete = false;
       }
     }
-    if (diagonal2Complete) return 'Diagonal Secundaria';
+    if (diagonal2Complete) {
+      completedPatterns.add('Diagonal Secundaria');
+      print('DEBUG: Diagonal Secundaria completada');
+    }
+    
     // Cartón lleno
     bool full = true;
     for (int row = 0; row < 5; row++) {
@@ -308,22 +329,193 @@ class BingoGame {
         }
       }
     }
-    if (full) return 'Cartón Lleno';
+    if (full) {
+      completedPatterns.add('Cartón Lleno');
+      print('DEBUG: Cartón Lleno completado');
+    }
     
-    // Nuevos patrones
-    if (_checkPattern(cartilla, calledNumbers, _diagonal5Pattern())) return '5 Casillas Diagonales';
-    if (_checkPattern(cartilla, calledNumbers, _xPattern())) return 'X';
-    if (_checkPattern(cartilla, calledNumbers, _fullFramePattern())) return 'Marco Completo';
-    if (_checkPattern(cartilla, calledNumbers, _heartPattern())) return 'Corazón';
-    if (_checkPattern(cartilla, calledNumbers, _snowfallPattern())) return 'Caída de Nieve';
-    if (_checkPattern(cartilla, calledNumbers, _smallFramePattern())) return 'Marco Pequeño';
-    if (_checkPattern(cartilla, calledNumbers, _treeArrowPattern())) return 'Árbol o Flecha';
-    if (_checkPattern(cartilla, calledNumbers, _spoutnikPattern())) return 'Spoutnik';
-    if (_checkPattern(cartilla, calledNumbers, _ingPattern())) return 'ING';
-    if (_checkPattern(cartilla, calledNumbers, _ngoPattern())) return 'NGO';
-    if (_checkPattern(cartilla, calledNumbers, _highwayPattern())) return 'Autopista';
+    // Nuevos patrones especiales
+    if (_checkPattern(cartilla, calledNumbers, _diagonal5Pattern())) {
+      completedPatterns.add('5 Casillas Diagonales');
+      print('DEBUG: 5 Casillas Diagonales completadas');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _xPattern())) {
+      completedPatterns.add('X');
+      print('DEBUG: X completada');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _fullFramePattern())) {
+      completedPatterns.add('Marco Completo');
+      print('DEBUG: Marco Completo completado');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _heartPattern())) {
+      completedPatterns.add('Corazón');
+      print('DEBUG: Corazón completado');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _snowfallPattern())) {
+      completedPatterns.add('Caída de Nieve');
+      print('DEBUG: Caída de Nieve completada');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _smallFramePattern())) {
+      completedPatterns.add('Marco Pequeño');
+      print('DEBUG: Marco Pequeño completado');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _treeArrowPattern())) {
+      completedPatterns.add('Árbol o Flecha');
+      print('DEBUG: Árbol o Flecha completado');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _spoutnikPattern())) {
+      completedPatterns.add('Spoutnik');
+      print('DEBUG: Spoutnik completado');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _ingPattern())) {
+      completedPatterns.add('ING');
+      print('DEBUG: ING completado');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _ngoPattern())) {
+      completedPatterns.add('NGO');
+      print('DEBUG: NGO completado');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _highwayPattern())) {
+      completedPatterns.add('Autopista');
+      print('DEBUG: Autopista completada');
+    }
     
-    return null;
+    // Nuevos patrones legendarios
+    if (_checkPattern(cartilla, calledNumbers, _relojArenaPattern())) {
+      completedPatterns.add('Reloj de Arena');
+      print('DEBUG: Reloj de Arena completado');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _dobleLineaVPattern())) {
+      completedPatterns.add('Doble Línea V');
+      print('DEBUG: Doble Línea V completada');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _figuraSuegraPattern())) {
+      completedPatterns.add('Figura la Suegra');
+      print('DEBUG: Figura la Suegra completada');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _figuraComodinPattern())) {
+      completedPatterns.add('Figura Comodín');
+      print('DEBUG: Figura Comodín completada');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _letraFEPattern())) {
+      completedPatterns.add('Letra FE');
+      print('DEBUG: Letra FE completada');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _figuraCLocaPattern())) {
+      completedPatterns.add('Figura C Loca');
+      print('DEBUG: Figura C Loca completada');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _figuraBanderaPattern())) {
+      completedPatterns.add('Figura Bandera');
+      print('DEBUG: Figura Bandera completada');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _figuraTripleLineaPattern())) {
+      completedPatterns.add('Figura Triple Línea');
+      print('DEBUG: Figura Triple Línea completada');
+    }
+    if (_checkPattern(cartilla, calledNumbers, _diagonalDerechaPattern())) {
+      completedPatterns.add('Diagonal Derecha');
+      print('DEBUG: Diagonal Derecha completada');
+    }
+    
+    print('DEBUG: Total de figuras completadas: ${completedPatterns.length}');
+    print('DEBUG: Figuras: $completedPatterns');
+    
+    return completedPatterns;
+  }
+
+  /// Devuelve el nombre de la figura lograda o null si no hay bingo
+  /// Ahora devuelve TODAS las figuras completadas, no solo la primera
+  String? getBingoPattern(List<List<int>> cartilla, List<int> calledNumbers) {
+    // Lista para almacenar todas las figuras completadas
+    List<String> completedPatterns = [];
+    
+    // Horizontal
+    for (int row = 0; row < 5; row++) {
+      bool rowComplete = true;
+      for (int col = 0; col < 5; col++) {
+        if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
+          rowComplete = false;
+          break;
+        }
+      }
+      if (rowComplete) completedPatterns.add('Línea Horizontal');
+    }
+    
+    // Vertical
+    for (int col = 0; col < 5; col++) {
+      bool colComplete = true;
+      for (int row = 0; row < 5; row++) {
+        if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
+          colComplete = false;
+          break;
+        }
+      }
+      if (colComplete) completedPatterns.add('Línea Vertical');
+    }
+    
+    // Diagonal principal
+    bool diagonal1Complete = true;
+    for (int i = 0; i < 5; i++) {
+      if (cartilla[i][i] != 0 && !calledNumbers.contains(cartilla[i][i])) {
+        diagonal1Complete = false;
+      }
+    }
+    if (diagonal1Complete) completedPatterns.add('Diagonal Principal');
+    
+    // Diagonal secundaria
+    bool diagonal2Complete = true;
+    for (int i = 0; i < 5; i++) {
+      if (cartilla[i][4-i] != 0 && !calledNumbers.contains(cartilla[i][4-i])) {
+        diagonal2Complete = false;
+      }
+    }
+    if (diagonal2Complete) completedPatterns.add('Diagonal Secundaria');
+    
+    // Cartón lleno
+    bool full = true;
+    for (int row = 0; row < 5; row++) {
+      for (int col = 0; col < 5; col++) {
+        if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
+          full = false;
+        }
+      }
+    }
+    if (full) completedPatterns.add('Cartón Lleno');
+    
+    // Nuevos patrones especiales
+    if (_checkPattern(cartilla, calledNumbers, _diagonal5Pattern())) completedPatterns.add('5 Casillas Diagonales');
+    if (_checkPattern(cartilla, calledNumbers, _xPattern())) completedPatterns.add('X');
+    if (_checkPattern(cartilla, calledNumbers, _fullFramePattern())) completedPatterns.add('Marco Completo');
+    if (_checkPattern(cartilla, calledNumbers, _heartPattern())) completedPatterns.add('Corazón');
+    if (_checkPattern(cartilla, calledNumbers, _snowfallPattern())) completedPatterns.add('Caída de Nieve');
+    if (_checkPattern(cartilla, calledNumbers, _smallFramePattern())) completedPatterns.add('Marco Pequeño');
+    if (_checkPattern(cartilla, calledNumbers, _treeArrowPattern())) completedPatterns.add('Árbol o Flecha');
+    if (_checkPattern(cartilla, calledNumbers, _spoutnikPattern())) completedPatterns.add('Spoutnik');
+    if (_checkPattern(cartilla, calledNumbers, _ingPattern())) completedPatterns.add('ING');
+    if (_checkPattern(cartilla, calledNumbers, _ngoPattern())) completedPatterns.add('NGO');
+    if (_checkPattern(cartilla, calledNumbers, _highwayPattern())) completedPatterns.add('Autopista');
+    
+    // Nuevos patrones legendarios
+    if (_checkPattern(cartilla, calledNumbers, _relojArenaPattern())) completedPatterns.add('Reloj de Arena');
+    if (_checkPattern(cartilla, calledNumbers, _dobleLineaVPattern())) completedPatterns.add('Doble Línea V');
+    if (_checkPattern(cartilla, calledNumbers, _figuraSuegraPattern())) completedPatterns.add('Figura la Suegra');
+    if (_checkPattern(cartilla, calledNumbers, _figuraComodinPattern())) completedPatterns.add('Figura Comodín');
+    if (_checkPattern(cartilla, calledNumbers, _letraFEPattern())) completedPatterns.add('Letra FE');
+    if (_checkPattern(cartilla, calledNumbers, _figuraCLocaPattern())) completedPatterns.add('Figura C Loca');
+    if (_checkPattern(cartilla, calledNumbers, _figuraBanderaPattern())) completedPatterns.add('Figura Bandera');
+    if (_checkPattern(cartilla, calledNumbers, _figuraTripleLineaPattern())) completedPatterns.add('Figura Triple Línea');
+    if (_checkPattern(cartilla, calledNumbers, _diagonalDerechaPattern())) completedPatterns.add('Diagonal Derecha');
+    
+    // Si no hay figuras completadas, devolver null
+    if (completedPatterns.isEmpty) return null;
+    
+    // Si solo hay una figura, devolverla directamente
+    if (completedPatterns.length == 1) return completedPatterns.first;
+    
+    // Si hay múltiples figuras, devolver la primera (o podríamos devolver todas)
+    // Por ahora devolvemos la primera para mantener compatibilidad
+    return completedPatterns.first;
   }
 
   /// Verifica si un patrón específico está completo
@@ -341,7 +533,9 @@ class BingoGame {
   }
 
   /// Devuelve un mapa con las figuras completadas en las cartillas actuales
+  /// Ahora verifica TODAS las figuras disponibles automáticamente
   Map<String, bool> getCompletedPatterns(List<int> calledNumbers) {
+    // Figuras básicas
     bool horizontal = false;
     bool vertical = false;
     bool diagMain = false;
@@ -359,7 +553,19 @@ class BingoGame {
     bool ngo = false;
     bool highway = false;
     
+    // Figuras legendarias - SIEMPRE verificadas
+    bool relojArena = false;
+    bool dobleLineaV = false;
+    bool figuraSuegra = false;
+    bool figuraComodin = false;
+    bool letraFE = false;
+    bool figuraCLoca = false;
+    bool figuraBandera = false;
+    bool figuraTripleLinea = false;
+    bool diagonalDerecha = false;
+    
     for (var cartilla in cartillas) {
+      // Verificar figuras básicas
       // Horizontal
       for (int row = 0; row < 5; row++) {
         bool rowComplete = true;
@@ -371,6 +577,7 @@ class BingoGame {
         }
         if (rowComplete) horizontal = true;
       }
+      
       // Vertical
       for (int col = 0; col < 5; col++) {
         bool colComplete = true;
@@ -382,6 +589,7 @@ class BingoGame {
         }
         if (colComplete) vertical = true;
       }
+      
       // Diagonal principal
       bool diag1 = true;
       for (int i = 0; i < 5; i++) {
@@ -390,6 +598,7 @@ class BingoGame {
         }
       }
       if (diag1) diagMain = true;
+      
       // Diagonal secundaria
       bool diag2 = true;
       for (int i = 0; i < 5; i++) {
@@ -398,6 +607,7 @@ class BingoGame {
         }
       }
       if (diag2) diagAnti = true;
+      
       // Cartón lleno
       bool isFull = true;
       for (int row = 0; row < 5; row++) {
@@ -409,7 +619,7 @@ class BingoGame {
       }
       if (isFull) full = true;
       
-      // Nuevos patrones
+      // Verificar TODAS las figuras especiales automáticamente
       if (_checkPattern(cartilla, calledNumbers, _diagonal5Pattern())) diagonal5 = true;
       if (_checkPattern(cartilla, calledNumbers, _xPattern())) x = true;
       if (_checkPattern(cartilla, calledNumbers, _fullFramePattern())) fullFrame = true;
@@ -421,7 +631,20 @@ class BingoGame {
       if (_checkPattern(cartilla, calledNumbers, _ingPattern())) ing = true;
       if (_checkPattern(cartilla, calledNumbers, _ngoPattern())) ngo = true;
       if (_checkPattern(cartilla, calledNumbers, _highwayPattern())) highway = true;
+      
+      // Verificar TODAS las figuras legendarias automáticamente
+      if (_checkPattern(cartilla, calledNumbers, _relojArenaPattern())) relojArena = true;
+      if (_checkPattern(cartilla, calledNumbers, _dobleLineaVPattern())) dobleLineaV = true;
+      if (_checkPattern(cartilla, calledNumbers, _figuraSuegraPattern())) figuraSuegra = true;
+      if (_checkPattern(cartilla, calledNumbers, _figuraComodinPattern())) figuraComodin = true;
+      if (_checkPattern(cartilla, calledNumbers, _letraFEPattern())) letraFE = true;
+      if (_checkPattern(cartilla, calledNumbers, _figuraCLocaPattern())) figuraCLoca = true;
+      if (_checkPattern(cartilla, calledNumbers, _figuraBanderaPattern())) figuraBandera = true;
+      if (_checkPattern(cartilla, calledNumbers, _figuraTripleLineaPattern())) figuraTripleLinea = true;
+      if (_checkPattern(cartilla, calledNumbers, _diagonalDerechaPattern())) diagonalDerecha = true;
     }
+    
+    // Retornar TODAS las figuras con su estado
     return {
       'Línea Horizontal': horizontal,
       'Línea Vertical': vertical,
@@ -439,6 +662,16 @@ class BingoGame {
       'ING': ing,
       'NGO': ngo,
       'Autopista': highway,
+      // Figuras legendarias - SIEMPRE incluidas
+      'Reloj de Arena': relojArena,
+      'Doble Línea V': dobleLineaV,
+      'Figura la Suegra': figuraSuegra,
+      'Figura Comodín': figuraComodin,
+      'Letra FE': letraFE,
+      'Figura C Loca': figuraCLoca,
+      'Figura Bandera': figuraBandera,
+      'Figura Triple Línea': figuraTripleLinea,
+      'Diagonal Derecha': diagonalDerecha,
     };
   }
 
@@ -543,6 +776,97 @@ class BingoGame {
     ];
   }
   
+  // Nuevos patrones legendarios
+  List<List<int>> _relojArenaPattern() {
+    return [
+      [1,1,1,1,1],
+      [1,0,0,0,1],
+      [0,0,1,0,0],
+      [1,0,0,0,1],
+      [1,1,1,1,1],
+    ];
+  }
+  
+  List<List<int>> _dobleLineaVPattern() {
+    return [
+      [1,0,0,0,1],
+      [0,1,0,1,0],
+      [0,0,1,0,0],
+      [0,1,0,1,0],
+      [1,0,0,0,1],
+    ];
+  }
+  
+  List<List<int>> _figuraSuegraPattern() {
+    return [
+      [1,0,1,0,1],
+      [0,1,0,1,0],
+      [1,0,1,0,1],
+      [0,1,0,1,0],
+      [1,0,1,0,1],
+    ];
+  }
+  
+  List<List<int>> _figuraComodinPattern() {
+    return [
+      [1,0,1,0,1],
+      [0,1,0,1,0],
+      [1,1,1,1,1],
+      [0,1,0,1,0],
+      [1,0,1,0,1],
+    ];
+  }
+  
+  List<List<int>> _letraFEPattern() {
+    return [
+      [1,0,0,0,0],
+      [1,1,1,1,0],
+      [1,0,0,0,0],
+      [1,0,0,0,0],
+      [1,0,0,0,0],
+    ];
+  }
+  
+  List<List<int>> _figuraCLocaPattern() {
+    return [
+      [1,0,0,0,1],
+      [1,0,0,0,1],
+      [1,0,1,0,1],
+      [1,0,0,0,1],
+      [1,0,0,0,1],
+    ];
+  }
+  
+  List<List<int>> _figuraBanderaPattern() {
+    return [
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [0,0,1,1,1],
+      [0,0,1,1,1],
+    ];
+  }
+  
+  List<List<int>> _figuraTripleLineaPattern() {
+    return [
+      [1,1,1,1,1],
+      [0,0,0,0,0],
+      [1,1,1,1,1],
+      [0,0,0,0,0],
+      [1,1,1,1,1],
+    ];
+  }
+  
+  List<List<int>> _diagonalDerechaPattern() {
+    return [
+      [1,0,0,0,0],
+      [0,1,0,0,0],
+      [0,0,1,0,0],
+      [0,0,0,1,0],
+      [0,0,0,0,1],
+    ];
+  }
+  
   // Método para llamar un número aleatorio
   void callNumber() {
     if (availableNumbers.isNotEmpty) {
@@ -576,19 +900,25 @@ class BingoGame {
     final completedPatterns = getCompletedPatterns(calledNumbers);
     final hasAnyBingo = completedPatterns.values.any((completed) => completed);
     
-    // Buscar cartillas ganadoras
+    // Buscar cartillas ganadoras usando el nuevo método
     final winningCards = <Map<String, dynamic>>[];
     for (int i = 0; i < cartillas.length; i++) {
       final cartilla = cartillas[i];
-      final pattern = getBingoPattern(cartilla, calledNumbers);
       
-      if (pattern != null) {
-        winningCards.add({
-          'cardIndex': i,
-          'pattern': pattern,
-          'numbers': cartilla,
-          'assignedVendor': getAssignedVendor(cartilla),
-        });
+      // Usar el nuevo método que devuelve TODAS las figuras completadas
+      final allPatterns = getAllCompletedPatternsForCard(cartilla, calledNumbers);
+      
+      if (allPatterns.isNotEmpty) {
+        // Agregar cada figura completada como una cartilla ganadora
+        for (final pattern in allPatterns) {
+          winningCards.add({
+            'cardIndex': i,
+            'pattern': pattern,
+            'numbers': cartilla,
+            'assignedVendor': getAssignedVendor(cartilla),
+            'allCompletedPatterns': allPatterns, // Incluir todas las figuras completadas
+          });
+        }
       }
     }
     
@@ -604,6 +934,7 @@ class BingoGame {
   }
 
   /// Verifica si hay bingo para patrones específicos de una ronda
+  /// Ahora verifica TODAS las figuras disponibles automáticamente
   Map<String, dynamic> checkBingoForRoundPatterns(List<String> roundPatterns) {
     if (cartillas.isEmpty) {
       return {
@@ -623,41 +954,40 @@ class BingoGame {
       };
     }
     
-    // Obtener solo los patrones de la ronda actual
+    // Obtener TODAS las figuras completadas (no solo las de la ronda)
     final completedPatterns = getCompletedPatterns(calledNumbers);
-    final roundCompletedPatterns = <String, bool>{};
+    final hasAnyBingo = completedPatterns.values.any((completed) => completed);
     
-    for (final pattern in roundPatterns) {
-      roundCompletedPatterns[pattern] = completedPatterns[pattern] ?? false;
-    }
-    
-    final hasRoundBingo = roundCompletedPatterns.values.any((completed) => completed);
-    
-    // Buscar cartillas ganadoras solo para los patrones de la ronda
+    // Buscar cartillas ganadoras para CUALQUIER figura
     final winningCards = <Map<String, dynamic>>[];
     for (int i = 0; i < cartillas.length; i++) {
       final cartilla = cartillas[i];
-      final pattern = getBingoPattern(cartilla, calledNumbers);
       
-      if (pattern != null && roundPatterns.contains(pattern)) {
-        winningCards.add({
-          'cardIndex': i,
-          'pattern': pattern,
-          'numbers': cartilla,
-          'assignedVendor': getAssignedVendor(cartilla),
-        });
+      // Usar el nuevo método que devuelve TODAS las figuras completadas
+      final allPatterns = getAllCompletedPatternsForCard(cartilla, calledNumbers);
+      
+      if (allPatterns.isNotEmpty) {
+        // Agregar cada figura completada como una cartilla ganadora
+        for (final pattern in allPatterns) {
+          winningCards.add({
+            'cardIndex': i,
+            'pattern': pattern,
+            'numbers': cartilla,
+            'assignedVendor': getAssignedVendor(cartilla),
+            'allCompletedPatterns': allPatterns, // Incluir todas las figuras completadas
+          });
+        }
       }
     }
     
     return {
-      'hasBingo': hasRoundBingo,
-      'completedPatterns': roundCompletedPatterns,
+      'hasBingo': hasAnyBingo,
+      'completedPatterns': completedPatterns,
       'winningCards': winningCards,
       'totalWinningCards': winningCards.length,
-      'roundPatterns': roundPatterns,
-      'message': hasRoundBingo 
-          ? '¡BINGO! Se completaron patrones de la ronda actual'
-          : 'No hay bingo para la ronda actual aún'
+      'message': hasAnyBingo 
+          ? '¡BINGO! Se completaron ${winningCards.length} cartilla${winningCards.length > 1 ? 's' : ''}'
+          : 'No hay bingo aún'
     };
   }
 } 

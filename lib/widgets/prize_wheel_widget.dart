@@ -304,7 +304,7 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
                 children: [
                   Expanded(child: _buildInfoCard('Cartillas Totales', widget.cartillaNumbers.length.toString(), Colors.blue)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildInfoCard('Disponibles', _availableCartillas.length.toString(), Colors.green)),
+                  Expanded(child: _buildInfoCard('Cartillas en juego', _availableCartillas.length.toString(), Colors.green)),
                   const SizedBox(width: 8),
                   Expanded(child: _buildInfoCard('Ganadores', _winners.length.toString(), Colors.purple)),
                 ],
@@ -319,7 +319,7 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Ruleta
+                    // Contenedor de la ruleta (sin flecha)
                     AnimatedBuilder(
                       animation: _spinAnimation,
                       builder: (context, child) {
@@ -333,6 +333,7 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
                                 wheelNumbers: _allWheelNumbers.isNotEmpty ? _allWheelNumbers : widget.cartillaNumbers,
                                 selectedCartilla: _selectedCartilla,
                                 isSpinning: _isSpinning,
+                                showIndicator: false, // No mostrar indicador en la ruleta
                               ),
                             ),
                           ),
@@ -480,11 +481,13 @@ class CartillaWheelPainter extends CustomPainter {
   final List<int> wheelNumbers;
   final int? selectedCartilla;
   final bool isSpinning;
+  final bool showIndicator; // Nuevo parámetro para controlar la visibilidad del indicador
 
   CartillaWheelPainter({
     required this.wheelNumbers,
     this.selectedCartilla,
     required this.isSpinning,
+    this.showIndicator = true, // Valor por defecto
   });
 
   @override
@@ -622,7 +625,7 @@ class CartillaWheelPainter extends CustomPainter {
     }
     
     // Indicador - calcular la posición correcta basada en el número seleccionado
-    if (selectedCartilla != null && !isSpinning) {
+    if (selectedCartilla != null && !isSpinning && showIndicator) { // Solo mostrar si showIndicator es true
       final selectedIndex = wheelNumbers.indexOf(selectedCartilla!);
       if (selectedIndex != -1) {
         final indicatorAngle = selectedIndex * sectionAngle + sectionAngle / 2;
@@ -642,19 +645,8 @@ class CartillaWheelPainter extends CustomPainter {
         
         canvas.drawPath(indicatorPath, indicatorPaint);
       }
-    } else {
-      // Indicador fijo en la parte superior cuando no hay selección o está girando
-      final indicatorPaint = Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill;
-      
-      final indicatorPath = Path();
-      indicatorPath.moveTo(center.dx, center.dy - radius + 12);
-      indicatorPath.lineTo(center.dx - 12, center.dy - radius - 12);
-      indicatorPath.lineTo(center.dx + 12, center.dy - radius - 12);
-      indicatorPath.close();
-      
-      canvas.drawPath(indicatorPath, indicatorPaint);
+    } else if (!showIndicator) {
+      // Si showIndicator es false, no mostrar el indicador
     }
   }
 

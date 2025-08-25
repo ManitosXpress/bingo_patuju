@@ -4,6 +4,7 @@ import '../models/bingo_game_config.dart';
 import 'bingo_patterns_dialog.dart';
 import '../models/bingo_game.dart';
 import '../providers/app_provider.dart';
+import '../services/rounds_persistence_service.dart';
 
 class BingoGamesPanel extends StatefulWidget {
   final VoidCallback? onGameStateChanged;
@@ -60,14 +61,10 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     // Cargar juegos predefinidos
     _loadDefaultGames();
     
-    // Seleccionar el primer juego por defecto
-    if (_games.isNotEmpty) {
-      _selectedGame = _games.first;
-      // Actualizar la variable estática con los patrones del primer juego
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _updateCurrentRoundIndex(0);
-      });
-    }
+    // Cargar rondas guardadas y seleccionar el juego correspondiente
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadSavedRounds();
+    });
   }
 
   @override
@@ -80,6 +77,132 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   // Método para cargar juegos predefinidos
   void _loadDefaultGames() {
     _games = BingoGamePresets.defaultGames;
+  }
+
+  // Método para cargar rondas guardadas
+  Future<void> _loadSavedRounds() async {
+    try {
+      // Verificar si hay datos guardados
+      final hasData = await RoundsPersistenceService.hasSavedData();
+      
+      if (hasData) {
+        // Obtener el ID del juego actual
+        final currentGameId = await RoundsPersistenceService.getCurrentGameId();
+        
+        if (currentGameId != null) {
+          // Buscar el juego en la lista de juegos disponibles
+          final savedGame = _games.firstWhere(
+            (game) => game.id == currentGameId,
+            orElse: () => _games.first,
+          );
+          
+          // Cargar las rondas guardadas
+          final savedRounds = await RoundsPersistenceService.loadGameRounds(currentGameId);
+          
+          if (savedRounds != null && savedRounds.rounds.isNotEmpty) {
+            // Actualizar el juego seleccionado con las rondas guardadas
+            setState(() {
+              _selectedGame = savedRounds;
+              // Actualizar el juego en la lista de juegos
+              final gameIndex = _games.indexWhere((game) => game.id == currentGameId);
+              if (gameIndex != -1) {
+                _games[gameIndex] = savedRounds;
+              }
+            });
+            
+                         // Cargar el índice de la ronda actual
+             final currentRoundIndex = await RoundsPersistenceService.loadCurrentRoundIndex();
+             await _updateCurrentRoundIndex(currentRoundIndex);
+            
+            print('DEBUG: Rondas guardadas cargadas para el juego: ${savedRounds.name}');
+          } else {
+            // No hay rondas guardadas, seleccionar el primer juego
+            _selectDefaultGame();
+          }
+        } else {
+          // No hay juego actual guardado, seleccionar el primer juego
+          _selectDefaultGame();
+        }
+      } else {
+        // No hay datos guardados, seleccionar el primer juego
+        _selectDefaultGame();
+      }
+    } catch (e) {
+      print('ERROR: Error cargando rondas guardadas: $e');
+      // En caso de error, seleccionar el primer juego
+      _selectDefaultGame();
+    }
+  }
+
+  // Método para seleccionar el juego por defecto
+  Future<void> _selectDefaultGame() async {
+    if (_games.isNotEmpty) {
+      setState(() {
+        _selectedGame = _games.first;
+      });
+      await _updateCurrentRoundIndex(0);
+    }
+  }
+
+  // Método para limpiar todos los datos guardados
+  void _clearSavedData(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning, color: Colors.orange.shade600),
+              const SizedBox(width: 8),
+              const Text('Limpiar Datos Guardados'),
+            ],
+          ),
+          content: const Text(
+            '¿Estás seguro de que quieres limpiar todos los datos guardados?\n\n'
+            'Esto eliminará todas las rondas creadas y el progreso del juego actual.\n'
+            'Esta acción no se puede deshacer.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                // Limpiar datos guardados
+                await RoundsPersistenceService.clearAllData();
+                
+                // Resetear el estado local
+                setState(() {
+                  _selectedGame = _games.first;
+                  _currentRoundIndex = 0;
+                });
+                
+                // Actualizar la variable estática
+                await _updateCurrentRoundIndex(0);
+                
+                Navigator.of(context).pop();
+                
+                // Mostrar mensaje de confirmación
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('🗑️ Todos los datos han sido limpiados'),
+                    backgroundColor: Colors.orange,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.delete_forever),
+              label: const Text('Limpiar Todo'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
 
@@ -111,12 +234,16 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       builder: (BuildContext context) {
         return _GameSelectorDialog(
           currentGame: _selectedGame,
-          onGameSelected: (game) {
+          onGameSelected: (game) async {
             setState(() {
               _selectedGame = game;
             });
+            
+            // Guardar las rondas del juego seleccionado
+            await RoundsPersistenceService.saveGameRounds(game);
+            
             // Usar el método que actualiza la variable estática
-            _updateCurrentRoundIndex(0);
+            await _updateCurrentRoundIndex(0);
             Navigator.of(context).pop();
           },
         );
@@ -129,12 +256,16 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       context: context,
       builder: (BuildContext context) {
         return _CreateGameDialog(
-          onGameCreated: (newGame) {
+          onGameCreated: (newGame) async {
             setState(() {
               _selectedGame = newGame;
             });
+            
+            // Guardar las rondas del nuevo juego
+            await RoundsPersistenceService.saveGameRounds(newGame);
+            
             // Usar el método que actualiza la variable estática
-            _updateCurrentRoundIndex(0);
+            await _updateCurrentRoundIndex(0);
             Navigator.of(context).pop();
           },
         );
@@ -148,12 +279,16 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       builder: (BuildContext context) {
         return _EditGameDialog(
           game: _selectedGame!,
-          onGameUpdated: (updatedGame) {
+          onGameUpdated: (updatedGame) async {
             setState(() {
               _selectedGame = updatedGame;
             });
+            
+            // Guardar las rondas del juego actualizado
+            await RoundsPersistenceService.saveGameRounds(updatedGame);
+            
             // Usar el método que actualiza la variable estática
-            _updateCurrentRoundIndex(0);
+            await _updateCurrentRoundIndex(0);
             Navigator.of(context).pop();
           },
         );
@@ -161,20 +296,95 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     );
   }
 
-  void _markCurrentRoundAsCompleted() {
+  void _loadGamesWithLegendaryFigures() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.auto_awesome, color: Colors.orange.shade600),
+              const SizedBox(width: 8),
+              const Text('Cargar Figuras Legendarias'),
+            ],
+          ),
+          content: const Text(
+            '¿Deseas cargar automáticamente todos los juegos con las nuevas figuras legendarias incluidas?\n\n'
+            'Esto creará juegos predefinidos para cada día de la semana con figuras legendarias distribuidas en todas las rondas.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                _loadLegendaryGames();
+                Navigator.of(context).pop();
+              },
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Cargar Figuras Legendarias'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade600,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  void _loadLegendaryGames() async {
+    final legendaryGames = BingoGamePresets.getGamesWithLegendaryFigures();
+    
+    setState(() {
+      _games = legendaryGames;
+      _selectedGame = legendaryGames.first;
+      _currentRoundIndex = 0;
+    });
+    
+    // Guardar las rondas del primer juego legendario
+    if (legendaryGames.isNotEmpty) {
+      await RoundsPersistenceService.saveGameRounds(legendaryGames.first);
+    }
+    
+    // Mostrar mensaje de confirmación
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.auto_awesome, color: Colors.white),
+            const SizedBox(width: 8),
+            const Text('¡Figuras legendarias cargadas exitosamente!'),
+          ],
+        ),
+        backgroundColor: Colors.orange.shade600,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    
+    // Actualizar la variable estática
+    await _updateCurrentRoundIndex(0);
+  }
+
+  void _markCurrentRoundAsCompleted() async {
     if (_selectedGame != null && _currentRoundIndex < _selectedGame!.rounds.length) {
       setState(() {
         _selectedGame!.rounds[_currentRoundIndex].isCompleted = true;
       });
       
+      // Guardar el estado del juego
+      await RoundsPersistenceService.saveGameRounds(_selectedGame!);
+      
       // Avanzar automáticamente a la siguiente ronda si no es la última
       if (_currentRoundIndex < _selectedGame!.rounds.length - 1) {
-        _updateCurrentRoundIndex(_currentRoundIndex + 1);
+        await _updateCurrentRoundIndex(_currentRoundIndex + 1);
       }
     }
   }
 
-  void _resetGame() {
+  void _resetGame() async {
     if (_selectedGame != null) {
       setState(() {
         for (var round in _selectedGame!.rounds) {
@@ -185,8 +395,11 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       // Limpiar todos los patrones marcados manualmente
       _clearAllManuallyMarkedPatterns();
       
+      // Guardar el estado del juego reseteado
+      await RoundsPersistenceService.saveGameRounds(_selectedGame!);
+      
       // Usar el método que actualiza la variable estática
-      _updateCurrentRoundIndex(0);
+      await _updateCurrentRoundIndex(0);
     }
   }
 
@@ -203,7 +416,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   }
 
   // Método para actualizar la variable estática cuando cambie la ronda
-  void _updateCurrentRoundIndex(int newIndex) {
+  Future<void> _updateCurrentRoundIndex(int newIndex) async {
     print('DEBUG: Cambiando ronda de $_currentRoundIndex a $newIndex');
     
     // Limpiar patrones marcados manualmente de la ronda anterior
@@ -212,6 +425,9 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     setState(() {
       _currentRoundIndex = newIndex;
     });
+    
+    // Guardar el índice de la ronda actual
+    await RoundsPersistenceService.saveCurrentRoundIndex(newIndex);
     
     // Actualizar la variable estática después de cambiar la ronda
     final patterns = getCurrentRoundPatterns();
@@ -247,6 +463,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   }
 
   // Método para obtener todos los patrones de una ronda (incluyendo consuelo si existe)
+  // Con reglas especiales: Cartón Lleno siempre penúltimo, Consuelo siempre último
   List<BingoPattern> _getAllPatternsForRound(BingoGameRound round) {
     List<BingoPattern> allPatterns = List.from(round.patterns);
     
@@ -262,7 +479,39 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       }
     }
     
-    return allPatterns;
+    // Aplicar reglas de orden: Cartón Lleno penúltimo, Consuelo último
+    return _reorderPatternsForDisplay(allPatterns);
+  }
+
+  // Método para reordenar patrones según reglas especiales
+  List<BingoPattern> _reorderPatternsForDisplay(List<BingoPattern> patterns) {
+    final normalPatterns = <BingoPattern>[];
+    final cartonLlenoPatterns = <BingoPattern>[];
+    final consueloPatterns = <BingoPattern>[];
+    
+    // Separar patrones según su tipo
+    for (final pattern in patterns) {
+      if (pattern == BingoPattern.cartonLleno) {
+        cartonLlenoPatterns.add(pattern);
+      } else if (pattern == BingoPattern.consuelo) {
+        consueloPatterns.add(pattern);
+      } else {
+        normalPatterns.add(pattern);
+      }
+    }
+    
+    // Construir lista final con orden correcto
+    final orderedPatterns = <BingoPattern>[];
+    orderedPatterns.addAll(normalPatterns);        // Patrones normales primero
+    orderedPatterns.addAll(cartonLlenoPatterns);   // Cartón Lleno penúltimo
+    orderedPatterns.addAll(consueloPatterns);      // Consuelo último
+    
+    return orderedPatterns;
+  }
+
+  // Método para obtener TODAS las figuras disponibles (no solo las de la ronda)
+  List<String> getAllAvailablePatterns() {
+    return BingoPattern.values.map((pattern) => _getPatternDisplayName(pattern)).toList();
   }
 
   // Método para obtener los patrones de la ronda actual
@@ -329,6 +578,25 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Nuevas figuras legendarias
+      case BingoPattern.relojArena:
+        return 'Reloj de Arena';
+      case BingoPattern.dobleLineaV:
+        return 'Doble Línea V';
+      case BingoPattern.figuraSuegra:
+        return 'Figura la Suegra';
+      case BingoPattern.figuraComodin:
+        return 'Figura Comodín';
+      case BingoPattern.letraFE:
+        return 'Letra FE';
+      case BingoPattern.figuraCLoca:
+        return 'Figura C Loca';
+      case BingoPattern.figuraBandera:
+        return 'Figura Bandera';
+      case BingoPattern.figuraTripleLinea:
+        return 'Figura Triple Línea';
+      case BingoPattern.diagonalDerecha:
+        return 'Diagonal Derecha';
     }
   }
 
@@ -354,6 +622,25 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Nuevas figuras legendarias
+      case BingoPattern.relojArena:
+        return 'Reloj de Arena';
+      case BingoPattern.dobleLineaV:
+        return 'Doble Línea V';
+      case BingoPattern.figuraSuegra:
+        return 'Figura la Suegra';
+      case BingoPattern.figuraComodin:
+        return 'Figura Comodín';
+      case BingoPattern.letraFE:
+        return 'Letra FE';
+      case BingoPattern.figuraCLoca:
+        return 'Figura C Loca';
+      case BingoPattern.figuraBandera:
+        return 'Figura Bandera';
+      case BingoPattern.figuraTripleLinea:
+        return 'Figura Triple Línea';
+      case BingoPattern.diagonalDerecha:
+        return 'Diagonal Derecha';
     }
   }
 
@@ -397,6 +684,12 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                       onPressed: () => _showCreateGameDialog(context),
                       icon: Icon(Icons.add_circle_outline, color: Colors.green.shade600, size: 20),
                       tooltip: 'Crear Nuevo Juego',
+                    ),
+                    // Botón para cargar juegos con figuras legendarias
+                    IconButton(
+                      onPressed: () => _loadGamesWithLegendaryFigures(),
+                      icon: Icon(Icons.auto_awesome, color: Colors.orange.shade600, size: 20),
+                      tooltip: 'Cargar Figuras Legendarias',
                     ),
                   ],
                 ),
@@ -861,9 +1154,9 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                                 ),
                             ],
                           ),
-                          onTap: isCompleted ? null : () {
-                            _updateCurrentRoundIndex(index);
-                          },
+                                                     onTap: isCompleted ? null : () async {
+                             await _updateCurrentRoundIndex(index);
+                           },
                         ),
                       );
                     },
@@ -1056,8 +1349,8 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
           children: [
             ElevatedButton.icon(
               onPressed: _currentRoundIndex > 0
-                  ? () {
-                      _updateCurrentRoundIndex(_currentRoundIndex - 1);
+                  ? () async {
+                      await _updateCurrentRoundIndex(_currentRoundIndex - 1);
                     }
                   : null,
               icon: const Icon(Icons.arrow_back, size: 14), // Reducir tamaño
@@ -1087,8 +1380,8 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
             ),
             ElevatedButton.icon(
               onPressed: _currentRoundIndex < _selectedGame!.rounds.length - 1
-                  ? () {
-                      _updateCurrentRoundIndex(_currentRoundIndex + 1);
+                  ? () async {
+                      await _updateCurrentRoundIndex(_currentRoundIndex + 1);
                     }
                   : null,
               icon: const Icon(Icons.arrow_forward, size: 14), // Reducir tamaño
@@ -1258,7 +1551,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
           ),
           const SizedBox(height: 4),
           
-          // Obtener todos los patrones de la ronda (incluyendo consuelo si existe)
+          // Mostrar solo las figuras de la ronda actual (incluyendo consuelo si existe)
           ..._getAllPatternsForRound(round).map((pattern) {
             final patternName = _getPatternDisplayName(pattern);
             final patternKey = _getPatternName(pattern);
@@ -1436,7 +1729,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     );
   }
 
-  void _toggleFigureManually(BingoPattern pattern, bool isCompleted) {
+  Future<void> _toggleFigureManually(BingoPattern pattern, bool isCompleted) async {
     try {
       final patternName = _getPatternName(pattern);
       
@@ -1485,8 +1778,8 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
               _selectedGame = updatedGame;
             });
             
-            // Usar el método que actualiza la variable estática
-            _updateCurrentRoundIndex(newCurrentRoundIndex);
+                         // Usar el método que actualiza la variable estática
+             await _updateCurrentRoundIndex(newCurrentRoundIndex);
             
             // Mostrar notificación de ronda completada
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1542,15 +1835,30 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
             ),
           ),
           const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: () => _showCreateGameDialog(context),
-            icon: const Icon(Icons.add_circle_outline, size: 18),
-            label: const Text('Crear Nueva Ronda'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade600,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => _showCreateGameDialog(context),
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: const Text('Crear Nueva Ronda'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _clearSavedData(context),
+                icon: const Icon(Icons.clear_all, size: 18),
+                label: const Text('Limpiar Datos'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1681,6 +1989,25 @@ class _GameSelectorDialog extends StatelessWidget {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Nuevas figuras legendarias
+      case BingoPattern.relojArena:
+        return 'Reloj de Arena';
+      case BingoPattern.dobleLineaV:
+        return 'Doble Línea V';
+      case BingoPattern.figuraSuegra:
+        return 'Figura la Suegra';
+      case BingoPattern.figuraComodin:
+        return 'Figura Comodín';
+      case BingoPattern.letraFE:
+        return 'Letra FE';
+      case BingoPattern.figuraCLoca:
+        return 'Figura C Loca';
+      case BingoPattern.figuraBandera:
+        return 'Figura Bandera';
+      case BingoPattern.figuraTripleLinea:
+        return 'Figura Triple Línea';
+      case BingoPattern.diagonalDerecha:
+        return 'Diagonal Derecha';
     }
   }
 }
@@ -2034,6 +2361,25 @@ class _RoundEditorState extends State<_RoundEditor> {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Nuevas figuras legendarias
+      case BingoPattern.relojArena:
+        return 'Reloj de Arena';
+      case BingoPattern.dobleLineaV:
+        return 'Doble Línea V';
+      case BingoPattern.figuraSuegra:
+        return 'Figura la Suegra';
+      case BingoPattern.figuraComodin:
+        return 'Figura Comodín';
+      case BingoPattern.letraFE:
+        return 'Letra FE';
+      case BingoPattern.figuraCLoca:
+        return 'Figura C Loca';
+      case BingoPattern.figuraBandera:
+        return 'Figura Bandera';
+      case BingoPattern.figuraTripleLinea:
+        return 'Figura Triple Línea';
+      case BingoPattern.diagonalDerecha:
+        return 'Diagonal Derecha';
     }
   }
 }
@@ -2504,6 +2850,25 @@ class _EditRoundDialogState extends State<_EditRoundDialog> {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Nuevas figuras legendarias
+      case BingoPattern.relojArena:
+        return 'Reloj de Arena';
+      case BingoPattern.dobleLineaV:
+        return 'Doble Línea V';
+      case BingoPattern.figuraSuegra:
+        return 'Figura la Suegra';
+      case BingoPattern.figuraComodin:
+        return 'Figura Comodín';
+      case BingoPattern.letraFE:
+        return 'Letra FE';
+      case BingoPattern.figuraCLoca:
+        return 'Figura C Loca';
+      case BingoPattern.figuraBandera:
+        return 'Figura Bandera';
+      case BingoPattern.figuraTripleLinea:
+        return 'Figura Triple Línea';
+      case BingoPattern.diagonalDerecha:
+        return 'Diagonal Derecha';
     }
   }
 } 

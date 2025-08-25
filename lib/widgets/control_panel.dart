@@ -755,32 +755,105 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
                           ),
                         ),
                       
-                      // Mostrar la cartilla visual si es ganadora
-                      if (_searchResult!['isWinning'] == true) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          'Patrón Ganador: ${_searchResult!['pattern']}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: Colors.green.shade700,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        // Cartilla visual con patrón resaltado
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green.shade300, width: 2),
-                          ),
-                          child: _buildCartillaVisual(
-                            _searchResult!['winningNumbers'] as List<List<int>>,
-                            _searchResult!['calledNumbers'] as List<int>,
-                            _searchResult!['pattern'] as String,
-                          ),
-                        ),
+                                             // Mostrar la cartilla visual si es ganadora
+                       if (_searchResult!['isWinning'] == true) ...[
+                         const SizedBox(height: 16),
+                         
+                         // Mostrar TODOS los patrones ganadores
+                         if (_searchResult!['allWinningPatterns'] != null) ...[
+                           Container(
+                             padding: const EdgeInsets.all(12),
+                             decoration: BoxDecoration(
+                               color: Colors.green.shade50,
+                               borderRadius: BorderRadius.circular(8),
+                               border: Border.all(color: Colors.green.shade200),
+                             ),
+                             child: Column(
+                               crossAxisAlignment: CrossAxisAlignment.start,
+                               children: [
+                                 Text(
+                                   '🎯 Patrones Ganadores (${(_searchResult!['allWinningPatterns'] as List<String>).length}):',
+                                   style: TextStyle(
+                                     fontWeight: FontWeight.bold,
+                                     fontSize: 14,
+                                     color: Colors.green.shade700,
+                                   ),
+                                 ),
+                                 const SizedBox(height: 8),
+                                 ...(_searchResult!['allWinningPatterns'] as List<String>).map((pattern) => 
+                                   Padding(
+                                     padding: const EdgeInsets.only(bottom: 4),
+                                     child: Row(
+                                       children: [
+                                         Icon(Icons.check_circle, color: Colors.green, size: 16),
+                                         const SizedBox(width: 8),
+                                         Text(
+                                           pattern,
+                                           style: TextStyle(
+                                             fontSize: 13,
+                                             fontWeight: FontWeight.w500,
+                                             color: Colors.green.shade700,
+                                           ),
+                                         ),
+                                       ],
+                                     ),
+                                   )
+                                 ),
+                               ],
+                             ),
+                           ),
+                           const SizedBox(height: 12),
+                         ],
+                         
+                         // Patrón principal (para compatibilidad)
+                         Row(
+                           children: [
+                             Expanded(
+                               child: Text(
+                                 'Patrón Principal: ${_searchResult!['pattern']}',
+                                 style: TextStyle(
+                                   fontWeight: FontWeight.bold,
+                                   fontSize: 14,
+                                   color: Colors.green.shade700,
+                                 ),
+                               ),
+                             ),
+                           ],
+                         ),
+                         if (widget.appProvider.bingoGame.calledNumbers.isNotEmpty) ...[
+                           const SizedBox(height: 8),
+                           Container(
+                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                             decoration: BoxDecoration(
+                               color: Colors.orange.shade100,
+                               borderRadius: BorderRadius.circular(4),
+                               border: Border.all(color: Colors.orange.shade300),
+                             ),
+                             child: Text(
+                               'Última bola cantada: ${widget.appProvider.bingoGame.calledNumbers.last}',
+                               style: TextStyle(
+                                 fontSize: 12,
+                                 fontWeight: FontWeight.w500,
+                                 color: Colors.orange.shade800,
+                               ),
+                             ),
+                           ),
+                         ],
+                         const SizedBox(height: 12),
+                                                 // Cartilla visual con patrones dinámicos
+                         Container(
+                           padding: const EdgeInsets.all(12),
+                           decoration: BoxDecoration(
+                             color: Colors.white,
+                             borderRadius: BorderRadius.circular(8),
+                             border: Border.all(color: Colors.green.shade300, width: 2),
+                           ),
+                           child: _buildDynamicCartillaVisual(
+                             _searchResult!['winningNumbers'] as List<List<int>>,
+                             _searchResult!['calledNumbers'] as List<int>,
+                             _searchResult!['allWinningPatterns'] as List<String>,
+                           ),
+                         ),
                       ],
                     ],
                   ],
@@ -788,119 +861,7 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
               ),
             ],
             
-            const SizedBox(height: 20),
-            // Mostrar solo patrones de la ronda actual si están disponibles
-            if (widget.currentRoundPatterns.isNotEmpty) ...[
-              Text(
-                'Patrones completados de la ronda actual:', 
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue.shade700)
-              ),
-              const SizedBox(height: 8),
-              ...widget.currentRoundPatterns.map((pattern) {
-                final isCompleted = (widget.bingoCheck['completedPatterns'] as Map<String, bool>)[pattern] ?? false;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                        color: isCompleted ? Colors.green : Colors.grey,
-                        size: 16
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        pattern, 
-                        style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          color: isCompleted ? Colors.green.shade700 : Colors.grey.shade600,
-                          decoration: isCompleted ? TextDecoration.lineThrough : null,
-                        )
-                      ),
-                      if (isCompleted) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade100,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.green.shade300),
-                          ),
-                          child: Text(
-                            'COMPLETADO',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              }),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info, color: Colors.blue.shade700, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Progreso de la ronda: ${(widget.bingoCheck['completedPatterns'] as Map<String, bool>).entries.where((e) => widget.currentRoundPatterns.contains(e.key) && e.value).length}/${widget.currentRoundPatterns.length} patrones completados',
-                        style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              // Mostrar todos los patrones si no hay ronda específica
-              Text('Patrones completados:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 8),
-              ...(widget.bingoCheck['completedPatterns'] as Map<String, bool>).entries.map((entry) {
-                if (entry.value == true) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        Icon(Icons.check_circle, color: Colors.green, size: 16),
-                        const SizedBox(width: 8),
-                        Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              }),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info, color: Colors.blue.shade700, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Total de patrones completados: ${(widget.bingoCheck['completedPatterns'] as Map<String, bool>).entries.where((e) => e.value).length}',
-                        style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+
           ],
         ),
       ),
@@ -928,8 +889,20 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
     );
   }
 
+  Widget _buildDynamicCartillaVisual(List<List<int>> winningNumbers, List<int> calledNumbers, List<String> allPatterns) {
+    return _DynamicCartillaVisual(
+      winningNumbers: winningNumbers,
+      calledNumbers: calledNumbers,
+      allPatterns: allPatterns,
+      cartilla: _searchResult!['cartilla'] as FirebaseCartilla,
+    );
+  }
+
   Widget _buildCartillaVisual(List<List<int>> winningNumbers, List<int> calledNumbers, String pattern) {
     final calledNumbersSet = Set<int>.from(calledNumbers);
+    
+    // Obtener la última bola cantada (la más reciente)
+    final lastCalledNumber = calledNumbers.isNotEmpty ? calledNumbers.last : null;
     
     // Determinar qué celdas están en el patrón ganador
     final winningCells = _getWinningPatternCells(pattern);
@@ -963,7 +936,7 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
                         alignment: Alignment.center,
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: _getCellColor(i, j, winningCells, calledNumbersSet, winningNumbers[i][j]),
+                          color: _getCellColor(i, j, winningCells, calledNumbersSet, winningNumbers[i][j], lastCalledNumber),
                           border: Border.all(
                             color: _getCellBorderColor(i, j, winningCells),
                             width: _getCellBorderWidth(i, j, winningCells),
@@ -974,7 +947,7 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: _getCellTextColor(i, j, winningCells, calledNumbersSet, winningNumbers[i][j]),
+                            color: _getCellTextColor(i, j, winningCells, calledNumbersSet, winningNumbers[i][j], lastCalledNumber),
                           ),
                         ),
                       ),
@@ -1022,6 +995,24 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.red.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: Colors.orange.shade300,
+                border: Border.all(color: Colors.orange.shade600, width: 2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Última Bola',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.orange.shade700,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1086,8 +1077,65 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
           }
         }
         break;
+      case '5 Casillas Diagonales':
+        cells.addAll(['0,0', '0,4', '2,2', '4,0', '4,4']);
+        break;
+      case 'X':
+        cells.addAll(['0,0', '0,4', '2,2', '4,0', '4,4']);
+        break;
+      case 'Corazón':
+        cells.addAll(['0,1', '0,3', '1,0', '1,1', '1,2', '1,3', '1,4', '2,0', '2,1', '2,2', '2,3', '2,4', '3,1', '3,2', '3,3', '4,2']);
+        break;
+      case 'Caída de Nieve':
+        cells.addAll(['0,2', '1,1', '1,2', '1,3', '2,0', '2,1', '2,2', '2,3', '2,4', '3,1', '3,2', '3,3', '4,2']);
+        break;
+      case 'Árbol o Flecha':
+        cells.addAll(['0,2', '1,1', '1,2', '1,3', '2,0', '2,1', '2,2', '2,3', '2,4', '3,2', '4,2']);
+        break;
+      case 'Spoutnik':
+        cells.addAll(['0,2', '1,1', '1,2', '1,3', '2,0', '2,1', '2,2', '2,3', '2,4', '3,2', '4,2']);
+        break;
+      case 'ING':
+        cells.addAll(['0,0', '1,0', '2,0', '3,0', '4,0', '4,1', '4,2', '4,3', '4,4']);
+        break;
+      case 'NGO':
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '0,4', '1,0', '1,4', '2,0', '2,1', '2,2', '2,3', '2,4', '3,0', '3,4', '4,0', '4,1', '4,2', '4,3', '4,4']);
+        break;
+      case 'Autopista':
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '0,4', '2,0', '2,1', '2,2', '2,3', '2,4', '4,0', '4,1', '4,2', '4,3', '4,4']);
+        break;
+      
+      // Figuras legendarias
+      case 'Reloj de Arena':
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '0,4', '1,1', '1,2', '1,3', '2,2', '3,1', '3,2', '3,3', '4,0', '4,1', '4,2', '4,3', '4,4']);
+        break;
+      case 'Doble Línea V':
+        cells.addAll(['0,0', '0,4', '1,1', '1,3', '2,2', '3,1', '3,3', '4,0', '4,4']);
+        break;
+      case 'Figura la Suegra':
+        cells.addAll(['0,0', '0,2', '0,4', '1,1', '1,3', '2,0', '2,2', '2,4', '3,1', '3,3', '4,0', '4,2', '4,4']);
+        break;
+      case 'Figura Comodín':
+        cells.addAll(['0,0', '0,2', '0,4', '1,1', '1,3', '2,0', '2,1', '2,2', '2,3', '2,4', '3,1', '3,3', '4,0', '4,2', '4,4']);
+        break;
+      case 'Letra FE':
+        cells.addAll(['0,0', '1,0', '1,1', '1,2', '1,3', '2,0', '3,0', '4,0']);
+        break;
+      case 'Figura C Loca':
+        cells.addAll(['0,0', '0,4', '1,0', '1,4', '2,0', '2,2', '2,4', '3,0', '3,4', '4,0', '4,4']);
+        break;
+      case 'Figura Bandera':
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '0,4', '1,0', '1,1', '1,2', '1,3', '1,4', '2,0', '2,1', '2,2', '2,3', '2,4', '3,2', '3,3', '3,4', '4,2', '4,3', '4,4']);
+        break;
+      case 'Figura Triple Línea':
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '0,4', '2,0', '2,1', '2,2', '2,3', '2,4', '4,0', '4,1', '4,2', '4,3', '4,4']);
+        break;
+      case 'Diagonal Derecha':
+        cells.addAll(['0,0', '1,1', '2,2', '3,3', '4,4']);
+        break;
+      
       default:
-        // Para otros patrones, no resaltar nada específico
+        // Para otros patrones, usar el método del patrón original
         break;
     }
     
@@ -1095,16 +1143,20 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
   }
 
   // Obtener el color de fondo de la celda
-  Color _getCellColor(int i, int j, Set<String> winningCells, Set<int> calledNumbers, int cellNumber) {
+  Color _getCellColor(int i, int j, Set<String> winningCells, Set<int> calledNumbers, int cellNumber, int? lastCalledNumber) {
     final cellKey = '$i,$j';
     
     if (winningCells.contains(cellKey)) {
       // Celda del patrón ganador
-      if (calledNumbers.contains(cellNumber)) {
+      if (cellNumber == lastCalledNumber) {
+        return Colors.orange.shade200; // Patrón ganador + última bola (prioridad máxima)
+      } else if (calledNumbers.contains(cellNumber)) {
         return Colors.green.shade200; // Patrón ganador + número llamado
       } else {
         return Colors.green.shade100; // Solo patrón ganador
       }
+    } else if (cellNumber == lastCalledNumber) {
+      return Colors.orange.shade100; // Solo última bola cantada
     } else if (calledNumbers.contains(cellNumber)) {
       return Colors.red.shade100; // Solo número llamado
     } else {
@@ -1125,15 +1177,421 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
   }
 
   // Obtener el color del texto de la celda
-  Color _getCellTextColor(int i, int j, Set<String> winningCells, Set<int> calledNumbers, int cellNumber) {
+  Color _getCellTextColor(int i, int j, Set<String> winningCells, Set<int> calledNumbers, int cellNumber, int? lastCalledNumber) {
     final cellKey = '$i,$j';
     
-    if (winningCells.contains(cellKey)) {
+    if (cellNumber == lastCalledNumber) {
+      return Colors.orange.shade800; // Última bola cantada (prioridad máxima)
+    } else if (winningCells.contains(cellKey)) {
       return Colors.green.shade800; // Patrón ganador
     } else if (calledNumbers.contains(cellNumber)) {
       return Colors.red.shade700; // Número llamado
     } else {
       return Colors.black; // Texto normal
+    }
+  }
+}
+
+// Widget para mostrar cartilla con patrones dinámicos
+class _DynamicCartillaVisual extends StatefulWidget {
+  final List<List<int>> winningNumbers;
+  final List<int> calledNumbers;
+  final List<String> allPatterns;
+  final FirebaseCartilla cartilla;
+
+  const _DynamicCartillaVisual({
+    required this.winningNumbers,
+    required this.calledNumbers,
+    required this.allPatterns,
+    required this.cartilla,
+  });
+
+  @override
+  State<_DynamicCartillaVisual> createState() => _DynamicCartillaVisualState();
+}
+
+class _DynamicCartillaVisualState extends State<_DynamicCartillaVisual> 
+    with TickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  int _currentPatternIndex = 0;
+  String _currentPattern = '';
+  Set<String> _currentWinningCells = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPattern = widget.allPatterns.first;
+    _currentWinningCells = _getWinningPatternCells(_currentPattern);
+    
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _startPatternCycle();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _startPatternCycle() {
+    if (widget.allPatterns.length > 1) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          _nextPattern();
+        }
+      });
+    }
+  }
+
+  void _nextPattern() {
+    if (mounted) {
+      setState(() {
+        _currentPatternIndex = (_currentPatternIndex + 1) % widget.allPatterns.length;
+        _currentPattern = widget.allPatterns[_currentPatternIndex];
+        _currentWinningCells = _getWinningPatternCells(_currentPattern);
+      });
+      
+      _animationController.forward().then((_) {
+        _animationController.reverse().then((_) {
+          if (mounted && widget.allPatterns.length > 1) {
+            _startPatternCycle(); // Continuar el ciclo
+          }
+        });
+      });
+    }
+  }
+
+  Set<String> _getWinningPatternCells(String pattern) {
+    final cells = <String>{};
+    
+    switch (pattern) {
+      case 'Línea Horizontal':
+        for (int j = 0; j < 5; j++) {
+          cells.add('0,$j');
+        }
+        break;
+      case 'Línea Vertical':
+        for (int i = 0; i < 5; i++) {
+          cells.add('$i,0');
+        }
+        break;
+      case 'Diagonal Principal':
+        for (int i = 0; i < 5; i++) {
+          cells.add('$i,$i');
+        }
+        break;
+      case 'Diagonal Secundaria':
+        for (int i = 0; i < 5; i++) {
+          cells.add('$i,${4 - i}');
+        }
+        break;
+      case 'Marco Completo':
+        for (int i = 0; i < 5; i++) {
+          for (int j = 0; j < 5; j++) {
+            if (i == 0 || i == 4 || j == 0 || j == 4) {
+              cells.add('$i,$j');
+            }
+          }
+        }
+        break;
+      case 'Marco Pequeño':
+        for (int i = 1; i < 4; i++) {
+          for (int j = 1; j < 4; j++) {
+            cells.add('$i,$j');
+          }
+        }
+        break;
+      case 'Cartón Lleno':
+        for (int i = 0; i < 5; i++) {
+          for (int j = 0; j < 5; j++) {
+            cells.add('$i,$j');
+          }
+        }
+        break;
+      case '5 Casillas Diagonales':
+        cells.addAll(['0,0', '0,4', '2,2', '4,0', '4,4']);
+        break;
+      case 'X':
+        cells.addAll(['0,0', '0,4', '2,2', '4,0', '4,4']);
+        break;
+      case 'Corazón':
+        cells.addAll(['0,1', '0,3', '1,0', '1,1', '1,2', '1,3', '1,4', '2,0', '2,1', '2,2', '2,3', '2,4', '3,1', '3,2', '3,3', '4,2']);
+        break;
+      case 'Caída de Nieve':
+        cells.addAll(['0,2', '1,1', '1,2', '1,3', '2,0', '2,1', '2,2', '2,3', '2,4', '3,1', '3,2', '3,3', '4,2']);
+        break;
+      case 'Árbol o Flecha':
+        cells.addAll(['0,2', '1,1', '1,2', '1,3', '2,0', '2,1', '2,2', '2,3', '2,4', '3,2', '4,2']);
+        break;
+      case 'Spoutnik':
+        cells.addAll(['0,2', '1,1', '1,2', '1,3', '2,0', '2,1', '2,2', '2,3', '2,4', '3,2', '4,2']);
+        break;
+      case 'ING':
+        cells.addAll(['0,0', '1,0', '2,0', '3,0', '4,0', '4,1', '4,2', '4,3', '4,4']);
+        break;
+      case 'NGO':
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '0,4', '1,0', '1,4', '2,0', '2,1', '2,2', '2,3', '2,4', '3,0', '3,4', '4,0', '4,1', '4,2', '4,3', '4,4']);
+        break;
+      case 'Autopista':
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '0,4', '2,0', '2,1', '2,2', '2,3', '2,4', '4,0', '4,1', '4,2', '4,3', '4,4']);
+        break;
+      
+      // Figuras legendarias
+      case 'Reloj de Arena':
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '0,4', '1,1', '1,2', '1,3', '2,2', '3,1', '3,2', '3,3', '4,0', '4,1', '4,2', '4,3', '4,4']);
+        break;
+      case 'Doble Línea V':
+        cells.addAll(['0,0', '0,4', '1,1', '1,3', '2,2', '3,1', '3,3', '4,0', '4,4']);
+        break;
+      case 'Figura la Suegra':
+        cells.addAll(['0,0', '0,2', '0,4', '1,1', '1,3', '2,0', '2,2', '2,4', '3,1', '3,3', '4,0', '4,2', '4,4']);
+        break;
+      case 'Figura Comodín':
+        cells.addAll(['0,0', '0,2', '0,4', '1,1', '1,3', '2,0', '2,1', '2,2', '2,3', '2,4', '3,1', '3,3', '4,0', '4,2', '4,4']);
+        break;
+      case 'Letra FE':
+        cells.addAll(['0,0', '1,0', '1,1', '1,2', '1,3', '2,0', '3,0', '4,0']);
+        break;
+      case 'Figura C Loca':
+        cells.addAll(['0,0', '0,4', '1,0', '1,4', '2,0', '2,2', '2,4', '3,0', '3,4', '4,0', '4,4']);
+        break;
+      case 'Figura Bandera':
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '0,4', '1,0', '1,1', '1,2', '1,3', '1,4', '2,0', '2,1', '2,2', '2,3', '2,4', '3,2', '3,3', '3,4', '4,2', '4,3', '4,4']);
+        break;
+      case 'Figura Triple Línea':
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '0,4', '2,0', '2,1', '2,2', '2,3', '2,4', '4,0', '4,1', '4,2', '4,3', '4,4']);
+        break;
+      case 'Diagonal Derecha':
+        cells.addAll(['0,0', '1,1', '2,2', '3,3', '4,4']);
+        break;
+      
+      default:
+        // Para otros patrones, usar el método del patrón original
+        break;
+    }
+    
+    return cells;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final calledNumbersSet = Set<int>.from(widget.calledNumbers);
+    final lastCalledNumber = widget.calledNumbers.isNotEmpty ? widget.calledNumbers.last : null;
+    
+    return Column(
+      children: [
+        // Título de la cartilla
+        Text(
+          'Cartilla ${widget.cartilla.cardNo ?? 'N/A'}',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: Colors.green.shade700,
+          ),
+        ),
+        const SizedBox(height: 12),
+        
+        // Indicador de patrón actual
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade100,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.blue.shade300),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_awesome, color: Colors.blue.shade700, size: 16),
+              const SizedBox(width: 6),
+              Text(
+                'Patrón: $_currentPattern',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade700,
+                ),
+              ),
+              if (widget.allPatterns.length > 1) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '(${_currentPatternIndex + 1}/${widget.allPatterns.length})',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.blue.shade600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 12),
+        
+        // Tabla de la cartilla con animación
+        AnimatedBuilder(
+          animation: _fadeAnimation,
+          builder: (context, child) {
+            return Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.green.shade300, width: 2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Table(
+                border: TableBorder.all(color: Colors.grey.shade300, width: 1),
+                children: [
+                  for (int i = 0; i < 5; i++) ...[
+                    TableRow(
+                      children: [
+                        for (int j = 0; j < 5; j++) ...[
+                          Container(
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: _getCellColor(i, j, _currentWinningCells, calledNumbersSet, widget.winningNumbers[i][j], lastCalledNumber),
+                              border: Border.all(
+                                color: _getCellBorderColor(i, j, _currentWinningCells),
+                                width: _getCellBorderWidth(i, j, _currentWinningCells),
+                              ),
+                            ),
+                            child: Text(
+                              widget.winningNumbers[i][j].toString(),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: _getCellTextColor(i, j, _currentWinningCells, calledNumbersSet, widget.winningNumbers[i][j], lastCalledNumber),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+        
+        const SizedBox(height: 8),
+        
+        // Leyenda
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: Colors.green.shade200,
+                border: Border.all(color: Colors.green.shade600, width: 2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Patrón Actual',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.green.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: Colors.red.shade100,
+                border: Border.all(color: Colors.red.shade400),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Número Llamado',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.red.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: Colors.orange.shade300,
+                border: Border.all(color: Colors.orange.shade600, width: 2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Última Bola',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.orange.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Color _getCellColor(int i, int j, Set<String> winningCells, Set<int> calledNumbers, int cellNumber, int? lastCalledNumber) {
+    final cellKey = '$i,$j';
+    
+    if (winningCells.contains(cellKey)) {
+      if (cellNumber == lastCalledNumber) {
+        return Colors.orange.shade200;
+      } else if (calledNumbers.contains(cellNumber)) {
+        return Colors.green.shade200;
+      } else {
+        return Colors.green.shade100;
+      }
+    } else if (cellNumber == lastCalledNumber) {
+      return Colors.orange.shade100;
+    } else if (calledNumbers.contains(cellNumber)) {
+      return Colors.red.shade100;
+    } else {
+      return Colors.white;
+    }
+  }
+
+  Color _getCellBorderColor(int i, int j, Set<String> winningCells) {
+    final cellKey = '$i,$j';
+    return winningCells.contains(cellKey) ? Colors.green.shade600 : Colors.grey.shade300;
+  }
+
+  double _getCellBorderWidth(int i, int j, Set<String> winningCells) {
+    final cellKey = '$i,$j';
+    return winningCells.contains(cellKey) ? 2.0 : 1.0;
+  }
+
+  Color _getCellTextColor(int i, int j, Set<String> winningCells, Set<int> calledNumbers, int cellNumber, int? lastCalledNumber) {
+    final cellKey = '$i,$j';
+    
+    if (cellNumber == lastCalledNumber) {
+      return Colors.orange.shade800;
+    } else if (winningCells.contains(cellKey)) {
+      return Colors.green.shade800;
+    } else if (calledNumbers.contains(cellNumber)) {
+      return Colors.red.shade700;
+    } else {
+      return Colors.black;
     }
   }
 } 

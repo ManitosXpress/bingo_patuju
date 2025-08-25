@@ -11,6 +11,16 @@ enum BingoPattern {
   cartonLleno,
   consuelo,
   x,
+  // Nuevas figuras legendarias
+  relojArena,
+  dobleLineaV,
+  figuraSuegra,
+  figuraComodin,
+  letraFE,
+  figuraCLoca,
+  figuraBandera,
+  figuraTripleLinea,
+  diagonalDerecha,
 }
 
 class BingoGameConfig {
@@ -149,6 +159,25 @@ class BingoGameRound {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Nuevas figuras legendarias
+      case BingoPattern.relojArena:
+        return 'Reloj de Arena';
+      case BingoPattern.dobleLineaV:
+        return 'Doble Línea V';
+      case BingoPattern.figuraSuegra:
+        return 'Figura la Suegra';
+      case BingoPattern.figuraComodin:
+        return 'Figura Comodín';
+      case BingoPattern.letraFE:
+        return 'Letra FE';
+      case BingoPattern.figuraCLoca:
+        return 'Figura C Loca';
+      case BingoPattern.figuraBandera:
+        return 'Figura Bandera';
+      case BingoPattern.figuraTripleLinea:
+        return 'Figura Triple Línea';
+      case BingoPattern.diagonalDerecha:
+        return 'Diagonal Derecha';
     }
   }
 }
@@ -199,4 +228,93 @@ class BingoGamePresets {
       rounds: [], // Sin rondas predefinidas - el usuario las crea desde cero
     ),
   ];
+  
+  // Método para generar juegos con figuras legendarias incluidas
+  static List<BingoGameConfig> getGamesWithLegendaryFigures() {
+    return [
+      _createGameWithLegendaryFigures('lunes', 'Partida de Bingo Lunes', 'Lunes', 8),
+      _createGameWithLegendaryFigures('martes', 'Partida de Bingo Martes', 'Martes', 4),
+      _createGameWithLegendaryFigures('miercoles', 'Partida de Bingo Miércoles', 'Miércoles', 4),
+      _createGameWithLegendaryFigures('jueves', 'Partida de Bingo Jueves', 'Jueves', 5),
+      _createGameWithLegendaryFigures('viernes', 'Partida de Bingo Viernes', 'Viernes', 5),
+      _createGameWithLegendaryFigures('sabado', 'Partida de Bingo Sábado', 'Sábado', 6),
+      _createGameWithLegendaryFigures('domingo', 'Partida de Bingo Domingo', 'Domingo', 6),
+    ];
+  }
+  
+  // Método auxiliar para crear un juego con figuras legendarias
+  static BingoGameConfig _createGameWithLegendaryFigures(String id, String name, String date, int roundCount) {
+    final rounds = <BingoGameRound>[];
+    
+    // Crear rondas con figuras legendarias incluidas
+    for (int i = 0; i < roundCount; i++) {
+      final isConsuelo = i % 2 == 1; // Rondas alternas son consuelos
+      
+      if (isConsuelo) {
+        // Ronda de consuelo
+        rounds.add(BingoGameRound(
+          id: 'consuelo_${i + 1}',
+          name: 'Consuelo ${i + 1}',
+          patterns: [BingoPattern.cartonLleno],
+          description: 'Ronda de consuelo con cartón lleno',
+        ));
+      } else {
+        // Ronda principal con figuras legendarias
+        final patterns = <BingoPattern>[];
+        
+        // Agregar figuras básicas
+        patterns.addAll([
+          BingoPattern.diagonalPrincipal,
+          BingoPattern.marcoPequeno,
+        ]);
+        
+        // Agregar figuras legendarias según el índice de la ronda
+        switch (i) {
+          case 0:
+            patterns.addAll([
+              BingoPattern.relojArena,
+              BingoPattern.dobleLineaV,
+            ]);
+            break;
+          case 2:
+            patterns.addAll([
+              BingoPattern.figuraSuegra,
+              BingoPattern.figuraComodin,
+            ]);
+            break;
+          case 4:
+            patterns.addAll([
+              BingoPattern.letraFE,
+              BingoPattern.figuraCLoca,
+            ]);
+            break;
+          case 6:
+            patterns.addAll([
+              BingoPattern.figuraBandera,
+              BingoPattern.figuraTripleLinea,
+            ]);
+            break;
+          default:
+            patterns.addAll([
+              BingoPattern.diagonalDerecha,
+              BingoPattern.x,
+            ]);
+        }
+        
+        rounds.add(BingoGameRound(
+          id: 'ronda_${i + 1}',
+          name: 'Ronda ${i + 1}',
+          patterns: patterns,
+          description: 'Ronda con figuras legendarias incluidas',
+        ));
+      }
+    }
+    
+    return BingoGameConfig(
+      id: id,
+      name: name,
+      date: date,
+      rounds: rounds,
+    );
+  }
 } 

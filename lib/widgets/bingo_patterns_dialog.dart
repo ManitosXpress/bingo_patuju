@@ -751,13 +751,50 @@ class BingoPatternsDialog extends StatelessWidget {
   }
 
   // Método para obtener solo los patrones de una ronda específica
+  // Mantiene el orden original de los patrones en la ronda
+  // Con reglas especiales: Cartón Lleno siempre penúltimo, Consuelo siempre último
   List<Map<String, dynamic>> _getPatternsForRound(BingoGameRound round) {
     final allPatterns = _getAllPatterns();
-    final roundPatternNames = round.patterns.map((p) => _getPatternName(p)).toSet();
+    final patternsMap = <String, Map<String, dynamic>>{};
     
-    return allPatterns.where((pattern) {
-      return roundPatternNames.contains(pattern['name'] as String);
-    }).toList();
+    // Crear un mapa de todos los patrones disponibles
+    for (final pattern in allPatterns) {
+      patternsMap[pattern['name'] as String] = pattern;
+    }
+    
+    // Construir la lista en el orden de la ronda
+    final orderedPatterns = <Map<String, dynamic>>[];
+    final cartonLlenoPattern = <Map<String, dynamic>>[];
+    final consueloPattern = <Map<String, dynamic>>[];
+    
+    for (final roundPattern in round.patterns) {
+      final patternName = _getPatternName(roundPattern);
+      if (patternsMap.containsKey(patternName)) {
+        final pattern = patternsMap[patternName]!;
+        
+        // Separar Cartón Lleno y Consuelo para posicionarlos al final
+        if (patternName == 'Cartón Lleno') {
+          cartonLlenoPattern.add(pattern);
+        } else if (patternName == 'Consuelo') {
+          consueloPattern.add(pattern);
+        } else {
+          // Agregar otros patrones en su orden normal
+          orderedPatterns.add(pattern);
+        }
+      }
+    }
+    
+    // Agregar Cartón Lleno de penúltimo (si existe)
+    if (cartonLlenoPattern.isNotEmpty) {
+      orderedPatterns.addAll(cartonLlenoPattern);
+    }
+    
+    // Agregar Consuelo de último (si existe)
+    if (consueloPattern.isNotEmpty) {
+      orderedPatterns.addAll(consueloPattern);
+    }
+    
+    return orderedPatterns;
   }
 
   String _getPatternName(BingoPattern pattern) {
@@ -782,6 +819,25 @@ class BingoPatternsDialog extends StatelessWidget {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Nuevas figuras legendarias
+      case BingoPattern.relojArena:
+        return 'Reloj de Arena';
+      case BingoPattern.dobleLineaV:
+        return 'Doble Línea V';
+      case BingoPattern.figuraSuegra:
+        return 'Figura la Suegra';
+      case BingoPattern.figuraComodin:
+        return 'Figura Comodín';
+      case BingoPattern.letraFE:
+        return 'Letra FE';
+      case BingoPattern.figuraCLoca:
+        return 'Figura C Loca';
+      case BingoPattern.figuraBandera:
+        return 'Figura Bandera';
+      case BingoPattern.figuraTripleLinea:
+        return 'Figura Triple Línea';
+      case BingoPattern.diagonalDerecha:
+        return 'Diagonal Derecha';
     }
   }
 } 

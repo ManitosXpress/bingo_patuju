@@ -660,52 +660,58 @@ class AppProvider extends ChangeNotifier {
         };
       }
 
-      // Verificar si la cartilla tiene un patrón completado
-      final bingoCheck = roundPatterns != null && roundPatterns.isNotEmpty
-          ? checkBingoForSpecificRoundPatterns(roundPatterns)
-          : checkBingoInRealTime();
-      
-      final winningCards = bingoCheck['winningCards'] as List<Map<String, dynamic>>;
-      
-      // Buscar si esta cartilla específica es ganadora
-      final winningCard = winningCards.firstWhere(
-        (card) {
-          // Convertir la cartilla de Firebase al formato del juego local para comparar
-          final firebaseNumbers = cartilla.numbers;
-          final gameNumbers = card['numbers'] as List<List<int>>;
-          
-          // Comparar si los números son iguales
-          if (firebaseNumbers.length != gameNumbers.length) return false;
-          for (int i = 0; i < firebaseNumbers.length; i++) {
-            if (firebaseNumbers[i].length != gameNumbers[i].length) return false;
-            for (int j = 0; j < firebaseNumbers[i].length; j++) {
-              if (firebaseNumbers[i][j] != gameNumbers[i][j]) return false;
-            }
-          }
-          return true;
-        },
-        orElse: () => <String, dynamic>{},
-      );
+      print('DEBUG: Verificando cartilla $cardNumber con números: ${cartilla.numbers}');
+      print('DEBUG: Números llamados: ${bingoGame.calledNumbers}');
 
-      if (winningCard.isNotEmpty) {
-        final pattern = winningCard['pattern'] as String;
+      // Verificar directamente si esta cartilla específica tiene un patrón completado
+      final cartillaNumbers = cartilla.numbers;
+      final calledNumbers = bingoGame.calledNumbers;
+      
+      // Verificar cada patrón de la ronda (o todos si no hay patrones específicos)
+      final patternsToCheck = roundPatterns ?? [
+        'Línea Horizontal', 'Línea Vertical', 'Diagonal Principal', 
+        'Diagonal Secundaria', 'Cartón Lleno', 'Marco Completo', 'Marco Pequeño',
+        '5 Casillas Diagonales', 'X', 'Corazón', 'Caída de Nieve', 'Árbol o Flecha',
+        'Spoutnik', 'ING', 'NGO', 'Autopista',
+        // Figuras legendarias
+        'Reloj de Arena', 'Doble Línea V', 'Figura la Suegra', 'Figura Comodín',
+        'Letra FE', 'Figura C Loca', 'Figura Bandera', 'Figura Triple Línea', 'Diagonal Derecha'
+      ];
+      
+      // Detectar TODOS los patrones ganadores
+      final List<String> allWinningPatterns = [];
+      
+      for (final pattern in patternsToCheck) {
+        if (_checkCartillaPattern(cartillaNumbers, calledNumbers, pattern)) {
+          allWinningPatterns.add(pattern);
+          print('DEBUG: Patrón detectado: $pattern');
+        }
+      }
+
+      if (allWinningPatterns.isNotEmpty) {
+        final primaryPattern = allWinningPatterns.first;
         final message = roundPatterns != null && roundPatterns.isNotEmpty
             ? '¡Cartilla $cardNumber es GANADORA para la ronda actual!'
             : '¡Cartilla $cardNumber es GANADORA!';
+            
+        print('DEBUG: ¡Cartilla $cardNumber GANÓ con ${allWinningPatterns.length} patrones: $allWinningPatterns!');
             
         return {
           'found': true,
           'isWinning': true,
           'cartilla': cartilla,
           'message': message,
-          'pattern': pattern,
-          'winningNumbers': winningCard['numbers'] as List<List<int>>,
-          'calledNumbers': bingoGame.calledNumbers,
+          'pattern': primaryPattern,
+          'allWinningPatterns': allWinningPatterns, // Lista de TODOS los patrones ganadores
+          'winningNumbers': cartillaNumbers,
+          'calledNumbers': calledNumbers,
         };
       } else {
         final message = roundPatterns != null && roundPatterns.isNotEmpty
             ? 'Cartilla $cardNumber no es ganadora para la ronda actual aún'
             : 'Cartilla $cardNumber no es ganadora aún';
+            
+        print('DEBUG: Cartilla $cardNumber no ganó ningún patrón');
             
         return {
           'found': true,
@@ -721,5 +727,263 @@ class AppProvider extends ChangeNotifier {
         'message': 'Error verificando cartilla: $e',
       };
     }
+  }
+
+  // Método auxiliar para verificar si una cartilla cumple un patrón específico
+  bool _checkCartillaPattern(List<List<int>> cartilla, List<int> calledNumbers, String pattern) {
+    switch (pattern) {
+      case 'Línea Horizontal':
+        for (int row = 0; row < 5; row++) {
+          bool rowComplete = true;
+          for (int col = 0; col < 5; col++) {
+            if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
+              rowComplete = false;
+              break;
+            }
+          }
+          if (rowComplete) return true;
+        }
+        return false;
+        
+      case 'Línea Vertical':
+        for (int col = 0; col < 5; col++) {
+          bool colComplete = true;
+          for (int row = 0; row < 5; row++) {
+            if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
+              colComplete = false;
+              break;
+            }
+          }
+          if (colComplete) return true;
+        }
+        return false;
+        
+      case 'Diagonal Principal':
+        for (int i = 0; i < 5; i++) {
+          if (cartilla[i][i] != 0 && !calledNumbers.contains(cartilla[i][i])) {
+            return false;
+          }
+        }
+        return true;
+        
+      case 'Diagonal Secundaria':
+        for (int i = 0; i < 5; i++) {
+          if (cartilla[i][4-i] != 0 && !calledNumbers.contains(cartilla[i][4-i])) {
+            return false;
+          }
+        }
+        return true;
+        
+      case 'Cartón Lleno':
+        for (int row = 0; row < 5; row++) {
+          for (int col = 0; col < 5; col++) {
+            if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
+              return false;
+            }
+          }
+        }
+        return true;
+        
+      case 'Marco Completo':
+        for (int i = 0; i < 5; i++) {
+          for (int j = 0; j < 5; j++) {
+            if ((i == 0 || i == 4 || j == 0 || j == 4) && 
+                cartilla[i][j] != 0 && !calledNumbers.contains(cartilla[i][j])) {
+              return false;
+            }
+          }
+        }
+        return true;
+        
+      case 'Marco Pequeño':
+        for (int i = 1; i < 4; i++) {
+          for (int j = 1; j < 4; j++) {
+            if (cartilla[i][j] != 0 && !calledNumbers.contains(cartilla[i][j])) {
+              return false;
+            }
+          }
+        }
+        return true;
+        
+      case '5 Casillas Diagonales':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,0,0,0,1],
+          [0,1,0,1,0],
+          [0,0,1,0,0],
+          [0,1,0,1,0],
+          [1,0,0,0,1],
+        ]);
+        
+      case 'X':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,0,0,0,1],
+          [0,1,0,1,0],
+          [0,0,1,0,0],
+          [0,1,0,1,0],
+          [1,0,0,0,1],
+        ]);
+        
+      case 'Corazón':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [0,1,0,1,0],
+          [1,1,1,1,1],
+          [1,1,1,1,1],
+          [0,1,1,1,0],
+          [0,0,1,0,0],
+        ]);
+        
+      case 'Caída de Nieve':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [0,0,1,0,0],
+          [0,1,1,1,0],
+          [1,1,1,1,1],
+          [0,1,1,1,0],
+          [0,0,1,0,0],
+        ]);
+        
+      case 'Árbol o Flecha':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [0,0,1,0,0],
+          [0,1,1,1,0],
+          [1,1,1,1,1],
+          [0,0,1,0,0],
+          [0,0,1,0,0],
+        ]);
+        
+      case 'Spoutnik':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [0,0,1,0,0],
+          [0,1,1,1,0],
+          [1,1,1,1,1],
+          [0,0,1,0,0],
+          [0,0,1,0,0],
+        ]);
+        
+      case 'ING':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,0,0,0,1],
+          [1,0,0,0,1],
+          [1,0,0,0,1],
+          [1,0,0,0,1],
+          [1,1,1,1,1],
+        ]);
+        
+      case 'NGO':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,1,1,1,1],
+          [1,0,0,0,1],
+          [1,1,1,1,1],
+          [1,0,0,0,1],
+          [1,1,1,1,1],
+        ]);
+        
+      case 'Autopista':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,1,1,1,1],
+          [0,0,1,0,0],
+          [0,0,1,0,0],
+          [0,0,1,0,0],
+          [1,1,1,1,1],
+        ]);
+        
+      // Figuras legendarias
+      case 'Reloj de Arena':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,1,1,1,1],
+          [0,1,1,1,0],
+          [0,0,1,0,0],
+          [0,1,1,1,0],
+          [1,1,1,1,1],
+        ]);
+        
+      case 'Doble Línea V':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,0,0,0,1],
+          [0,1,0,1,0],
+          [0,0,1,0,0],
+          [0,1,0,1,0],
+          [1,0,0,0,1],
+        ]);
+        
+      case 'Figura la Suegra':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,0,1,0,1],
+          [0,1,0,1,0],
+          [1,0,1,0,1],
+          [0,1,0,1,0],
+          [1,0,1,0,1],
+        ]);
+        
+      case 'Figura Comodín':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,0,1,0,1],
+          [0,1,0,1,0],
+          [1,1,1,1,1],
+          [0,1,0,1,0],
+          [1,0,1,0,1],
+        ]);
+        
+      case 'Letra FE':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,0,0,0,0],
+          [1,1,1,1,0],
+          [1,0,0,0,0],
+          [1,0,0,0,0],
+          [1,0,0,0,0],
+        ]);
+        
+      case 'Figura C Loca':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,0,0,0,1],
+          [1,0,0,0,1],
+          [1,0,1,0,1],
+          [1,0,0,0,1],
+          [1,0,0,0,1],
+        ]);
+        
+      case 'Figura Bandera':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,1,1,1,1],
+          [1,1,1,1,1],
+          [1,1,1,1,1],
+          [0,0,1,1,1],
+          [0,0,1,1,1],
+        ]);
+        
+      case 'Figura Triple Línea':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,1,1,1,1],
+          [0,0,0,0,0],
+          [1,1,1,1,1],
+          [0,0,0,0,0],
+          [1,1,1,1,1],
+        ]);
+        
+      case 'Diagonal Derecha':
+        return _checkCustomPattern(cartilla, calledNumbers, [
+          [1,0,0,0,0],
+          [0,1,0,0,0],
+          [0,0,1,0,0],
+          [0,0,0,1,0],
+          [0,0,0,0,1],
+        ]);
+        
+      default:
+        return false;
+    }
+  }
+
+  // Método auxiliar para verificar patrones personalizados
+  bool _checkCustomPattern(List<List<int>> cartilla, List<int> calledNumbers, List<List<int>> pattern) {
+    for (int row = 0; row < 5; row++) {
+      for (int col = 0; col < 5; col++) {
+        if (pattern[row][col] == 1) {
+          if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
   }
 } 
