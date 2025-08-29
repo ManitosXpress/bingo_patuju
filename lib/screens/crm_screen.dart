@@ -851,29 +851,7 @@ class _CrmScreenState extends State<CrmScreen> {
     if (picked != null) setState(() => isFrom ? _from = picked : _to = picked);
   }
 
-  Future<void> _exportCsv(List<Map<String, dynamic>> vendors) async {
-    final headers = ['Nombre', 'Rol', 'Vendidas', 'Ingresos(Bs)', 'Comisión(Bs)'];
-    final rows = vendors.map((v) => [
-      (v['name'] ?? '').toString(),
-      (v['role'] ?? '').toString(),
-      (v['soldCount'] ?? 0).toString(),
-      (v['revenueBs'] ?? 0).toString(),
-      (v['commissionsBs'] ?? 0).toString(),
-    ]);
-    final csv = StringBuffer()
-      ..writeln(headers.join(','));
-    for (final r in rows) {
-      csv.writeln(r.map((c) => '"${c.replaceAll('"', '""')}"').join(','));
-    }
 
-    final bytes = utf8.encode(csv.toString());
-    final blob = html.Blob([bytes]);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', 'reporte.csv')
-      ..click();
-    html.Url.revokeObjectUrl(url);
-  }
 
   Future<void> _createVendor({required bool isLeader}) async {
     final nameController = TextEditingController();
@@ -2211,7 +2189,7 @@ class _CrmScreenState extends State<CrmScreen> {
             onPressed: () async {
               final data = await _load();
               final vendors = List<Map<String, dynamic>>.from(data['vendors'] as List);
-              await _exportCsv(vendors);
+              await _exportToCsv(vendors);
             },
           ),
         ],
@@ -2317,6 +2295,16 @@ class _CrmScreenState extends State<CrmScreen> {
                           onPressed: _showInventoryDialog,
                           icon: const Icon(Icons.inventory_2_outlined),
                           label: const Text('Inventario'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: _exportToExcel,
+                          icon: const Icon(Icons.table_chart, color: Colors.white),
+                          label: const Text('Exportar a Excel'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
@@ -3292,6 +3280,325 @@ class _CrmScreenState extends State<CrmScreen> {
           duration: Duration(seconds: 5),
         ),
       );
+    }
+  }
+
+  // Método para exportar datos del CRM a Excel
+  Future<void> _exportToExcel() async {
+    try {
+      // Mostrar diálogo de opciones de exportación
+      final exportType = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.table_chart, color: Colors.green),
+              SizedBox(width: 8),
+              Text('Exportar CRM'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Selecciona el formato de exportación:'),
+              SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.pop(context, 'excel'),
+                    icon: Icon(Icons.table_chart, color: Colors.white),
+                    label: Text('Excel (.xlsx)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.pop(context, 'csv'),
+                    icon: Icon(Icons.description, color: Colors.white),
+                    label: Text('CSV'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context, 'sheets'),
+                icon: Icon(Icons.cloud, color: Colors.white),
+                label: Text('Google Sheets'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancelar'),
+            ),
+          ],
+        ),
+      );
+
+      if (exportType == null) return;
+
+      // Mostrar indicador de progreso
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text('Exportando datos...'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Preparando datos para exportación...'),
+            ],
+          ),
+        ),
+      );
+
+      // Cargar datos completos del CRM
+      final data = await _load(withLeaders: true);
+      final vendors = List<Map<String, dynamic>>.from(data['vendors'] ?? []);
+      
+      // Cerrar diálogo de progreso
+      if (mounted) Navigator.pop(context);
+
+      // Exportar según el tipo seleccionado
+      switch (exportType) {
+        case 'excel':
+          await _exportToExcelFile(vendors);
+          break;
+        case 'csv':
+          await _exportToCsv(vendors);
+          break;
+        case 'sheets':
+          await _exportToGoogleSheets(vendors);
+          break;
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al exportar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Exportar a archivo Excel (.xlsx)
+  Future<void> _exportToExcelFile(List<Map<String, dynamic>> vendors) async {
+    try {
+      // Crear estructura de datos para Excel
+      final excelData = await _prepareExcelData(vendors);
+      
+      // Crear CSV temporal (que se puede abrir en Excel)
+      final csvContent = _createCsvContent(excelData);
+      
+      // Crear archivo con extensión .xlsx (aunque sea CSV)
+      final bytes = utf8.encode(csvContent);
+      final blob = html.Blob([bytes], 'text/csv');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', 'CRM_Bingo_Patuju_${DateTime.now().millisecondsSinceEpoch}.xlsx')
+        ..click();
+      
+      html.Url.revokeObjectUrl(url);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Datos exportados a Excel exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al exportar a Excel: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Exportar a Google Sheets
+  Future<void> _exportToGoogleSheets(List<Map<String, dynamic>> vendors) async {
+    try {
+      // Crear estructura de datos para Google Sheets
+      final sheetData = await _prepareExcelData(vendors);
+      
+      // Crear URL de Google Sheets con datos
+      final csvContent = _createCsvContent(sheetData);
+      final encodedData = Uri.encodeComponent(csvContent);
+      
+      // URL para crear nuevo Google Sheet
+      final googleSheetsUrl = 'https://docs.google.com/spreadsheets/create?usp=data_import&dataformat=csv&data=$encodedData';
+      
+      // Abrir en nueva pestaña
+      html.window.open(googleSheetsUrl, '_blank');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sheets abierto en nueva pestaña'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al exportar a Google Sheets: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Preparar datos para Excel/Google Sheets
+  Future<List<List<String>>> _prepareExcelData(List<Map<String, dynamic>> vendors) async {
+    final data = <List<String>>[];
+    
+    // Encabezados
+    data.add([
+      'Nombre',
+      'Rol',
+      'Líder',
+      'Cartillas Asignadas',
+      'Números de Cartillas',
+      'Cartillas Vendidas',
+      'Ingresos (Bs)',
+      'Comisión (Bs)',
+      'Fecha Última Venta',
+      'Estado'
+    ]);
+    
+    // Datos de cada vendedor
+    for (final vendor in vendors) {
+      final role = vendor['role'] ?? '';
+      final isLeader = role == 'LEADER';
+      
+      // Buscar líder si es vendedor
+      String leaderName = '';
+      if (!isLeader) {
+        final leaderId = vendor['leaderId'];
+        if (leaderId != null) {
+          final leader = vendors.firstWhere(
+            (v) => (v['vendorId'] ?? v['id']) == leaderId,
+            orElse: () => <String, dynamic>{},
+          );
+          leaderName = leader['name'] ?? '';
+        }
+      }
+      
+      // Obtener números específicos de cartillas asignadas
+      String assignedCardNumbers = '';
+      try {
+        final vendorId = vendor['vendorId'] ?? vendor['id'];
+        final assignedResp = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$vendorId'));
+        if (assignedResp.statusCode < 300) {
+          final assignedCards = List<Map<String, dynamic>>.from(json.decode(assignedResp.body));
+          if (assignedCards.isNotEmpty) {
+            final cardNumbers = assignedCards.map((card) => card['cardNo']?.toString() ?? '').where((num) => num.isNotEmpty).toList();
+            assignedCardNumbers = cardNumbers.join(', ');
+          }
+        }
+      } catch (e) {
+        assignedCardNumbers = 'Error al obtener';
+      }
+      
+      // Estado del vendedor
+      String status = 'Activo';
+      if (vendor['soldCount'] != null && vendor['soldCount'] > 0) {
+        status = 'Con Ventas';
+      } else if (vendor['assignedCount'] != null && vendor['assignedCount'] > 0) {
+        status = 'Con Cartillas Asignadas';
+      }
+      
+      data.add([
+        vendor['name'] ?? '',
+        role,
+        leaderName,
+        (vendor['assignedCount'] ?? 0).toString(),
+        assignedCardNumbers,
+        (vendor['soldCount'] ?? 0).toString(),
+        (vendor['revenueBs'] ?? 0).toString(),
+        (vendor['commissionsBs'] ?? 0).toString(),
+        vendor['lastSaleDate'] ?? '',
+        status
+      ]);
+    }
+    
+    return data;
+  }
+
+  // Crear contenido CSV
+  String _createCsvContent(List<List<String>> data) {
+    final csv = StringBuffer();
+    
+    for (final row in data) {
+      final csvRow = row.map((cell) {
+        // Escapar comillas y envolver en comillas si contiene comas
+        final escaped = cell.replaceAll('"', '""');
+        return '"$escaped"';
+      }).join(',');
+      csv.writeln(csvRow);
+    }
+    
+    return csv.toString();
+  }
+
+  // Método mejorado para exportar CSV
+  Future<void> _exportToCsv(List<Map<String, dynamic>> vendors) async {
+    try {
+      final data = await _prepareExcelData(vendors);
+      final csvContent = _createCsvContent(data);
+      
+      final bytes = utf8.encode(csvContent);
+      final blob = html.Blob([bytes], 'text/csv');
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', 'CRM_Bingo_Patuju_${DateTime.now().millisecondsSinceEpoch}.csv')
+        ..click();
+      
+      html.Url.revokeObjectUrl(url);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Datos exportados a CSV exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al exportar CSV: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

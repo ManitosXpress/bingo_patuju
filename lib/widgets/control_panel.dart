@@ -485,16 +485,36 @@ class _ControlPanelState extends State<ControlPanel> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.blue.shade200),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.info, color: Colors.blue.shade700, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Total de patrones completados: ${(bingoCheck['completedPatterns'] as Map<String, bool>).entries.where((e) => e.value).length}',
-                          style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
-                        ),
+                      Row(
+                        children: [
+                          Icon(Icons.info, color: Colors.blue.shade700, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Total de patrones completados: ${(bingoCheck['completedPatterns'] as Map<String, bool>).entries.where((e) => e.value).length}',
+                              style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
                       ),
+                      if (bingoCheck['totalWinningCards'] != null && bingoCheck['totalPatternsCompleted'] != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.style, color: Colors.blue.shade700, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Cartillas ganadoras: ${bingoCheck['totalWinningCards']} (${bingoCheck['totalPatternsCompleted']} patrones totales)',
+                                style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -874,11 +894,21 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
           onPressed: () {
             Navigator.of(context).pop();
             // Mostrar mensaje de confirmación
+            final totalWinningCards = widget.bingoCheck['totalWinningCards'] ?? 0;
+            final totalPatternsCompleted = widget.bingoCheck['totalPatternsCompleted'] ?? 0;
+            
+            String message;
+            if (totalPatternsCompleted > totalWinningCards) {
+              message = '✅ ${totalWinningCards} CARTILLA${totalWinningCards > 1 ? 'S' : ''} GANADORA${totalWinningCards > 1 ? 'S' : ''} CON ${totalPatternsCompleted} PATRÓN${totalPatternsCompleted > 1 ? 'ES' : ''}';
+            } else {
+              message = '✅ ${totalWinningCards} BINGO${totalWinningCards > 1 ? 'S' : ''} VERIFICADO${totalWinningCards > 1 ? 'S' : ''}';
+            }
+            
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('✅ ${widget.bingoCheck['totalWinningCards']} BINGO${widget.bingoCheck['totalWinningCards'] > 1 ? 'S' : ''} VERIFICADO${widget.bingoCheck['totalWinningCards'] > 1 ? 'S' : ''}'),
+                content: Text(message),
                 backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
+                duration: const Duration(seconds: 4),
               ),
             );
           },
@@ -1119,7 +1149,7 @@ class _BingoVerificationDialogState extends State<_BingoVerificationDialog> {
         cells.addAll(['0,0', '0,2', '0,4', '1,1', '1,3', '2,0', '2,1', '2,2', '2,3', '2,4', '3,1', '3,3', '4,0', '4,2', '4,4']);
         break;
       case 'Letra FE':
-        cells.addAll(['0,0', '1,0', '1,1', '1,2', '1,3', '2,0', '3,0', '4,0']);
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '1,0', '2,0', '2,1', '2,2', '3,0', '4,0']);
         break;
       case 'Figura C Loca':
         cells.addAll(['0,0', '0,4', '1,0', '1,4', '2,0', '2,2', '2,4', '3,0', '3,4', '4,0', '4,4']);
@@ -1363,7 +1393,7 @@ class _DynamicCartillaVisualState extends State<_DynamicCartillaVisual>
         cells.addAll(['0,0', '0,2', '0,4', '1,1', '1,3', '2,0', '2,1', '2,2', '2,3', '2,4', '3,1', '3,3', '4,0', '4,2', '4,4']);
         break;
       case 'Letra FE':
-        cells.addAll(['0,0', '1,0', '1,1', '1,2', '1,3', '2,0', '3,0', '4,0']);
+        cells.addAll(['0,0', '0,1', '0,2', '0,3', '1,0', '2,0', '2,1', '2,2', '3,0', '4,0']);
         break;
       case 'Figura C Loca':
         cells.addAll(['0,0', '0,4', '1,0', '1,4', '2,0', '2,2', '2,4', '3,0', '3,4', '4,0', '4,4']);

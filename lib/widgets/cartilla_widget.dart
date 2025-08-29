@@ -1,5 +1,36 @@
 import 'package:flutter/material.dart';
 
+/// Widget para mostrar cartillas de bingo con soporte para impresión
+/// 
+/// Uso básico:
+/// ```dart
+/// CartillaWidget(
+///   numbers: bingoNumbers,
+///   cardNumber: "15",
+///   date: "2025-08-25",
+///   price: "Bs. 20",
+/// )
+/// ```
+/// 
+/// Para impresión (sin márgenes exteriores):
+/// ```dart
+/// CartillaWidget.createForPrint(
+///   numbers: bingoNumbers,
+///   cardNumber: "15",
+///   date: "2025-08-25",
+///   price: "Bs. 20",
+/// )
+/// ```
+/// 
+/// Para modo compacto:
+/// ```dart
+/// CartillaWidget.createCompact(
+///   numbers: bingoNumbers,
+///   cardNumber: "15",
+///   date: "2025-08-25",
+///   price: "Bs. 20",
+/// )
+/// ```
 class CartillaWidget extends StatelessWidget {
   final List<List<int>> numbers;
   final String? cardNumber;
@@ -8,6 +39,7 @@ class CartillaWidget extends StatelessWidget {
   final bool isSelected;
   final VoidCallback? onTap;
   final bool compact; // Nuevo parámetro para modo compacto
+  final bool forPrint; // Nuevo parámetro para impresión
 
   const CartillaWidget({
     super.key,
@@ -18,6 +50,7 @@ class CartillaWidget extends StatelessWidget {
     this.isSelected = false,
     this.onTap,
     this.compact = false, // Por defecto no es compacto
+    this.forPrint = false, // Por defecto no es para impresión
   });
 
   @override
@@ -45,7 +78,7 @@ class CartillaWidget extends StatelessWidget {
             ),
           ] : null, // Sin sombra para impresión
         ),
-        child: compact ? _buildCompactLayout() : _buildFullLayout(),
+        child: compact ? _buildCompactLayout() : (forPrint ? _buildPrintLayout() : _buildFullLayout()),
       ),
     );
   }
@@ -54,42 +87,73 @@ class CartillaWidget extends StatelessWidget {
   Widget _buildFullLayout() {
     return RepaintBoundary(
       child: Container(
-        color: Colors.white,
-        child: Stack(
-          children: [
-            // Marca de agua de fondo - bingo_imperial.png
-            Positioned.fill(
-              child: Center(
-                child: Opacity(
-                  opacity: 0.25, // Opacidad reducida para impresión
-                  child: Image.asset(
-                    'assets/images/bingo_imperial.png',
-                    fit: BoxFit.contain,
-                    width: 280, // Tamaño reducido para ahorrar espacio
-                    height: 280, // Tamaño reducido para ahorrar espacio
-                  ),
-                ),
-              ),
-            ),
-            
-            // Contenido principal de la cartilla con scroll
-            SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(30), // Márgenes reducidos para ahorrar espacio
-                child: Column(
-                  mainAxisSize: MainAxisSize.min, // No expandir más del necesario
-                  children: [
-                    _buildHeader(),
-                    const SizedBox(height: 15), // Espaciado reducido
-                    _buildBingoGrid(),
-                    const SizedBox(height: 15), // Espacio reducido al final
-                  ],
-                ),
-              ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.grey.shade300, width: 2), // Borde principal de toda la cartilla
+          borderRadius: BorderRadius.circular(16), // Bordes redondeados para toda la cartilla
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+              spreadRadius: 1,
             ),
           ],
         ),
+        child: _buildCartillaContent(),
       ),
+    );
+  }
+
+  // Layout para impresión (sin márgenes exteriores)
+  Widget _buildPrintLayout() {
+    return RepaintBoundary(
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.grey.shade300, width: 2), // Borde principal de toda la cartilla
+          borderRadius: BorderRadius.circular(16), // Bordes redondeados para toda la cartilla
+        ),
+        child: _buildCartillaContent(),
+      ),
+    );
+  }
+
+  // Contenido de la cartilla (reutilizable)
+  Widget _buildCartillaContent() {
+    return Stack(
+      children: [
+        // Marca de agua de fondo - bingo_imperial.png
+        Positioned.fill(
+          child: Center(
+            child: Opacity(
+              opacity: 0.25, // Opacidad reducida para impresión
+              child: Image.asset(
+                'assets/images/bingo_imperial.png',
+                fit: BoxFit.contain,
+                width: 280, // Tamaño reducido para ahorrar espacio
+                height: 280, // Tamaño reducido para ahorrar espacio
+              ),
+            ),
+          ),
+        ),
+        
+        // Contenido principal de la cartilla con scroll
+        SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20), // Padding interno reducido para evitar cortes
+            child: Column(
+              mainAxisSize: MainAxisSize.min, // No expandir más del necesario
+              children: [
+                _buildHeader(),
+                const SizedBox(height: 15), // Espaciado reducido
+                _buildBingoGrid(),
+                const SizedBox(height: 15), // Espacio reducido al final
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -277,7 +341,8 @@ class CartillaWidget extends StatelessWidget {
   // Grid completo de bingo
   Widget _buildBingoGrid() {
     return Container(
-      padding: const EdgeInsets.all(12), // Padding reducido para ahorrar espacio
+      padding: const EdgeInsets.all(15), // Padding reducido para mejor ajuste
+      margin: const EdgeInsets.all(6), // Margen interior reducido
       child: Stack(
         children: [
           // Background watermark - B premium con anillos (parte superior izquierda)
@@ -352,7 +417,7 @@ class CartillaWidget extends StatelessWidget {
                     Expanded(
                       child: Container(
                         height: 65, // Altura ligeramente reducida para ahorrar espacio
-                        margin: const EdgeInsets.all(2), // Margen reducido para evitar overflow
+                        margin: const EdgeInsets.all(3), // Margen aumentado para mejor separación
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF8C00),
                           border: Border.all(color: Colors.black, width: 2),
@@ -388,7 +453,7 @@ class CartillaWidget extends StatelessWidget {
                       Expanded(
                         child: Container(
                           height: 65, // Altura ligeramente reducida para ahorrar espacio
-                          margin: const EdgeInsets.all(2), // Margen reducido para evitar overflow
+                          margin: const EdgeInsets.all(3), // Margen aumentado para mejor separación
                           decoration: BoxDecoration(
                             color: Colors.white,
                             border: Border.all(color: Colors.black, width: 2),
@@ -414,7 +479,8 @@ class CartillaWidget extends StatelessWidget {
     final letterFontSize = 16.0; // Fuente aumentada proporcionalmente
     
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(12), // Padding para mejor presentación
+      margin: const EdgeInsets.all(6), // Margen interior de la cuadrícula compacta
       child: Column(
         children: [
           // Header row with B I N G O
@@ -424,7 +490,7 @@ class CartillaWidget extends StatelessWidget {
                 Expanded(
                   child: Container(
                     height: cellHeight,
-                    margin: const EdgeInsets.all(2),
+                    margin: const EdgeInsets.all(2.5), // Margen ajustado para modo compacto
                     decoration: BoxDecoration(
                       color: const Color(0xFFFF8C00),
                       border: Border.all(color: Colors.black, width: 2),
@@ -453,7 +519,7 @@ class CartillaWidget extends StatelessWidget {
                   Expanded(
                     child: Container(
                       height: cellHeight,
-                      margin: const EdgeInsets.all(2),
+                      margin: const EdgeInsets.all(2.5), // Margen ajustado para modo compacto
                       decoration: BoxDecoration(
                         color: Colors.white,
                         border: Border.all(color: Colors.black, width: 2),
@@ -473,26 +539,17 @@ class CartillaWidget extends StatelessWidget {
 
   // Contenido de celda para modo completo
   Widget _buildCellContent(int row, int col) {
-    // Center cell (free space) - Mostrar número de cartilla
+    // Center cell (free space) - Mostrar "FREE"
     if (row == 2 && col == 2) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            'assets/images/bingo_imperial.png',
-            height: 32, // Tamaño ajustado proporcionalmente
-            width: 32, // Tamaño ajustado proporcionalmente
+      return const Center(
+        child: Text(
+          "FREE",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFFFF8C00),
           ),
-          const SizedBox(height: 2), // Espaciado aumentado
-          Text(
-            cardNumber ?? "CARTILLA", // Mostrar número de cartilla si está disponible
-            style: const TextStyle(
-              fontSize: 9, // Fuente ajustada proporcionalmente
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-        ],
+        ),
       );
     }
     
@@ -514,39 +571,17 @@ class CartillaWidget extends StatelessWidget {
 
   // Contenido de celda compacta
   Widget _buildCompactCellContent(int row, int col) {
-    // Center cell (free space) - Mostrar número de cartilla
+    // Center cell (free space) - Mostrar "FREE"
     if (row == 2 && col == 2) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 22, // Tamaño aumentado proporcionalmente
-            height: 22, // Tamaño aumentado proporcionalmente
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF8C00),
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Text(
-                "B",
-                style: TextStyle(
-                  fontSize: 14, // Fuente aumentada proporcionalmente
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-            ),
+      return const Center(
+        child: Text(
+          "FREE",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFFFF8C00),
           ),
-          const SizedBox(height: 2),
-          Text(
-            cardNumber ?? "CART", // Mostrar número de cartilla si está disponible
-            style: TextStyle(
-              fontSize: 7, // Fuente aumentada proporcionalmente
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-        ],
+        ),
       );
     }
     
@@ -564,5 +599,41 @@ class CartillaWidget extends StatelessWidget {
     }
     
     return const SizedBox.shrink();
+  }
+
+  // Método estático para crear una cartilla optimizada para impresión
+  static Widget createForPrint({
+    required List<List<int>> numbers,
+    String? cardNumber,
+    String? date,
+    String? price,
+  }) {
+    return CartillaWidget(
+      numbers: numbers,
+      cardNumber: cardNumber,
+      date: date,
+      price: price,
+      forPrint: true,
+    );
+  }
+
+  // Método estático para crear una cartilla compacta
+  static Widget createCompact({
+    required List<List<int>> numbers,
+    String? cardNumber,
+    String? date,
+    String? price,
+    bool isSelected = false,
+    VoidCallback? onTap,
+  }) {
+    return CartillaWidget(
+      numbers: numbers,
+      cardNumber: cardNumber,
+      date: date,
+      price: price,
+      compact: true,
+      isSelected: isSelected,
+      onTap: onTap,
+    );
   }
 } 

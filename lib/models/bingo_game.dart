@@ -819,9 +819,9 @@ class BingoGame {
   
   List<List<int>> _letraFEPattern() {
     return [
-      [1,0,0,0,0],
       [1,1,1,1,0],
       [1,0,0,0,0],
+      [1,1,1,0,0],
       [1,0,0,0,0],
       [1,0,0,0,0],
     ];
@@ -902,6 +902,8 @@ class BingoGame {
     
     // Buscar cartillas ganadoras usando el nuevo método
     final winningCards = <Map<String, dynamic>>[];
+    final uniqueWinningCardIndices = <int>{}; // Para contar cartillas únicas
+    
     for (int i = 0; i < cartillas.length; i++) {
       final cartilla = cartillas[i];
       
@@ -919,6 +921,9 @@ class BingoGame {
             'allCompletedPatterns': allPatterns, // Incluir todas las figuras completadas
           });
         }
+        
+        // Agregar el índice de la cartilla a la lista de cartillas únicas ganadoras
+        uniqueWinningCardIndices.add(i);
       }
     }
     
@@ -926,9 +931,10 @@ class BingoGame {
       'hasBingo': hasAnyBingo,
       'completedPatterns': completedPatterns,
       'winningCards': winningCards,
-      'totalWinningCards': winningCards.length,
+      'totalWinningCards': uniqueWinningCardIndices.length, // Número real de cartillas físicas ganadoras
+      'totalPatternsCompleted': winningCards.length, // Total de patrones completados
       'message': hasAnyBingo 
-          ? '¡BINGO! Se completaron ${winningCards.length} cartilla${winningCards.length > 1 ? 's' : ''}'
+          ? '¡BINGO! Se completaron ${uniqueWinningCardIndices.length} cartilla${uniqueWinningCardIndices.length > 1 ? 's' : ''} con ${winningCards.length} patrón${winningCards.length > 1 ? 'es' : ''}'
           : 'No hay bingo aún'
     };
   }
@@ -960,6 +966,8 @@ class BingoGame {
     
     // Buscar cartillas ganadoras para CUALQUIER figura
     final winningCards = <Map<String, dynamic>>[];
+    final uniqueWinningCardIndices = <int>{}; // Para contar cartillas únicas
+    
     for (int i = 0; i < cartillas.length; i++) {
       final cartilla = cartillas[i];
       
@@ -977,6 +985,9 @@ class BingoGame {
             'allCompletedPatterns': allPatterns, // Incluir todas las figuras completadas
           });
         }
+        
+        // Agregar el índice de la cartilla a la lista de cartillas únicas ganadoras
+        uniqueWinningCardIndices.add(i);
       }
     }
     
@@ -984,9 +995,10 @@ class BingoGame {
       'hasBingo': hasAnyBingo,
       'completedPatterns': completedPatterns,
       'winningCards': winningCards,
-      'totalWinningCards': winningCards.length,
+      'totalWinningCards': uniqueWinningCardIndices.length, // Número real de cartillas físicas ganadoras
+      'totalPatternsCompleted': winningCards.length, // Total de patrones completados
       'message': hasAnyBingo 
-          ? '¡BINGO! Se completaron ${winningCards.length} cartilla${winningCards.length > 1 ? 's' : ''}'
+          ? '¡BINGO! Se completaron ${uniqueWinningCardIndices.length} cartilla${uniqueWinningCardIndices.length > 1 ? 's' : ''} con ${winningCards.length} patrón${winningCards.length > 1 ? 'es' : ''}'
           : 'No hay bingo aún'
     };
   }
