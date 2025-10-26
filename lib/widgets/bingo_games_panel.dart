@@ -564,6 +564,8 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         return 'Diagonal Secundaria';
       case BingoPattern.lineaHorizontal:
         return 'Línea Horizontal';
+      case BingoPattern.lineaVertical:
+        return 'Línea Vertical';
       case BingoPattern.marcoCompleto:
         return 'Marco Completo';
       case BingoPattern.marcoPequeno:
@@ -578,6 +580,19 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Patrones adicionales
+      case BingoPattern.figuraAvion:
+        return 'Figura Avión';
+      case BingoPattern.caidaNieve:
+        return 'Caída de Nieve';
+      case BingoPattern.arbolFlecha:
+        return 'Árbol o Flecha';
+      case BingoPattern.letraI:
+        return 'LETRA I';
+      case BingoPattern.letraN:
+        return 'LETRA N';
+      case BingoPattern.autopista:
+        return 'Autopista';
       // Nuevas figuras legendarias
       case BingoPattern.relojArena:
         return 'Reloj de Arena';
@@ -586,7 +601,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       case BingoPattern.figuraSuegra:
         return 'Figura la Suegra';
       case BingoPattern.figuraComodin:
-        return 'Figura Comodín';
+        return 'Figura Infinito';
       case BingoPattern.letraFE:
         return 'Letra FE';
       case BingoPattern.figuraCLoca:
@@ -608,6 +623,8 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         return 'Diagonal Secundaria';
       case BingoPattern.lineaHorizontal:
         return 'Línea Horizontal';
+      case BingoPattern.lineaVertical:
+        return 'Línea Vertical';
       case BingoPattern.marcoCompleto:
         return 'Marco Completo';
       case BingoPattern.marcoPequeno:
@@ -622,6 +639,19 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Patrones adicionales
+      case BingoPattern.figuraAvion:
+        return 'Figura Avión';
+      case BingoPattern.caidaNieve:
+        return 'Caída de Nieve';
+      case BingoPattern.arbolFlecha:
+        return 'Árbol o Flecha';
+      case BingoPattern.letraI:
+        return 'LETRA I';
+      case BingoPattern.letraN:
+        return 'LETRA N';
+      case BingoPattern.autopista:
+        return 'Autopista';
       // Nuevas figuras legendarias
       case BingoPattern.relojArena:
         return 'Reloj de Arena';
@@ -630,7 +660,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       case BingoPattern.figuraSuegra:
         return 'Figura la Suegra';
       case BingoPattern.figuraComodin:
-        return 'Figura Comodín';
+        return 'Figura Infinito';
       case BingoPattern.letraFE:
         return 'Letra FE';
       case BingoPattern.figuraCLoca:
@@ -650,50 +680,63 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       builder: (context, appProvider, child) {
 
         
-        return Card(
-          margin: const EdgeInsets.all(4.0),
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            padding: const EdgeInsets.all(16.0),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 // Título del panel con selector de juego
-                Row(
-                  children: [
-                    Icon(Icons.games, color: Colors.blue.shade700, size: 20),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Juegos de Bingo',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
-                          fontSize: 18,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blue.shade50, Colors.blue.shade100],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.games, color: Colors.blue.shade700, size: 24),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Juegos de Bingo',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade700,
+                            fontSize: 20,
+                          ),
                         ),
                       ),
-                    ),
-                    // Botón para cambiar de juego
-                    IconButton(
-                      onPressed: () => _showGameSelectorDialog(context),
-                      icon: Icon(Icons.swap_horiz, color: Colors.blue.shade600, size: 20),
-                      tooltip: 'Cambiar Juego',
-                    ),
-                    // Botón para crear nuevo juego
-                    IconButton(
-                      onPressed: () => _showCreateGameDialog(context),
-                      icon: Icon(Icons.add_circle_outline, color: Colors.green.shade600, size: 20),
-                      tooltip: 'Crear Nuevo Juego',
-                    ),
-                    // Botón para cargar juegos con figuras legendarias
-                    IconButton(
-                      onPressed: () => _loadGamesWithLegendaryFigures(),
-                      icon: Icon(Icons.auto_awesome, color: Colors.orange.shade600, size: 20),
-                      tooltip: 'Cargar Figuras Legendarias',
-                    ),
-                  ],
+                      // Botón para cambiar de juego
+                      IconButton(
+                        onPressed: () => _showGameSelectorDialog(context),
+                        icon: Icon(Icons.swap_horiz, color: Colors.blue.shade600, size: 20),
+                        tooltip: 'Cambiar Juego',
+                      ),
+                      // Botón para crear nuevo juego
+                      IconButton(
+                        onPressed: () => _showCreateGameDialog(context),
+                        icon: Icon(Icons.add_circle_outline, color: Colors.green.shade600, size: 20),
+                        tooltip: 'Crear Nuevo Juego',
+                      ),
+                      // Botón para cargar juegos con figuras legendarias
+                      IconButton(
+                        onPressed: () => _loadGamesWithLegendaryFigures(),
+                        icon: Icon(Icons.auto_awesome, color: Colors.orange.shade600, size: 20),
+                        tooltip: 'Cargar Figuras Legendarias',
+                      ),
+                    ],
+                  ),
                 ),
-                                 const SizedBox(height: 8),
+                const SizedBox(height: 8),
                  
                  // Botón para ver todas las figuras de bingo
                  SizedBox(
@@ -854,10 +897,8 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                    _buildGameInfo(),
                    const SizedBox(height: 6),
                    
-                   // Lista de rondas - Hacer flexible
-                   Expanded(
-                     child: _buildRoundsList(),
-                   ),
+                   // Lista de rondas
+                   _buildRoundsList(),
                    
                    const SizedBox(height: 6),
                    
@@ -870,7 +911,8 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                    // Controles del juego
                    _buildGameControls(),
                  ],
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -1975,6 +2017,8 @@ class _GameSelectorDialog extends StatelessWidget {
         return 'Diagonal Secundaria';
       case BingoPattern.lineaHorizontal:
         return 'Línea Horizontal';
+      case BingoPattern.lineaVertical:
+        return 'Línea Vertical';
       case BingoPattern.marcoCompleto:
         return 'Marco Completo';
       case BingoPattern.marcoPequeno:
@@ -1989,6 +2033,19 @@ class _GameSelectorDialog extends StatelessWidget {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Patrones adicionales
+      case BingoPattern.figuraAvion:
+        return 'Figura Avión';
+      case BingoPattern.caidaNieve:
+        return 'Caída de Nieve';
+      case BingoPattern.arbolFlecha:
+        return 'Árbol o Flecha';
+      case BingoPattern.letraI:
+        return 'LETRA I';
+      case BingoPattern.letraN:
+        return 'LETRA N';
+      case BingoPattern.autopista:
+        return 'Autopista';
       // Nuevas figuras legendarias
       case BingoPattern.relojArena:
         return 'Reloj de Arena';
@@ -1997,7 +2054,7 @@ class _GameSelectorDialog extends StatelessWidget {
       case BingoPattern.figuraSuegra:
         return 'Figura la Suegra';
       case BingoPattern.figuraComodin:
-        return 'Figura Comodín';
+        return 'Figura Infinito';
       case BingoPattern.letraFE:
         return 'Letra FE';
       case BingoPattern.figuraCLoca:
@@ -2347,6 +2404,8 @@ class _RoundEditorState extends State<_RoundEditor> {
         return 'Diagonal Secundaria';
       case BingoPattern.lineaHorizontal:
         return 'Línea Horizontal';
+      case BingoPattern.lineaVertical:
+        return 'Línea Vertical';
       case BingoPattern.marcoCompleto:
         return 'Marco Completo';
       case BingoPattern.marcoPequeno:
@@ -2361,6 +2420,19 @@ class _RoundEditorState extends State<_RoundEditor> {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Patrones adicionales
+      case BingoPattern.figuraAvion:
+        return 'Figura Avión';
+      case BingoPattern.caidaNieve:
+        return 'Caída de Nieve';
+      case BingoPattern.arbolFlecha:
+        return 'Árbol o Flecha';
+      case BingoPattern.letraI:
+        return 'LETRA I';
+      case BingoPattern.letraN:
+        return 'LETRA N';
+      case BingoPattern.autopista:
+        return 'Autopista';
       // Nuevas figuras legendarias
       case BingoPattern.relojArena:
         return 'Reloj de Arena';
@@ -2369,7 +2441,7 @@ class _RoundEditorState extends State<_RoundEditor> {
       case BingoPattern.figuraSuegra:
         return 'Figura la Suegra';
       case BingoPattern.figuraComodin:
-        return 'Figura Comodín';
+        return 'Figura Infinito';
       case BingoPattern.letraFE:
         return 'Letra FE';
       case BingoPattern.figuraCLoca:
@@ -2836,6 +2908,8 @@ class _EditRoundDialogState extends State<_EditRoundDialog> {
         return 'Diagonal Secundaria';
       case BingoPattern.lineaHorizontal:
         return 'Línea Horizontal';
+      case BingoPattern.lineaVertical:
+        return 'Línea Vertical';
       case BingoPattern.marcoCompleto:
         return 'Marco Completo';
       case BingoPattern.marcoPequeno:
@@ -2850,6 +2924,19 @@ class _EditRoundDialogState extends State<_EditRoundDialog> {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Patrones adicionales
+      case BingoPattern.figuraAvion:
+        return 'Figura Avión';
+      case BingoPattern.caidaNieve:
+        return 'Caída de Nieve';
+      case BingoPattern.arbolFlecha:
+        return 'Árbol o Flecha';
+      case BingoPattern.letraI:
+        return 'LETRA I';
+      case BingoPattern.letraN:
+        return 'LETRA N';
+      case BingoPattern.autopista:
+        return 'Autopista';
       // Nuevas figuras legendarias
       case BingoPattern.relojArena:
         return 'Reloj de Arena';
@@ -2858,7 +2945,7 @@ class _EditRoundDialogState extends State<_EditRoundDialog> {
       case BingoPattern.figuraSuegra:
         return 'Figura la Suegra';
       case BingoPattern.figuraComodin:
-        return 'Figura Comodín';
+        return 'Figura Infinito';
       case BingoPattern.letraFE:
         return 'Letra FE';
       case BingoPattern.figuraCLoca:

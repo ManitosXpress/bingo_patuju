@@ -48,24 +48,43 @@ router.get('/vendors-summary', async (req: any, res: any) => {
     sStat.revenueBs += sale.amount ?? 0;
     sStat.commissionsBs += sale.commissions?.seller ?? 0;
     sStat.sellerCommissionBs += sale.commissions?.seller ?? 0;
+    
     // Leader
     if (sale.leaderId) {
       const lStat = ensure(sale.leaderId);
       lStat.commissionsBs += sale.commissions?.leader ?? 0;
       lStat.leaderCommissionBs += sale.commissions?.leader ?? 0;
     }
+    
+    // Subleader (vendedor padre de subvendedores)
+    if (sale.subleaderId) {
+      const slStat = ensure(sale.subleaderId);
+      slStat.commissionsBs += sale.commissions?.subleader ?? 0;
+      slStat.subleaderCommissionBs = (slStat.subleaderCommissionBs ?? 0) + (sale.commissions?.subleader ?? 0);
+    }
   });
 
-  // Attach children (sellers under leaders)
+  // Attach children (sellers under leaders and subsellers under sellers)
   const byLeader: Record<string, string[]> = {};
+  
   vendors.forEach((v) => {
     if (v.leaderId) {
-      byLeader[v.leaderId] = byLeader[v.leaderId] || [];
-      byLeader[v.leaderId].push(v.id);
+      if (v.role === 'SELLER') {
+        byLeader[v.leaderId] = byLeader[v.leaderId] || [];
+        byLeader[v.leaderId].push(v.id);
+      } else if (v.role === 'SUBSELLER') {
+        // Los subvendedores también se agregan al líder para mostrar en la jerarquía
+        byLeader[v.leaderId] = byLeader[v.leaderId] || [];
+        byLeader[v.leaderId].push(v.id);
+        
+        // También los agregamos a su vendedor padre si existe
+        // Esto requeriría una lógica más compleja para determinar el vendedor padre específico
+      }
     }
   });
 
   let result = Array.from(vendors.values()).map((v) => ({
+    ...v, // Incluir todos los campos del vendedor (incluyendo sellerId)
     ...(stats[v.id] ?? ensure(v.id)),
     children: byLeader[v.id] || [],
   }));

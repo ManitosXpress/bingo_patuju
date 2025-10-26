@@ -8,7 +8,7 @@ class BackendConfig {
     if (useLocalEmulator) {
       return 'http://localhost:5001/bingo-baitty/us-central1/api';
     }
-    return 'https://us-central1-bingo-baitty.cloudfunctions.net/api';
+    return 'https://api-qijtzxgljq-uc.a.run.app';
   }
   
   // Endpoints de la API

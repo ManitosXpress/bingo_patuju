@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../index';
 
-export type VendorRole = 'LEADER' | 'SELLER';
+export type VendorRole = 'LEADER' | 'SELLER' | 'SUBSELLER';
 
 interface VendorDoc {
   id: string;
@@ -10,6 +10,7 @@ interface VendorDoc {
   phone?: string;
   role: VendorRole;
   leaderId?: string; // seller -> leader
+  sellerId?: string; // subseller -> seller
   createdAt: number;
   isActive: boolean;
 }
@@ -17,8 +18,9 @@ interface VendorDoc {
 const vendorSchema = z.object({
   name: z.string().min(2),
   phone: z.string().min(6).optional(),
-  role: z.enum(['LEADER', 'SELLER']),
+  role: z.enum(['LEADER', 'SELLER', 'SUBSELLER']),
   leaderId: z.string().optional(),
+  sellerId: z.string().optional(), // Para subvendedores
 });
 
 export const router = Router();
@@ -37,12 +39,27 @@ router.post('/', async (req: any, res: any) => {
     if (parsed.role === 'SELLER' && !parsed.leaderId) {
       return res.status(400).json({ error: 'SELLER requires leaderId' });
     }
+    if (parsed.role === 'SUBSELLER' && !parsed.sellerId) {
+      return res.status(400).json({ error: 'SUBSELLER requires sellerId' });
+    }
+
+    // Para subvendedores, obtener el leaderId del vendedor padre
+    let finalLeaderId = parsed.leaderId;
+    if (parsed.role === 'SUBSELLER' && parsed.sellerId) {
+      const sellerDoc = await db.collection('vendors').doc(parsed.sellerId).get();
+      if (!sellerDoc.exists) {
+        return res.status(400).json({ error: 'Seller not found' });
+      }
+      const sellerData = sellerDoc.data() as any;
+      finalLeaderId = sellerData.leaderId;
+    }
 
     const ref = await db.collection('vendors').add({
       name: parsed.name,
       phone: parsed.phone ?? null,
       role: parsed.role,
-      leaderId: parsed.leaderId ?? null,
+      leaderId: finalLeaderId ?? null,
+      sellerId: parsed.sellerId ?? null, // Nuevo campo para subvendedores
       createdAt: Date.now(),
       isActive: true,
     });

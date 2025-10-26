@@ -27,97 +27,155 @@ class BingoPatternsDialog extends StatelessWidget {
             : _getAllPatterns();
         
         return Dialog(
+          backgroundColor: Colors.transparent,
           child: Container(
             width: MediaQuery.of(context).size.width * 0.95,
             height: MediaQuery.of(context).size.height * 0.95,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currentRound != null 
-                                ? 'Figuras de "${currentRound!.name}"'
-                                : 'Todas las Figuras de Bingo',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade700,
-                            ),
-                          ),
-                          if (currentRound != null) ...[
-                            const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              'Ronda actual del juego',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                                fontStyle: FontStyle.italic,
+                              currentRound != null 
+                                  ? 'Figuras de "${currentRound!.name}"'
+                                  : 'Todas las Figuras de Bingo',
+                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade700,
+                                fontSize: 24,
+                              ),
+                            ),
+                            if (currentRound != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Ronda actual del juego',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.green.shade300),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Optimizado para scroll y pantalla completa',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade700,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
-                        ],
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 2),
                 
                 // Patterns list (changed from grid to list)
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      // Calculate grid size based on available space
+                      // Calculate grid size based on available space and screen mode
                       final availableWidth = constraints.maxWidth;
+                      final availableHeight = constraints.maxHeight;
                       
-                      // Use full width for better visibility
-                      final gridSize = (availableWidth * 0.15).clamp(50.0, 80.0);
+                      // Detectar si está en pantalla completa basado en el tamaño disponible
+                      final isFullscreen = availableHeight > 600 && availableWidth > 800;
+                      
+                      // Ajustar tamaño de grid según el modo de pantalla
+                      final gridSize = isFullscreen 
+                          ? (availableWidth * 0.2).clamp(80.0, 120.0)  // Más grande en pantalla completa
+                          : (availableWidth * 0.15).clamp(50.0, 80.0);  // Tamaño normal
                       final cellSize = gridSize / 5.5;
                       
-                      return ListView.builder(
-                        itemCount: patternsToShow.length,
-                        itemBuilder: (context, index) {
-                          final pattern = patternsToShow[index];
-                          final patternName = pattern['name'] as String;
-                          final patternMatrix = pattern['matrix'] as List<List<int>>;
-                          final probability = probs[patternName] ?? '0.00%';
-                          final isCompleted = completed[patternName] ?? false;
-                          
-                          // Resaltar si es parte de la ronda actual
-                          final isCurrentRoundPattern = currentRound != null && 
-                              currentRound!.patterns.any((p) => _getPatternName(p) == patternName);
-                          
-                          return _buildPatternListItem(
-                            context,
-                            patternName,
-                            patternMatrix,
-                            probability,
-                            isCompleted,
-                            gridSize,
-                            cellSize,
-                            isCurrentRoundPattern: isCurrentRoundPattern,
-                          );
-                        },
+                      return Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300, width: 1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: patternsToShow.length,
+                          itemBuilder: (context, index) {
+                            final pattern = patternsToShow[index];
+                            final patternName = pattern['name'] as String;
+                            final patternMatrix = pattern['matrix'] as List<List<int>>;
+                            final probability = probs[patternName] ?? '0.00%';
+                            final isCompleted = completed[patternName] ?? false;
+                            
+                            // Resaltar si es parte de la ronda actual
+                            final isCurrentRoundPattern = currentRound != null && 
+                                currentRound!.patterns.any((p) => _getPatternName(p) == patternName);
+                            
+                            return _buildPatternListItem(
+                              context,
+                              patternName,
+                              patternMatrix,
+                              probability,
+                              isCompleted,
+                              gridSize,
+                              cellSize,
+                              isCurrentRoundPattern: isCurrentRoundPattern,
+                              isFullscreen: isFullscreen,
+                            );
+                          },
+                          ),
+                        ),
                       );
                     },
                   ),
                 ),
                 
-                const SizedBox(height: 20),
+                const SizedBox(height: 2),
                 
                 // Footer info
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
@@ -136,7 +194,7 @@ class BingoPatternsDialog extends StatelessWidget {
                         ),
                       ),
                       if (currentRound != null) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 2),
                         Text(
                           'Ronda: ${currentRound!.name}',
                           style: TextStyle(
@@ -171,7 +229,7 @@ class BingoPatternsDialog extends StatelessWidget {
       {'name': 'Diagonal Principal', 'matrix': _mainDiagonalPattern()},
       {'name': 'Diagonal Secundaria', 'matrix': _antiDiagonalPattern()},
       {'name': 'Cartón Lleno', 'matrix': _fullCardPattern()},
-      {'name': '5 Casillas Diagonales', 'matrix': _diagonal5Pattern()},
+      {'name': 'Figura Avión', 'matrix': _diagonal5Pattern()},
       {'name': 'X', 'matrix': _xPattern()},
       {'name': 'Marco Completo', 'matrix': _fullFramePattern()},
       {'name': 'Corazón', 'matrix': _heartPattern()},
@@ -179,9 +237,19 @@ class BingoPatternsDialog extends StatelessWidget {
       {'name': 'Marco Pequeño', 'matrix': _smallFramePattern()},
       {'name': 'Árbol o Flecha', 'matrix': _treeArrowPattern()},
       {'name': 'Spoutnik', 'matrix': _spoutnikPattern()},
-      {'name': 'ING', 'matrix': _ingPattern()},
-      {'name': 'NGO', 'matrix': _ngoPattern()},
+      {'name': 'LETRA I', 'matrix': _ingPattern()},
+      {'name': 'LETRA N', 'matrix': _ngoPattern()},
       {'name': 'Autopista', 'matrix': _highwayPattern()},
+      // Figuras legendarias
+      {'name': 'Reloj de Arena', 'matrix': _relojArenaPattern()},
+      {'name': 'Doble Línea V', 'matrix': _dobleLineaVPattern()},
+      {'name': 'Figura la Suegra', 'matrix': _figuraSuegraPattern()},
+      {'name': 'Figura Infinito', 'matrix': _figuraComodinPattern()},
+      {'name': 'Letra FE', 'matrix': _letraFEPattern()},
+      {'name': 'Figura C Loca', 'matrix': _figuraCLocaPattern()},
+      {'name': 'Figura Bandera', 'matrix': _figuraBanderaPattern()},
+      {'name': 'Figura Triple Línea', 'matrix': _figuraTripleLineaPattern()},
+      {'name': 'Diagonal Derecha', 'matrix': _diagonalDerechaPattern()},
     ];
   }
 
@@ -193,7 +261,7 @@ class BingoPatternsDialog extends StatelessWidget {
     bool completed,
     double gridSize,
     double cellSize,
-    {bool isCurrentRoundPattern = false}
+    {bool isCurrentRoundPattern = false, bool isFullscreen = false}
   ) {
     String displayProbability = completed ? 'COMPLETADO ✓' : probability;
     
@@ -213,7 +281,7 @@ class BingoPatternsDialog extends StatelessWidget {
     }
     
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
@@ -230,7 +298,7 @@ class BingoPatternsDialog extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(isFullscreen ? 20 : 16),
         child: Row(
           children: [
             // Pattern visualization
@@ -245,7 +313,7 @@ class BingoPatternsDialog extends StatelessWidget {
               ),
             ),
             
-            const SizedBox(width: 20),
+            SizedBox(width: isFullscreen ? 24 : 20),
             
             // Pattern info
             Expanded(
@@ -258,20 +326,20 @@ class BingoPatternsDialog extends StatelessWidget {
                     name,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: isFullscreen ? 20 : 18,
                       color: completed 
                         ? Colors.green.shade700 
                         : (isCurrentRoundPattern ? Colors.blue.shade700 : Colors.black87),
                     ),
                   ),
                   
-                  const SizedBox(height: 8),
+                  SizedBox(height: isFullscreen ? 10 : 8),
                   
                   // Pattern description
                   Text(
                     _getPatternDescription(name),
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: isFullscreen ? 16 : 14,
                       color: completed 
                         ? Colors.green.shade600 
                         : (isCurrentRoundPattern ? Colors.blue.shade600 : Colors.grey.shade600),
@@ -281,9 +349,12 @@ class BingoPatternsDialog extends StatelessWidget {
                   
                   // Indicador de ronda actual
                   if (isCurrentRoundPattern && !completed) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: isFullscreen ? 6 : 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isFullscreen ? 10 : 8, 
+                        vertical: isFullscreen ? 4 : 2
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.blue.shade100,
                         borderRadius: BorderRadius.circular(8),
@@ -291,7 +362,7 @@ class BingoPatternsDialog extends StatelessWidget {
                       child: Text(
                         'Ronda Actual',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: isFullscreen ? 12 : 10,
                           fontWeight: FontWeight.bold,
                           color: Colors.blue.shade700,
                         ),
@@ -302,11 +373,14 @@ class BingoPatternsDialog extends StatelessWidget {
               ),
             ),
             
-            const SizedBox(width: 20),
+            SizedBox(width: isFullscreen ? 24 : 20),
             
             // Probability or completion status
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: isFullscreen ? 20 : 16, 
+                vertical: isFullscreen ? 12 : 8
+              ),
               decoration: BoxDecoration(
                 color: completed 
                   ? Colors.green.shade100 
@@ -322,7 +396,7 @@ class BingoPatternsDialog extends StatelessWidget {
                 displayProbability,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: isFullscreen ? 18 : 16,
                   color: completed 
                     ? Colors.green.shade700 
                     : (isCurrentRoundPattern ? Colors.blue.shade700 : Colors.grey.shade700),
@@ -347,7 +421,7 @@ class BingoPatternsDialog extends StatelessWidget {
         return 'Completar la diagonal desde la esquina superior derecha';
       case 'Cartón Lleno':
         return 'Completar todas las casillas del cartón';
-      case '5 Casillas Diagonales':
+      case 'Figura Avión':
         return 'Completar 5 casillas en forma diagonal';
       case 'X':
         return 'Completar las casillas que forman una X en el cartón';
@@ -410,8 +484,11 @@ class BingoPatternsDialog extends StatelessWidget {
     // Inicializar contadores
     final patterns = [
       'Línea Horizontal', 'Línea Vertical', 'Diagonal Principal', 'Diagonal Secundaria',
-      'Cartón Lleno', '5 Casillas Diagonales', 'X', 'Marco Completo', 'Corazón',
-      'Caída de Nieve', 'Marco Pequeño', 'Árbol o Flecha', 'Spoutnik', 'ING', 'NGO', 'Autopista'
+      'Cartón Lleno', 'Figura Avión', 'X', 'Marco Completo', 'Corazón',
+      'Caída de Nieve', 'Marco Pequeño', 'Árbol o Flecha', 'Spoutnik', 'LETRA I', 'LETRA N', 'Autopista',
+      // Figuras legendarias
+      'Reloj de Arena', 'Doble Línea V', 'Figura la Suegra', 'Figura Infinito', 'Letra FE',
+      'Figura C Loca', 'Figura Bandera', 'Figura Triple Línea', 'Diagonal Derecha'
     ];
     
     for (String pattern in patterns) {
@@ -454,7 +531,7 @@ class BingoPatternsDialog extends StatelessWidget {
       'Diagonal Principal': 2.0,
       'Diagonal Secundaria': 2.0,
       'Cartón Lleno': 0.1,
-      '5 Casillas Diagonales': 8.0,
+      'Figura Avión': 8.0,
       'X': 8.0,
       'Marco Completo': 15.0,
       'Corazón': 12.0,
@@ -465,6 +542,16 @@ class BingoPatternsDialog extends StatelessWidget {
       'ING': 16.0,
       'NGO': 16.0,
       'Autopista': 22.0,
+      // Figuras legendarias
+      'Reloj de Arena': 12.0,
+      'Doble Línea V': 10.0,
+      'Figura la Suegra': 14.0,
+      'Figura Infinito': 16.0,
+      'Letra FE': 18.0,
+      'Figura C Loca': 15.0,
+      'Figura Bandera': 20.0,
+      'Figura Triple Línea': 22.0,
+      'Diagonal Derecha': 8.0,
     };
     
     final result = <String, String>{};
@@ -498,7 +585,7 @@ class BingoPatternsDialog extends StatelessWidget {
 
   List<List<int>> _getPatternMatrix(String patternName) {
     switch (patternName) {
-      case '5 Casillas Diagonales':
+      case 'Avión':
         return _diagonal5Pattern();
       case 'X':
         return _xPattern();
@@ -520,6 +607,25 @@ class BingoPatternsDialog extends StatelessWidget {
         return _ngoPattern();
       case 'Autopista':
         return _highwayPattern();
+      // Figuras legendarias
+      case 'Reloj de Arena':
+        return _relojArenaPattern();
+      case 'Doble Línea V':
+        return _dobleLineaVPattern();
+      case 'Figura la Suegra':
+        return _figuraSuegraPattern();
+      case 'Figura Infinito':
+        return _figuraComodinPattern();
+      case 'Letra FE':
+        return _letraFEPattern();
+      case 'Figura C Loca':
+        return _figuraCLocaPattern();
+      case 'Figura Bandera':
+        return _figuraBanderaPattern();
+      case 'Figura Triple Línea':
+        return _figuraTripleLineaPattern();
+      case 'Diagonal Derecha':
+        return _diagonalDerechaPattern();
       default:
         return List.generate(5, (_) => List.filled(5, 0));
     }
@@ -642,11 +748,11 @@ class BingoPatternsDialog extends StatelessWidget {
   
   List<List<int>> _diagonal5Pattern() {
     return [
-      [1,0,0,0,1],
-      [0,1,0,1,0],
-      [0,0,1,0,0],
-      [0,1,0,1,0],
-      [1,0,0,0,1],
+      [0,0,0,1,0],
+      [1,0,0,1,0],
+      [1,1,1,1,1],
+      [1,0,0,1,0],
+      [0,0,0,1,0],
     ];
   }
   
@@ -705,18 +811,18 @@ class BingoPatternsDialog extends StatelessWidget {
       [0,0,1,0,0],
       [0,1,1,1,0],
       [1,1,1,1,1],
-      [0,0,0,0,0],
-      [0,0,0,0,0],
+      [0,0,1,0,0],
+      [0,0,1,0,0],
     ];
   }
   
   List<List<int>> _spoutnikPattern() {
     return [
-      [1,0,0,0,1],
+      [1,1,1,1,1],
       [0,0,1,0,0],
-      [0,1,0,1,0],
+      [0,1,1,1,0],
       [0,0,1,0,0],
-      [1,0,0,0,1],
+      [1,1,1,1,1],
     ];
   }
   
@@ -805,6 +911,8 @@ class BingoPatternsDialog extends StatelessWidget {
         return 'Diagonal Secundaria';
       case BingoPattern.lineaHorizontal:
         return 'Línea Horizontal';
+      case BingoPattern.lineaVertical:
+        return 'Línea Vertical';
       case BingoPattern.marcoCompleto:
         return 'Marco Completo';
       case BingoPattern.marcoPequeno:
@@ -819,6 +927,19 @@ class BingoPatternsDialog extends StatelessWidget {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Patrones adicionales
+      case BingoPattern.figuraAvion:
+        return 'Figura Avión';
+      case BingoPattern.caidaNieve:
+        return 'Caída de Nieve';
+      case BingoPattern.arbolFlecha:
+        return 'Árbol o Flecha';
+      case BingoPattern.letraI:
+        return 'LETRA I';
+      case BingoPattern.letraN:
+        return 'LETRA N';
+      case BingoPattern.autopista:
+        return 'Autopista';
       // Nuevas figuras legendarias
       case BingoPattern.relojArena:
         return 'Reloj de Arena';
@@ -827,7 +948,7 @@ class BingoPatternsDialog extends StatelessWidget {
       case BingoPattern.figuraSuegra:
         return 'Figura la Suegra';
       case BingoPattern.figuraComodin:
-        return 'Figura Comodín';
+        return 'Figura Infinito';
       case BingoPattern.letraFE:
         return 'Letra FE';
       case BingoPattern.figuraCLoca:
@@ -839,5 +960,96 @@ class BingoPatternsDialog extends StatelessWidget {
       case BingoPattern.diagonalDerecha:
         return 'Diagonal Derecha';
     }
+  }
+
+  // Métodos para las figuras legendarias
+  List<List<int>> _relojArenaPattern() {
+    return [
+      [1,1,1,1,1],
+      [0,1,1,1,0],
+      [0,0,1,0,0],
+      [0,1,1,1,0],
+      [1,1,1,1,1],
+    ];
+  }
+
+  List<List<int>> _dobleLineaVPattern() {
+    return [
+      [1,0,0,0,1],
+      [1,0,0,0,1],
+      [1,0,0,0,1],
+      [1,0,0,0,1],
+      [1,0,0,0,1],
+    ];
+  }
+
+  List<List<int>> _figuraSuegraPattern() {
+    return [
+      [1,0,0,0,1],
+      [0,0,1,0,0],
+      [0,1,1,1,0],
+      [0,0,1,0,0],
+      [1,0,0,0,1],
+    ];
+  }
+
+  List<List<int>> _figuraComodinPattern() {
+    return [
+      [1,1,1,0,0],
+      [1,0,1,0,0],
+      [1,1,1,1,1],
+      [0,0,1,0,1],
+      [0,0,1,1,1],
+    ];
+  }
+
+  List<List<int>> _letraFEPattern() {
+    return [
+      [1,1,1,1,0],
+      [1,0,0,0,0],
+      [1,1,1,0,0],
+      [1,0,0,0,0],
+      [1,0,0,0,0],
+    ];
+  }
+
+  List<List<int>> _figuraCLocaPattern() {
+    return [
+      [1,1,1,1,0],
+      [0,0,0,0,1],
+      [0,0,0,0,1],
+      [0,0,0,0,1],
+      [1,1,1,1,0],
+    ];
+  }
+
+  List<List<int>> _figuraBanderaPattern() {
+    return [
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [1,0,0,0,0],
+      [1,0,0,0,0],
+    ];
+  }
+
+  List<List<int>> _figuraTripleLineaPattern() {
+    return [
+      [1,1,1,1,1],
+      [0,0,0,0,0],
+      [1,1,1,1,1],
+      [0,0,0,0,0],
+      [1,1,1,1,1],
+    ];
+  }
+
+  List<List<int>> _diagonalDerechaPattern() {
+    return [
+      [0,0,0,0,1],
+      [0,0,0,1,0],
+      [0,0,1,0,0],
+      [0,1,0,0,0],
+      [1,0,0,0,0],
+    ];
   }
 } 

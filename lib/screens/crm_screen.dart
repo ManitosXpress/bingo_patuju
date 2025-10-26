@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import 'dart:html' as html;
 import 'package:screenshot/screenshot.dart';
 import 'dart:typed_data';
+import 'package:provider/provider.dart';
 import '../config/backend_config.dart';
 import '../widgets/cartilla_widget.dart';
 import '../block_assignment.dart';
+import '../providers/app_provider.dart';
 
 class CrmScreen extends StatefulWidget {
   const CrmScreen({super.key});
@@ -304,9 +306,9 @@ class _CrmScreenState extends State<CrmScreen> {
           backgroundColor: Colors.white,
           body: Center(
             child: Container(
-              width: 720, // Ancho optimizado para mejor calidad (720 píxeles)
-              height: 1020, // Alto optimizado para mejor calidad (1020 píxeles)
-              child: SingleChildScrollView(
+              width: 650, // Ancho reducido para mejor ajuste
+              height: 900, // Alto ajustado para mejor ajuste
+              child: Center(
                 child: CartillaWidget(
                   numbers: _convertNumbersToIntList(card['numbers'] ?? []),
                   cardNumber: card['cardNo']?.toString() ?? card['id'],
@@ -853,19 +855,21 @@ class _CrmScreenState extends State<CrmScreen> {
 
 
 
-  Future<void> _createVendor({required bool isLeader}) async {
+  Future<void> _createVendor({required bool isLeader, bool isSubseller = false}) async {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     String? leaderId = _leaderId;
+    String? sellerId; // Para subvendedores
+    
     await showDialog(context: context, builder: (_) {
       return AlertDialog(
-        title: Text(isLeader ? 'Nuevo Líder' : 'Nuevo Vendedor'),
+        title: Text(isLeader ? 'Nuevo Líder' : (isSubseller ? 'Nuevo Subvendedor' : 'Nuevo Vendedor')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
             TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Teléfono')),
-            if (!isLeader)
+            if (!isLeader && !isSubseller)
               DropdownButtonFormField<String>(
                 value: leaderId,
                 items: _leaders
@@ -876,6 +880,19 @@ class _CrmScreenState extends State<CrmScreen> {
                     .toList(),
                 onChanged: (v) => leaderId = v,
                 decoration: const InputDecoration(labelText: 'Líder'),
+              ),
+            if (isSubseller)
+              DropdownButtonFormField<String>(
+                value: sellerId,
+                items: _vendorsAll
+                    .where((v) => (v['role'] ?? '') == 'SELLER')
+                    .map((s) => DropdownMenuItem<String>(
+                          value: (s['id'] as String),
+                          child: Text('${s['name']} (${s['leaderName'] ?? 'Sin líder'})'),
+                        ))
+                    .toList(),
+                onChanged: (v) => sellerId = v,
+                decoration: const InputDecoration(labelText: 'Vendedor'),
               ),
           ],
         ),
@@ -888,11 +905,14 @@ class _CrmScreenState extends State<CrmScreen> {
 
     if (nameController.text.isEmpty) return;
 
+    final role = isLeader ? 'LEADER' : (isSubseller ? 'SUBSELLER' : 'SELLER');
+    
     final body = {
       'name': nameController.text,
       'phone': phoneController.text,
-      'role': isLeader ? 'LEADER' : 'SELLER',
-      if (!isLeader) 'leaderId': leaderId,
+      'role': role,
+      if (!isLeader && !isSubseller) 'leaderId': leaderId,
+      if (isSubseller) 'sellerId': sellerId, // Nuevo campo para subvendedores
     };
     final resp = await http.post(
       Uri.parse('$_apiBase/vendors'), 
@@ -1521,7 +1541,7 @@ class _CrmScreenState extends State<CrmScreen> {
                             Icon(Icons.info_outline, color: Colors.blue.shade600, size: 16),
                             SizedBox(width: 6),
                             Text(
-                              'Haz clic en el botón rojo para eliminar cartillas individuales',
+                              'Haz clic en el botón rojo para desasignar cartillas individuales',
                               style: TextStyle(
                                 color: Colors.blue.shade700,
                                 fontSize: 12,
@@ -1546,8 +1566,8 @@ class _CrmScreenState extends State<CrmScreen> {
                      SizedBox(width: 8),
                      ElevatedButton.icon(
                        onPressed: () => _deleteAllAssignedCards(cards, vendorId),
-                       icon: Icon(Icons.delete_forever, color: Colors.white),
-                       label: Text('Eliminar Todas (${cards.length})'),
+                       icon: Icon(Icons.person_remove, color: Colors.white),
+                       label: Text('Desasignar Todas (${cards.length})'),
                        style: ElevatedButton.styleFrom(
                          backgroundColor: Colors.red,
                          foregroundColor: Colors.white,
@@ -1590,7 +1610,7 @@ class _CrmScreenState extends State<CrmScreen> {
                               top: 2,
                               right: 2,
                               child: Tooltip(
-                                message: 'Eliminar cartilla $cardNumber',
+                                message: 'Desasignar cartilla $cardNumber',
                                 child: GestureDetector(
                                   onTap: () => _deleteIndividualCard(card, vendorId),
                                   child: Container(
@@ -1884,7 +1904,7 @@ class _CrmScreenState extends State<CrmScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '⚠️ Esta acción es IRREVERSIBLE',
+                    '⚠️ Esta acción desasignará la cartilla',
                     style: TextStyle(
                       color: Colors.red,
                       fontWeight: FontWeight.bold,
@@ -1915,7 +1935,7 @@ class _CrmScreenState extends State<CrmScreen> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: Text('ELIMINAR'),
+            child: Text('DESASIGNAR'),
           ),
         ],
       ),
@@ -1928,7 +1948,7 @@ class _CrmScreenState extends State<CrmScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text('Eliminando...'),
+        title: Text('Desasignando...'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -2042,9 +2062,9 @@ class _CrmScreenState extends State<CrmScreen> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.delete_forever, color: Colors.red),
+            Icon(Icons.person_remove, color: Colors.red),
             SizedBox(width: 8),
-            Text('Eliminar Cartilla'),
+            Text('Desasignar Cartilla'),
           ],
         ),
         content: Column(
@@ -2052,7 +2072,7 @@ class _CrmScreenState extends State<CrmScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '¿Estás seguro de que quieres eliminar la cartilla $cardNumber?',
+              '¿Estás seguro de que quieres desasignar la cartilla $cardNumber?',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 16),
@@ -2067,16 +2087,16 @@ class _CrmScreenState extends State<CrmScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '⚠️ Esta acción es IRREVERSIBLE',
+                    '⚠️ Esta acción desasignará la cartilla',
                     style: TextStyle(
                       color: Colors.red,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   SizedBox(height: 8),
-                  Text('• La cartilla se eliminará permanentemente del sistema'),
-                  Text('• No se podrá recuperar'),
-                  Text('• Se liberará el número para futuras asignaciones'),
+                  Text('• La cartilla se desasignará del vendedor/líder'),
+                  Text('• Quedará disponible para futuras asignaciones'),
+                  Text('• Se liberará el número del inventario actual'),
                 ],
               ),
             ),
@@ -2093,7 +2113,7 @@ class _CrmScreenState extends State<CrmScreen> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: Text('ELIMINAR'),
+            child: Text('DESASIGNAR'),
           ),
         ],
       ),
@@ -2106,35 +2126,33 @@ class _CrmScreenState extends State<CrmScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text('Eliminando...'),
+        title: Text('Desasignando...'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             CircularProgressIndicator(),
             SizedBox(height: 16),
-            Text('Eliminando cartilla $cardNumber...'),
+            Text('Desasignando cartilla $cardNumber...'),
           ],
         ),
       ),
     );
 
     try {
-      // Llamar al endpoint de eliminación
-      final response = await http.delete(
-        Uri.parse('$_apiBase/cards/${card['id']}'),
-        headers: {'Content-Type': 'application/json'},
-      );
+      // Desasignar cartilla usando el método del AppProvider
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      final success = await appProvider.unassignFirebaseCartilla(card['id']);
 
       // Cerrar diálogo de progreso
       Navigator.pop(context);
 
       if (!mounted) return;
 
-      if (response.statusCode == 200) {
+      if (success) {
         // Mostrar mensaje de éxito
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Cartilla $cardNumber eliminada exitosamente'),
+            content: Text('Cartilla $cardNumber desasignada exitosamente'),
             backgroundColor: Colors.green,
           ),
         );
@@ -2148,13 +2166,10 @@ class _CrmScreenState extends State<CrmScreen> {
         // Refrescar la interfaz principal
         setState(() { _refreshTick++; });
       } else {
-        final error = json.decode(response.body);
-        final errorMessage = error['error'] ?? 'Error desconocido';
-        
-        // Mostrar error específico
+        // Mostrar error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $errorMessage'),
+            content: Text('Error al desasignar la cartilla $cardNumber'),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 5),
           ),
@@ -2286,6 +2301,15 @@ class _CrmScreenState extends State<CrmScreen> {
                           icon: const Icon(Icons.person_add),
                           label: const Text('Nuevo Vendedor'),
                         ),
+                        ElevatedButton.icon(
+                          onPressed: () => _createVendor(isLeader: false, isSubseller: true),
+                          icon: const Icon(Icons.people_alt),
+                          label: const Text('Nuevo Subvendedor'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
                         OutlinedButton.icon(
                           onPressed: _assignCard,
                           icon: const Icon(Icons.assignment_ind),
@@ -2321,154 +2345,269 @@ class _CrmScreenState extends State<CrmScreen> {
                   ],
                 ),
               ),
-              // Lista agrupada: líderes con sus vendedores debajo
+              // Lista jerárquica moderna: líderes con vendedores y subvendedores
               Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(12),
-                  children: [
-                    // Mostrar líderes primero
-                    ...vendors.where((v) => (v['role'] ?? '') == 'LEADER').map((leader) {
-                      final rawChildren = (leader['children'] as List?) ?? [];
-                      List<Map<String, dynamic>> sellerObjs;
-                      if (rawChildren.isNotEmpty && rawChildren.first is String) {
-                        final ids = rawChildren.cast<String>();
-                        sellerObjs = vendors.where((s) => (s['role'] ?? '') != 'LEADER' && ids.contains((s['vendorId'] ?? s['id']).toString())).toList();
-                      } else if (rawChildren.isNotEmpty && rawChildren.first is Map) {
-                        sellerObjs = List<Map<String, dynamic>>.from(rawChildren);
-                      } else {
-                        sellerObjs = vendors.where((s) => (s['role'] ?? '') != 'LEADER' && (s['leaderId'] == leader['vendorId'])).toList();
-                      }
-                      return Card(
-                        child: ExpansionTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.orange,
-                            child: Text((leader['name'] ?? '?').toString().substring(0, 1).toUpperCase(), style: const TextStyle(color: Colors.white)),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.grey[50]!,
+                        Colors.grey[100]!,
+                      ],
+                    ),
+                  ),
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      // Mostrar líderes primero con diseño moderno
+                      ...vendors.where((v) => (v['role'] ?? '') == 'LEADER').map((leader) {
+                        final rawChildren = (leader['children'] as List?) ?? [];
+                        List<Map<String, dynamic>> sellerObjs;
+                        if (rawChildren.isNotEmpty && rawChildren.first is String) {
+                          final ids = rawChildren.cast<String>();
+                          sellerObjs = vendors.where((s) => (s['role'] ?? '') != 'LEADER' && ids.contains((s['vendorId'] ?? s['id']).toString())).toList();
+                        } else if (rawChildren.isNotEmpty && rawChildren.first is Map) {
+                          sellerObjs = List<Map<String, dynamic>>.from(rawChildren);
+                        } else {
+                          sellerObjs = vendors.where((s) => (s['role'] ?? '') != 'LEADER' && (s['leaderId'] == leader['vendorId'])).toList();
+                        }
+                        
+                        // Separar vendedores y subvendedores
+                        final sellers = sellerObjs.where((s) => (s['role'] ?? '') == 'SELLER').toList();
+                        final subsellers = sellerObjs.where((s) => (s['role'] ?? '') == 'SUBSELLER').toList();
+                        
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                          title: Text(leader['name'] ?? '—'),
-                          subtitle: const Text('Líder'),
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                                children: [
-                                                                     _stat(
-                                     'Vendidas', 
-                                     leader['soldCount'].toString(),
-                                     assignedValue: (leader['assignedCount'] ?? 0).toString(),
-                                     vendorId: leader['vendorId'] ?? leader['id'],
-                                   ),
-                                  _stat('Ingresos (Bs)', leader['revenueBs'].toString()),
-                                  _stat('Comisión (Bs)', leader['commissionsBs'].toString()),
-                                  ElevatedButton.icon(
-                                    onPressed: () => _registerSaleDialog(leader['vendorId'] ?? leader['id']),
-                                    icon: const Icon(Icons.point_of_sale),
-                                    label: const Text('Vender'),
+                          child: Card(
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: ExpansionTile(
+                              tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                              childrenPadding: const EdgeInsets.all(16),
+                              leading: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFFFF6B35), Color(0xFFFF8E53)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                                  OutlinedButton.icon(
-                                    onPressed: () => _sellAllAssigned(leader['vendorId'] ?? leader['id']),
-                                    icon: const Icon(Icons.sell_outlined),
-                                    label: const Text('Vender todo'),
+                                  borderRadius: BorderRadius.circular(30),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.orange.withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    (leader['name'] ?? '?').toString().substring(0, 1).toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                leader['name'] ?? '—',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2D3748),
+                                ),
+                              ),
+                              subtitle: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Text(
+                                      '👑 LÍDER',
+                                      style: TextStyle(
+                                        color: Color(0xFFFF6B35),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () => _deleteVendor(leader),
-                                    icon: const Icon(Icons.delete_forever, color: Colors.white),
-                                    label: const Text('Eliminar'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                      foregroundColor: Colors.white,
+                                  Text(
+                                    '${sellers.length} vendedores • ${subsellers.length} subvendedores',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 14,
                                     ),
                                   ),
                                 ],
                               ),
+                              children: [
+                                // Estadísticas del líder con diseño moderno
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.orange.withOpacity(0.05),
+                                        Colors.orange.withOpacity(0.1),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                        children: [
+                                          _modernStat(
+                                            'Vendidas',
+                                            leader['soldCount'].toString(),
+                                            assignedValue: (leader['assignedCount'] ?? 0).toString(),
+                                            vendorId: leader['vendorId'] ?? leader['id'],
+                                            color: Colors.blue,
+                                          ),
+                                          _modernStat('Ingresos', 'Bs ${leader['revenueBs']}', color: Colors.green),
+                                          _modernStat('Comisión', 'Bs ${leader['commissionsBs']}', color: Colors.purple),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Wrap(
+                                        spacing: 12,
+                                        runSpacing: 8,
+                                        alignment: WrapAlignment.center,
+                                        children: [
+                                          _modernButton(
+                                            'Vender',
+                                            Icons.point_of_sale,
+                                            () => _registerSaleDialog(leader['vendorId'] ?? leader['id']),
+                                            Colors.blue,
+                                          ),
+                                          _modernButton(
+                                            'Vender Todo',
+                                            Icons.sell_outlined,
+                                            () => _sellAllAssigned(leader['vendorId'] ?? leader['id']),
+                                            Colors.green,
+                                          ),
+                                          _modernButton(
+                                            'Eliminar',
+                                            Icons.delete_forever,
+                                            () => _deleteVendor(leader),
+                                            Colors.red,
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                // Vendedores con diseño jerárquico (incluyendo sus subvendedores)
+                                if (sellers.isNotEmpty) ...[
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.group, color: Colors.blue, size: 20),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          'VENDEDORES',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.blue,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ...sellers.map((seller) => _buildSellerCardWithSubsellers(seller, subsellers)),
+                                ],
+                              ],
                             ),
-                            if (sellerObjs.isNotEmpty)
-                              Container(
-                                alignment: Alignment.centerLeft,
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                child: const Text('Vendedores', style: TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                        );
+                      }),
+                      
+                      // Mostrar vendedores sin líder (huérfanos) con diseño moderno
+                      ...vendors.where((v) => (v['role'] ?? '') != 'LEADER' && (v['leaderId'] == null || v['leaderId'] == '')).map((s) => 
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.all(16),
+                              leading: Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(25),
+                                ),
+                                child: const Icon(Icons.person, color: Colors.grey),
                               ),
-                            // Vendedores del líder
-                            ...sellerObjs.map((s) => ListTile(
-                              contentPadding: const EdgeInsets.only(left: 24, right: 12),
-                              leading: const Icon(Icons.person, color: Colors.blue),
-                              title: Text(s['name'] ?? '—'),
-                              subtitle: const Text('Vendedor'),
-                              onTap: () => _showVendorDetail(s),
-                              trailing: Wrap(
-                                spacing: 12, 
-                                crossAxisAlignment: WrapCrossAlignment.center, 
+                              title: Text(
+                                s['name'] ?? '—',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(
+                                (s['role'] ?? '') == 'SELLER' ? 'Vendedor sin líder' : 'Subvendedor sin líder',
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                                                     _stat(
-                                     'Vendidas', 
-                                     (s['soldCount'] ?? 0).toString(),
-                                     assignedValue: (s['assignedCount'] ?? 0).toString(),
-                                     vendorId: s['vendorId'] ?? s['id'],
-                                   ),
-                                  _stat('Comisión (Bs)', (s['commissionsBs'] ?? 0).toString()),
-                                  OutlinedButton.icon(
-                                    onPressed: () => _reassignLeader(s),
-                                    icon: const Icon(Icons.swap_horiz),
-                                    label: const Text('Reasignar líder'),
-                                  ),
-                                  ElevatedButton.icon(
-                                    onPressed: () => _registerSaleDialog(s['vendorId'] ?? s['id']),
-                                    icon: const Icon(Icons.point_of_sale),
-                                    label: const Text('Vender'),
-                                  ),
-                                  OutlinedButton.icon(
-                                    onPressed: () => _sellAllAssigned(s['vendorId'] ?? s['id']),
-                                    icon: const Icon(Icons.sell_outlined),
-                                    label: const Text('Vender todo'),
+                                  _modernButton(
+                                    'Asignar líder',
+                                    Icons.person_add_alt,
+                                    () => _reassignLeader(s),
+                                    Colors.blue,
+                                    isSmall: true,
                                   ),
                                   const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () => _deleteVendor(s),
-                                    icon: const Icon(Icons.delete_forever, color: Colors.white),
-                                    label: const Text('Eliminar'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                      foregroundColor: Colors.white,
-                                    ),
+                                  _modernButton(
+                                    'Eliminar',
+                                    Icons.delete_forever,
+                                    () => _deleteVendor(s),
+                                    Colors.red,
+                                    isSmall: true,
                                   ),
                                 ],
                               ),
-                            )),
-                          ],
-                        ),
-                      );
-                    }),
-                    // Mostrar vendedores sin líder (huérfanos) si existieran
-                    ...vendors.where((v) => (v['role'] ?? '') != 'LEADER' && (v['leaderId'] == null || v['leaderId'] == '')).map((s) => Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.person, color: Colors.blue),
-                        title: Text(s['name'] ?? '—'),
-                        subtitle: const Text('Vendedor'),
-                        onTap: () => _showVendorDetail(s),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            OutlinedButton.icon(
-                              onPressed: () => _reassignLeader(s),
-                              icon: const Icon(Icons.person_add_alt),
-                              label: const Text('Asignar líder'),
                             ),
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
-                              onPressed: () => _deleteVendor(s),
-                              icon: const Icon(Icons.delete_forever, color: Colors.white),
-                              label: const Text('Eliminar'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    )),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -2478,7 +2617,419 @@ class _CrmScreenState extends State<CrmScreen> {
     );
   }
 
-  // Métodos helper para calcular totales
+  // Métodos helper para la nueva interfaz moderna
+  
+  Widget _modernStat(String label, String value, {String? assignedValue, String? vendorId, Color? color}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: (color ?? Colors.blue).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: (color ?? Colors.blue).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color ?? Colors.blue,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (assignedValue != null && vendorId != null) ...[
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$assignedValue asignadas',
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Colors.green,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  Widget _modernButton(String label, IconData icon, VoidCallback onPressed, Color color, {bool isSmall = false}) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: isSmall ? 16 : 20),
+      label: Text(
+        label,
+        style: TextStyle(fontSize: isSmall ? 12 : 14),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmall ? 12 : 16,
+          vertical: isSmall ? 8 : 12,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        elevation: 2,
+      ),
+    );
+  }
+  
+  Widget _buildSellerCard(Map<String, dynamic> seller, {required bool isSubseller}) {
+    final color = isSubseller ? Colors.purple : Colors.blue;
+    final icon = isSubseller ? Icons.people_alt : Icons.person;
+    final roleLabel = isSubseller ? 'SUBVENDEDOR' : 'VENDEDOR';
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.all(16),
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  color.withOpacity(0.8),
+                  color,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+          title: Text(
+            seller['name'] ?? '—',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          subtitle: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  roleLabel,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${seller['soldCount'] ?? 0} vendidas',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    color.withOpacity(0.05),
+                    color.withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _modernStat(
+                        'Vendidas',
+                        (seller['soldCount'] ?? 0).toString(),
+                        assignedValue: (seller['assignedCount'] ?? 0).toString(),
+                        vendorId: seller['vendorId'] ?? seller['id'],
+                        color: color,
+                      ),
+                      _modernStat(
+                        'Comisión',
+                        'Bs ${seller['commissionsBs'] ?? 0}',
+                        color: Colors.green,
+                      ),
+                      if (isSubseller && seller['subleaderCommissionBs'] != null)
+                        _modernStat(
+                          'Com. Subvendedor',
+                          'Bs ${seller['subleaderCommissionBs']}',
+                          color: Colors.orange,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      if (!isSubseller)
+                        _modernButton(
+                          'Reasignar líder',
+                          Icons.swap_horiz,
+                          () => _reassignLeader(seller),
+                          Colors.orange,
+                          isSmall: true,
+                        ),
+                      _modernButton(
+                        'Vender',
+                        Icons.point_of_sale,
+                        () => _registerSaleDialog(seller['vendorId'] ?? seller['id']),
+                        Colors.blue,
+                        isSmall: true,
+                      ),
+                      _modernButton(
+                        'Vender Todo',
+                        Icons.sell_outlined,
+                        () => _sellAllAssigned(seller['vendorId'] ?? seller['id']),
+                        Colors.green,
+                        isSmall: true,
+                      ),
+                      _modernButton(
+                        'Eliminar',
+                        Icons.delete_forever,
+                        () => _deleteVendor(seller),
+                        Colors.red,
+                        isSmall: true,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSellerCardWithSubsellers(Map<String, dynamic> seller, List<Map<String, dynamic>> allSubsellers) {
+    // Filtrar subvendedores que pertenecen a este vendedor específico
+    final sellerId = seller['vendorId'] ?? seller['id'];
+    final subsellers = allSubsellers.where((sub) => 
+      (sub['sellerId'] == sellerId)
+    ).toList();
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          childrenPadding: const EdgeInsets.all(16),
+          leading: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.blue.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.person, color: Colors.white, size: 24),
+          ),
+          title: Text(
+            seller['name'] ?? '—',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: Color(0xFF2D3748),
+            ),
+          ),
+          subtitle: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'VENDEDOR',
+                  style: TextStyle(
+                    color: Color(0xFF2196F3),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${seller['soldCount'] ?? 0} vendidas',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 14,
+                ),
+              ),
+              if (subsellers.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '• ${subsellers.length} subvendedores',
+                  style: TextStyle(
+                    color: Colors.purple[600],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          children: [
+            // Estadísticas del vendedor
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.blue.withOpacity(0.05),
+                    Colors.blue.withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _modernStat(
+                        'Vendidas',
+                        (seller['soldCount'] ?? 0).toString(),
+                        assignedValue: (seller['assignedCount'] ?? 0).toString(),
+                        vendorId: sellerId,
+                        color: Colors.blue,
+                      ),
+                      _modernStat(
+                        'Comisión',
+                        'Bs ${seller['commissionsBs'] ?? 0}',
+                        color: Colors.green,
+                      ),
+                      if (seller['subleaderCommissionBs'] != null)
+                        _modernStat(
+                          'Com. Subvendedor',
+                          'Bs ${seller['subleaderCommissionBs']}',
+                          color: Colors.orange,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      _modernButton(
+                        'Vender',
+                        Icons.point_of_sale,
+                        () => _registerSaleDialog(sellerId),
+                        Colors.blue,
+                      ),
+                      _modernButton(
+                        'Vender Todo',
+                        Icons.sell_outlined,
+                        () => _sellAllAssigned(sellerId),
+                        Colors.green,
+                      ),
+                      _modernButton(
+                        'Eliminar',
+                        Icons.delete_forever,
+                        () => _deleteVendor(seller),
+                        Colors.red,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            
+            // Subvendedores del vendedor
+            if (subsellers.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.people_alt, color: Colors.purple, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'SUBVENDEDORES (${subsellers.length})',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...subsellers.map((subseller) => Container(
+                margin: const EdgeInsets.only(left: 20, bottom: 8),
+                child: _buildSellerCard(subseller, isSubseller: true),
+              )),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   int _getTotalSold(List<Map<String, dynamic>> vendors) {
     return vendors.fold<int>(0, (sum, vendor) => sum + (_toInt(vendor['soldCount'])));
   }
@@ -2521,11 +3072,14 @@ class _CrmScreenState extends State<CrmScreen> {
       ).toList();
       
       for (final seller in sellers) {
+        final sellerRole = (seller['role'] ?? '') == 'SUBSELLER' ? 'Subvendedor' : 'Vendedor';
+        final sellerIcon = (seller['role'] ?? '') == 'SUBSELLER' ? '👥' : '👤';
+        
         items.add(DropdownMenuItem<String>(
           value: seller['id'] as String,
           child: Padding(
             padding: const EdgeInsets.only(left: 20),
-            child: Text('👤 Vendedor: ${seller['name']}'),
+            child: Text('$sellerIcon $sellerRole: ${seller['name']}'),
           ),
         ));
       }
@@ -2545,11 +3099,14 @@ class _CrmScreenState extends State<CrmScreen> {
       ));
       
       for (final seller in orphanSellers) {
+        final sellerRole = (seller['role'] ?? '') == 'SUBSELLER' ? 'Subvendedor' : 'Vendedor';
+        final sellerIcon = (seller['role'] ?? '') == 'SUBSELLER' ? '👥' : '👤';
+        
         items.add(DropdownMenuItem<String>(
           value: seller['id'] as String,
           child: Padding(
             padding: const EdgeInsets.only(left: 20),
-            child: Text('👤 Vendedor: ${seller['name']}'),
+            child: Text('$sellerIcon $sellerRole: ${seller['name']}'),
           ),
         ));
       }
@@ -2774,9 +3331,9 @@ class _CrmScreenState extends State<CrmScreen> {
               backgroundColor: Colors.white,
               body: Center(
                 child: Container(
-                  width: 720, // Ancho optimizado para mejor calidad (720 píxeles)
-                  height: 1020, // Alto optimizado para mejor calidad (1020 píxeles)
-                  child: SingleChildScrollView(
+                  width: 650, // Ancho reducido para mejor ajuste
+                  height: 900, // Alto ajustado para mejor ajuste
+                  child: Center(
                     child: CartillaWidget(
                       numbers: _convertNumbersToIntList(card['numbers'] ?? []),
                       cardNumber: cardNumber,
@@ -2967,7 +3524,7 @@ class _CrmScreenState extends State<CrmScreen> {
     if (cards.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No hay cartillas para eliminar'),
+          content: Text('No hay cartillas para desasignar'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -2980,9 +3537,9 @@ class _CrmScreenState extends State<CrmScreen> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.delete_forever, color: Colors.red),
+            Icon(Icons.person_remove, color: Colors.red),
             SizedBox(width: 8),
-            Text('ELIMINAR TODAS LAS CARTILLAS'),
+            Text('DESASIGNAR TODAS LAS CARTILLAS'),
           ],
         ),
         content: Column(
@@ -2990,7 +3547,7 @@ class _CrmScreenState extends State<CrmScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '🚨 ADVERTENCIA CRÍTICA: Esta operación es IRREVERSIBLE',
+              '🚨 ADVERTENCIA CRÍTICA: Esta operación desasignará todas las cartillas',
               style: TextStyle(
                 color: Colors.red,
                 fontWeight: FontWeight.bold,
@@ -2999,7 +3556,7 @@ class _CrmScreenState extends State<CrmScreen> {
             ),
             SizedBox(height: 16),
             Text(
-              '¿Estás seguro de que quieres eliminar TODAS las ${cards.length} cartillas asignadas?',
+              '¿Estás seguro de que quieres desasignar TODAS las ${cards.length} cartillas asignadas?',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 16),
@@ -3021,10 +3578,10 @@ class _CrmScreenState extends State<CrmScreen> {
                     ),
                   ),
                   SizedBox(height: 8),
-                  Text('• Se ELIMINARÁN PERMANENTEMENTE ${cards.length} cartillas'),
-                  Text('• NO se podrán recuperar'),
-                  Text('• Los números quedarán disponibles para futuras asignaciones'),
-                  Text('• Se liberará todo el inventario del vendedor/líder'),
+                  Text('• Se DESASIGNARÁN ${cards.length} cartillas del vendedor/líder'),
+                  Text('• Las cartillas quedarán disponibles para futuras asignaciones'),
+                  Text('• Los números se liberarán del inventario actual'),
+                  Text('• Se limpiará completamente la asignación'),
                 ],
               ),
             ),
@@ -3042,7 +3599,7 @@ class _CrmScreenState extends State<CrmScreen> {
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Esta operación es útil para limpiar completamente el inventario de un vendedor o líder.',
+                      'Esta operación es útil para desasignar completamente el inventario de un vendedor o líder.',
                       style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
                     ),
                   ),
@@ -3062,7 +3619,7 @@ class _CrmScreenState extends State<CrmScreen> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: Text('ELIMINAR TODAS'),
+            child: Text('DESASIGNAR TODAS'),
           ),
         ],
       ),
@@ -3076,7 +3633,7 @@ class _CrmScreenState extends State<CrmScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text('ELIMINANDO CARTILLAS...'),
+        title: Text('DESASIGNANDO CARTILLAS...'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -3087,12 +3644,12 @@ class _CrmScreenState extends State<CrmScreen> {
             ),
             SizedBox(height: 16),
             Text(
-              'Eliminadas: 0 / $total',
+              'Desasignadas: 0 / $total',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 8),
             Text(
-              'Eliminando cartilla 1 de $total...',
+              'Desasignando cartilla 1 de $total...',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
           ],
@@ -3109,17 +3666,15 @@ class _CrmScreenState extends State<CrmScreen> {
         final cardNumber = card['cardNo']?.toString() ?? card['id'];
         
         try {
-          // Llamar al endpoint de eliminación
-          final response = await http.delete(
-            Uri.parse('$_apiBase/cards/${card['id']}'),
-            headers: {'Content-Type': 'application/json'},
-          );
+          // Desasignar cartilla usando el método del AppProvider
+          final appProvider = Provider.of<AppProvider>(context, listen: false);
+          final success = await appProvider.unassignFirebaseCartilla(card['id']);
           
-          if (response.statusCode == 200) {
+          if (success) {
             successCount++;
           } else {
             errorCount++;
-            debugPrint('Error eliminando cartilla $cardNumber: ${response.body}');
+            debugPrint('Error desasignando cartilla $cardNumber');
           }
           
           // Actualizar progreso
@@ -3130,7 +3685,7 @@ class _CrmScreenState extends State<CrmScreen> {
               context: context,
               barrierDismissible: false,
               builder: (context) => AlertDialog(
-                title: Text('ELIMINANDO CARTILLAS...'),
+                title: Text('DESASIGNANDO CARTILLAS...'),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -3141,12 +3696,12 @@ class _CrmScreenState extends State<CrmScreen> {
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Eliminadas: ${i + 1} / $total',
+                      'Desasignadas: ${i + 1} / $total',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Eliminando cartilla ${i + 2 > total ? total : i + 2} de $total...',
+                      'Desasignando cartilla ${i + 2 > total ? total : i + 2} de $total...',
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                     SizedBox(height: 8),
@@ -3165,7 +3720,7 @@ class _CrmScreenState extends State<CrmScreen> {
           
         } catch (e) {
           errorCount++;
-          debugPrint('Error eliminando cartilla $cardNumber: $e');
+          debugPrint('Error desasignando cartilla $cardNumber: $e');
         }
       }
       
@@ -3184,7 +3739,7 @@ class _CrmScreenState extends State<CrmScreen> {
                   color: successCount > 0 ? Colors.green : Colors.red,
                 ),
                 SizedBox(width: 8),
-                Text('Eliminación Completada'),
+                Text('Desasignación Completada'),
               ],
             ),
             content: Column(
@@ -3204,13 +3759,13 @@ class _CrmScreenState extends State<CrmScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Resumen de Eliminación:',
+                        'Resumen de Desasignación:',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       SizedBox(height: 8),
                       Text('• Total de cartillas: $total'),
                       Text(
-                        '• Eliminadas exitosamente: $successCount',
+                        '• Desasignadas exitosamente: $successCount',
                         style: TextStyle(
                           color: Colors.green.shade700,
                           fontWeight: FontWeight.bold,
@@ -3242,7 +3797,7 @@ class _CrmScreenState extends State<CrmScreen> {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'El inventario ha sido limpiado completamente. Los números de cartilla están disponibles para futuras asignaciones.',
+                            'El inventario ha sido desasignado completamente. Los números de cartilla están disponibles para futuras asignaciones.',
                             style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
                           ),
                         ),

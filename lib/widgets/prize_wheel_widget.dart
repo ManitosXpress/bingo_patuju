@@ -120,7 +120,7 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
   void initState() {
     super.initState();
     _spinController = AnimationController(
-      duration: const Duration(seconds: 6), // Más duración
+      duration: const Duration(seconds: 3), // Exactamente 3 segundos
       vsync: this,
     );
     _spinAnimation = Tween<double>(
@@ -128,7 +128,7 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _spinController,
-      curve: Curves.elasticOut, // Efecto de rebote
+      curve: Curves.easeInOut, // Suave aceleración y desaceleración
     ));
   }
 
@@ -180,6 +180,24 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
         widget.onPrizeSelected!(selectedCartilla);
       }
     });
+  }
+
+  // Método para obtener el número que se muestra mientras gira
+  String _getSpinningNumber() {
+    if (!_isSpinning) return '';
+    
+    final allNumbers = _allWheelNumbers;
+    if (allNumbers.isEmpty) return '';
+    
+    // Calcular qué número mostrar basado en el progreso de la animación
+    final progress = _spinAnimation.value;
+    final totalNumbers = allNumbers.length;
+    
+    // Crear un efecto de "ruleta" que acelera y luego desacelera
+    final easedProgress = Curves.easeInOut.transform(progress);
+    final index = (easedProgress * totalNumbers * 10) % totalNumbers;
+    
+    return '${allNumbers[index.floor()]}';
   }
 
   @override
@@ -313,32 +331,121 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
             
             const SizedBox(height: 16),
             
-            // Ruleta centrada
+            // Ruleta centrada con números girando en el centro
             Expanded(
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Contenedor de la ruleta (sin flecha)
-                    AnimatedBuilder(
-                      animation: _spinAnimation,
-                      builder: (context, child) {
-                        return Transform.rotate(
-                          angle: _spinAnimation.value * 50 * math.pi, // Más rotaciones
-                          child: Container(
-                            width: 280,
-                            height: 280,
-                            child: CustomPaint(
-                              painter: CartillaWheelPainter(
-                                wheelNumbers: _allWheelNumbers.isNotEmpty ? _allWheelNumbers : widget.cartillaNumbers,
-                                selectedCartilla: _selectedCartilla,
-                                isSpinning: _isSpinning,
-                                showIndicator: false, // No mostrar indicador en la ruleta
+                    // Contenedor de la ruleta
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Ruleta giratoria (solo colores, sin números)
+                        AnimatedBuilder(
+                          animation: _spinAnimation,
+                          builder: (context, child) {
+                            return Transform.rotate(
+                              angle: _spinAnimation.value * 50 * math.pi, // Más rotaciones
+                              child: Container(
+                                width: 280,
+                                height: 280,
+                                child: CustomPaint(
+                                  painter: CartillaWheelPainter(
+                                    wheelNumbers: _allWheelNumbers.isNotEmpty ? _allWheelNumbers : widget.cartillaNumbers,
+                                    selectedCartilla: _selectedCartilla,
+                                    isSpinning: _isSpinning,
+                                    showNumbers: false, // No mostrar números en la ruleta
+                                    showIndicator: false,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        
+                        // Números girando en el centro
+                        if (_isSpinning)
+                          AnimatedBuilder(
+                            animation: _spinAnimation,
+                            builder: (context, child) {
+                              return Container(
+                                width: 200,
+                                height: 200,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.9),
+                                  border: Border.all(color: Colors.orange, width: 4),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.3),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _getSpinningNumber(),
+                                    style: TextStyle(
+                                      fontSize: 48,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange.shade800,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black.withOpacity(0.3),
+                                          offset: Offset(2, 2),
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        
+                        // Número ganador final en el centro
+                        if (!_isSpinning && _selectedCartilla != null)
+                          Container(
+                            width: 200,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  Colors.orange.shade300,
+                                  Colors.orange.shade700,
+                                ],
+                              ),
+                              border: Border.all(color: Colors.white, width: 6),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.orange.withOpacity(0.5),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$_selectedCartilla',
+                                style: TextStyle(
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.5),
+                                      offset: Offset(2, 2),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        );
-                      },
+                      ],
                     ),
                     
                     const SizedBox(height: 16),
@@ -482,12 +589,14 @@ class CartillaWheelPainter extends CustomPainter {
   final int? selectedCartilla;
   final bool isSpinning;
   final bool showIndicator; // Nuevo parámetro para controlar la visibilidad del indicador
+  final bool showNumbers; // Nuevo parámetro para controlar si mostrar números
 
   CartillaWheelPainter({
     required this.wheelNumbers,
     this.selectedCartilla,
     required this.isSpinning,
     this.showIndicator = true, // Valor por defecto
+    this.showNumbers = true, // Valor por defecto
   });
 
   @override
@@ -495,53 +604,69 @@ class CartillaWheelPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - 20;
 
-    // Dibujar el borde exterior
+    // Dibujar el borde exterior más grueso y colorido
     final borderPaint = Paint()
-      ..color = Colors.orange
+      ..color = Colors.orange.shade600
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 8.0;
+      ..strokeWidth = 12.0;
     
     canvas.drawCircle(center, radius, borderPaint);
 
-    // Dibujar las secciones de la ruleta
+    // Dibujar las secciones de la ruleta con colores más vibrantes
     final sectionAngle = 2 * math.pi / wheelNumbers.length;
+    
+    // Colores vibrantes para las secciones
+    final vibrantColors = [
+      Colors.red.shade500,
+      Colors.orange.shade500,
+      Colors.yellow.shade500,
+      Colors.green.shade500,
+      Colors.blue.shade500,
+      Colors.purple.shade500,
+      Colors.pink.shade500,
+      Colors.teal.shade500,
+      Colors.cyan.shade500,
+      Colors.lime.shade500,
+      Colors.indigo.shade500,
+      Colors.amber.shade500,
+    ];
     
     for (int i = 0; i < wheelNumbers.length; i++) {
       final startAngle = i * sectionAngle;
       final endAngle = (i + 1) * sectionAngle;
       final isWinningNumber = selectedCartilla != null && wheelNumbers[i] == selectedCartilla && !isSpinning;
       
-      // Color de la sección
+      // Color de la sección - más vibrante
       final sectionPaint = Paint()
         ..color = isWinningNumber 
-          ? Colors.orange 
-          : Colors.primaries[i % Colors.primaries.length].withOpacity(0.8)
+          ? Colors.orange.shade600
+          : vibrantColors[i % vibrantColors.length]
         ..style = PaintingStyle.fill;
       
       canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius - 4),
+        Rect.fromCircle(center: center, radius: radius - 6),
         startAngle,
         sectionAngle,
         true,
         sectionPaint,
       );
       
-      // Borde de la sección - más grueso para el número ganador
+      // Borde de la sección - más grueso y visible
       final sectionBorderPaint = Paint()
-        ..color = isWinningNumber ? Colors.yellow : Colors.white
+        ..color = isWinningNumber ? Colors.yellow.shade300 : Colors.white
         ..style = PaintingStyle.stroke
-        ..strokeWidth = isWinningNumber ? 4.0 : 1.0; // Reducido para secciones pequeñas
+        ..strokeWidth = isWinningNumber ? 3.0 : 2.0;
       
       canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius - 4),
+        Rect.fromCircle(center: center, radius: radius - 6),
         startAngle,
         sectionAngle,
         true,
         sectionBorderPaint,
       );
       
-      // Solo mostrar texto si la sección es lo suficientemente grande
-      if (sectionAngle > 0.1) { // Mínimo ángulo para mostrar texto
+      // Solo mostrar texto si showNumbers es true y la sección es lo suficientemente grande
+      if (showNumbers && sectionAngle > 0.1) { // Mínimo ángulo para mostrar texto
         // Texto del número
         final textAngle = startAngle + sectionAngle / 2;
         final textRadius = radius * 0.7;
@@ -592,12 +717,27 @@ class CartillaWheelPainter extends CustomPainter {
       }
     }
     
-    // Centro de la ruleta
+    // Centro de la ruleta con gradiente
+    final centerGradient = RadialGradient(
+      colors: [
+        Colors.orange.shade400,
+        Colors.orange.shade700,
+      ],
+    );
+    
     final centerPaint = Paint()
-      ..color = Colors.orange
+      ..shader = centerGradient.createShader(Rect.fromCircle(center: center, radius: 25))
       ..style = PaintingStyle.fill;
     
-    canvas.drawCircle(center, 20, centerPaint);
+    canvas.drawCircle(center, 25, centerPaint);
+    
+    // Borde del centro
+    final centerBorderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+    
+    canvas.drawCircle(center, 25, centerBorderPaint);
     
     // Mostrar el número ganador en el centro
     if (selectedCartilla != null && !isSpinning) {
@@ -607,8 +747,15 @@ class CartillaWheelPainter extends CustomPainter {
           text: centerText,
           style: TextStyle(
             color: Colors.white,
-            fontSize: 16,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
+            shadows: [
+              Shadow(
+                color: Colors.black.withOpacity(0.5),
+                offset: Offset(1, 1),
+                blurRadius: 2,
+              ),
+            ],
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -652,4 +799,4 @@ class CartillaWheelPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-} 
+}

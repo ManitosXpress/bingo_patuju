@@ -58,10 +58,10 @@ class CartillaWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: compact ? null : 612, // Ancho fijo para modo completo - hoja carta (8.5" x 72 DPI)
+        width: compact ? null : 550, // Ancho reducido para mejor ajuste en impresión
         height: compact ? null : null, // Altura flexible para evitar overflow
         constraints: compact ? null : const BoxConstraints(
-          maxHeight: 792, // Altura máxima para hoja carta
+          maxHeight: 800, // Altura máxima ajustada para impresión
         ),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -141,14 +141,14 @@ class CartillaWidget extends StatelessWidget {
         // Contenido principal de la cartilla con scroll
         SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.all(20), // Padding interno reducido para evitar cortes
+            padding: const EdgeInsets.all(12), // Padding interno reducido para evitar cortes
             child: Column(
               mainAxisSize: MainAxisSize.min, // No expandir más del necesario
               children: [
                 _buildHeader(),
-                const SizedBox(height: 15), // Espaciado reducido
+                const SizedBox(height: 10), // Espaciado reducido
                 _buildBingoGrid(),
-                const SizedBox(height: 15), // Espacio reducido al final
+                const SizedBox(height: 10), // Espacio reducido al final
               ],
             ),
           ),
@@ -170,7 +170,7 @@ class CartillaWidget extends StatelessWidget {
   // Header para modo completo
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(12), // Padding reducido para ahorrar espacio
+      padding: const EdgeInsets.all(8), // Padding reducido para ahorrar espacio
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.zero, // Sin bordes redondeados para impresión
@@ -180,8 +180,8 @@ class CartillaWidget extends StatelessWidget {
         children: [
           // Left side - Card number box (centrado)
           Container(
-            width: 80, // Tamaño ligeramente aumentado
-            height: 70, // Altura ligeramente aumentada
+            width: 65, // Tamaño reducido para mejor ajuste
+            height: 55, // Altura reducida para mejor ajuste
             decoration: BoxDecoration(
               border: Border.all(color: Colors.black, width: 3),
               borderRadius: BorderRadius.circular(8),
@@ -192,16 +192,16 @@ class CartillaWidget extends StatelessWidget {
                 Text(
                   "CARTILLA",
                   style: TextStyle(
-                    fontSize: 11, // Fuente ligeramente aumentada
+                    fontSize: 9, // Fuente reducida
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
                 ),
-                const SizedBox(height: 2), // Espaciado ligeramente aumentado
+                const SizedBox(height: 1), // Espaciado reducido
                 Text(
                   cardNumber ?? "#",
                   style: TextStyle(
-                    fontSize: 20, // Fuente ligeramente aumentada
+                    fontSize: 16, // Fuente reducida
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -210,21 +210,21 @@ class CartillaWidget extends StatelessWidget {
             ),
           ),
           
-          const SizedBox(width: 20), // Espaciado pequeño para acercar al logo
+          const SizedBox(width: 15), // Espaciado reducido
           
           // Center - Logo and title (más grande) - Reducir ancho para acercar elementos
           Container(
-            width: 140, // Ancho fijo más pequeño para acercar elementos
+            width: 120, // Ancho reducido para mejor ajuste
             child: Column(
               children: [
                 const SizedBox(height: 5), // Espaciado mínimo
                 
-                // Logo con imagen bingo_imperial.png (más grande)
+                // Logo con imagen bingo_imperial.png (reducido)
                 Center(
                   child: Image.asset(
                     'assets/images/bingo_imperial.png',
-                    height: 160, // Tamaño aumentado de 100 a 120
-                    width: 160, // Tamaño aumentado de 100 a 120
+                    height: 120, // Tamaño reducido para mejor ajuste
+                    width: 120, // Tamaño reducido para mejor ajuste
                   ),
                 ),
                 
@@ -233,18 +233,18 @@ class CartillaWidget extends StatelessWidget {
             ),
           ),
           
-          const SizedBox(width: 20), // Espaciado pequeño para acercar al logo
+          const SizedBox(width: 15), // Espaciado reducido
           
           // Right side - Date and Price labels (centrado)
           Container(
-            width: 80, // Ancho fijo para balance visual
+            width: 70, // Ancho reducido para balance visual
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center, // Centrar texto
               children: [
                 Text(
                   "FECHA:",
                   style: TextStyle(
-                    fontSize: 14, // Fuente reducida para ahorrar espacio
+                    fontSize: 11, // Fuente reducida para ahorrar espacio
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -252,15 +252,15 @@ class CartillaWidget extends StatelessWidget {
                 Text(
                   date ?? "N/A",
                   style: TextStyle(
-                    fontSize: 12, // Fuente reducida para ahorrar espacio
+                    fontSize: 10, // Fuente reducida para ahorrar espacio
                     color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 6), // Espaciado reducido
+                const SizedBox(height: 4), // Espaciado reducido
                 Text(
                   "PRECIO:",
                   style: TextStyle(
-                    fontSize: 14, // Fuente reducida para ahorrar espacio
+                    fontSize: 11, // Fuente reducida para ahorrar espacio
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -268,7 +268,7 @@ class CartillaWidget extends StatelessWidget {
                 Text(
                   price ?? "N/A",
                   style: TextStyle(
-                    fontSize: 12, // Fuente reducida para ahorrar espacio
+                    fontSize: 10, // Fuente reducida para ahorrar espacio
                     color: Colors.black87,
                   ),
                 ),
@@ -341,8 +341,8 @@ class CartillaWidget extends StatelessWidget {
   // Grid completo de bingo
   Widget _buildBingoGrid() {
     return Container(
-      padding: const EdgeInsets.all(15), // Padding reducido para mejor ajuste
-      margin: const EdgeInsets.all(6), // Margen interior reducido
+      padding: const EdgeInsets.all(10), // Padding reducido para mejor ajuste
+      margin: const EdgeInsets.all(4), // Margen interior reducido
       child: Stack(
         children: [
           // Background watermark - B premium con anillos (parte superior izquierda)
@@ -350,8 +350,8 @@ class CartillaWidget extends StatelessWidget {
             left: 4,
             top: 4,
             child: Container(
-              width: 70, // Tamaño reducido para ahorrar espacio
-              height: 70, // Tamaño reducido para ahorrar espacio
+              width: 50, // Tamaño reducido para ahorrar espacio
+              height: 50, // Tamaño reducido para ahorrar espacio
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
@@ -390,7 +390,7 @@ class CartillaWidget extends StatelessWidget {
                   child: Text(
                     "B",
                     style: TextStyle(
-                      fontSize: 35, // Fuente reducida para ahorrar espacio
+                      fontSize: 25, // Fuente reducida para ahorrar espacio
                       fontWeight: FontWeight.bold,
                       color: const Color(0xFFFF8C00).withValues(alpha: 0.2),
                       shadows: [
@@ -416,8 +416,8 @@ class CartillaWidget extends StatelessWidget {
                   for (String letter in ['B', 'I', 'N', 'G', 'O'])
                     Expanded(
                       child: Container(
-                        height: 65, // Altura ligeramente reducida para ahorrar espacio
-                        margin: const EdgeInsets.all(3), // Margen aumentado para mejor separación
+                        height: 50, // Altura reducida para ahorrar espacio
+                        margin: const EdgeInsets.all(2), // Margen reducido para mejor ajuste
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF8C00),
                           border: Border.all(color: Colors.black, width: 2),
@@ -427,7 +427,7 @@ class CartillaWidget extends StatelessWidget {
                           child: Text(
                             letter,
                             style: const TextStyle(
-                              fontSize: 26, // Fuente ajustada proporcionalmente
+                              fontSize: 20, // Fuente reducida para mejor ajuste
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                               shadows: [
@@ -452,8 +452,8 @@ class CartillaWidget extends StatelessWidget {
                     for (int col = 0; col < 5; col++)
                       Expanded(
                         child: Container(
-                          height: 65, // Altura ligeramente reducida para ahorrar espacio
-                          margin: const EdgeInsets.all(3), // Margen aumentado para mejor separación
+                          height: 50, // Altura reducida para ahorrar espacio
+                          margin: const EdgeInsets.all(2), // Margen reducido para mejor ajuste
                           decoration: BoxDecoration(
                             color: Colors.white,
                             border: Border.all(color: Colors.black, width: 2),
@@ -545,7 +545,7 @@ class CartillaWidget extends StatelessWidget {
         child: Text(
           "FREE",
           style: TextStyle(
-            fontSize: 24,
+            fontSize: 18, // Fuente reducida para mejor ajuste
             fontWeight: FontWeight.bold,
             color: Color(0xFFFF8C00),
           ),
@@ -559,7 +559,7 @@ class CartillaWidget extends StatelessWidget {
       return Text(
         number.toString(),
         style: const TextStyle(
-          fontSize: 24, // Fuente ajustada proporcionalmente
+          fontSize: 18, // Fuente reducida para mejor ajuste
           fontWeight: FontWeight.bold,
           color: Colors.black,
         ),

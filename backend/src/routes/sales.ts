@@ -38,19 +38,45 @@ router.post('/', async (req: any, res: any) => {
 
     let leaderId: string | null = seller.leaderId ?? null;
 
-    // Commissions per spec: each sale gives 2 Bs to the seller; and 1 Bs to the leader if seller is not leader
-    const sellerCommission = 2;
-    const leaderCommission = seller.role === 'LEADER' ? 0 : 1;
+    // Nueva estructura de comisiones:
+    // - Líder: 3 Bs por cartilla vendida directamente, 1.5 Bs por vendedor de línea
+    // - Vendedor: 3 Bs por cartilla vendida directamente, 1.5 Bs por subvendedor
+    // - Subvendedor: 3 Bs por cartilla vendida
+    
+    let sellerCommission = 3; // Todos reciben 3 Bs por venta directa
+    let leaderCommission = 0;
+    let subleaderCommission = 0; // Para vendedores que tienen subvendedores
+    
+    if (seller.role === 'LEADER') {
+      // Líder vendiendo directamente - solo recibe 3 Bs
+      leaderCommission = 0;
+    } else if (seller.role === 'SELLER') {
+      // Vendedor vendiendo - líder recibe 1.5 Bs
+      leaderCommission = 1.5;
+    } else if (seller.role === 'SUBSELLER') {
+      // Subvendedor vendiendo - vendedor padre recibe 1.5 Bs, líder NO recibe nada
+      leaderCommission = 0; // El líder NO recibe del subvendedor
+      subleaderCommission = 1.5; // Para el vendedor padre
+    }
+
+    // Obtener el vendedor padre si es un subvendedor
+    let subleaderId: string | null = null;
+    if (seller.role === 'SUBSELLER' && seller.sellerId) {
+      // Usar el sellerId directamente del subvendedor
+      subleaderId = seller.sellerId;
+    }
 
     // Create sale
     const saleRef = await db.collection('sales').add({
       cardId,
       sellerId,
       leaderId,
+      subleaderId,
       amount,
       commissions: {
         seller: sellerCommission,
         leader: leaderCommission,
+        subleader: subleaderCommission,
       },
       createdAt: Date.now(),
     });
@@ -66,11 +92,22 @@ router.post('/', async (req: any, res: any) => {
       source: saleRef.id,
       createdAt: Date.now(),
     });
+    
     if (leaderCommission > 0 && leaderId) {
       await db.collection('balances').add({
         vendorId: leaderId,
         type: 'COMMISSION',
         amount: leaderCommission,
+        source: saleRef.id,
+        createdAt: Date.now(),
+      });
+    }
+    
+    if (subleaderCommission > 0 && subleaderId) {
+      await db.collection('balances').add({
+        vendorId: subleaderId,
+        type: 'COMMISSION',
+        amount: subleaderCommission,
         source: saleRef.id,
         createdAt: Date.now(),
       });

@@ -669,13 +669,12 @@ class AppProvider extends ChangeNotifier {
       
       // Verificar cada patrón de la ronda (o todos si no hay patrones específicos)
       final patternsToCheck = roundPatterns ?? [
-        'Línea Horizontal', 'Línea Vertical', 'Diagonal Principal', 
-        'Diagonal Secundaria', 'Cartón Lleno', 'Marco Completo', 'Marco Pequeño',
-        '5 Casillas Diagonales', 'X', 'Corazón', 'Caída de Nieve', 'Árbol o Flecha',
-        'Spoutnik', 'ING', 'NGO', 'Autopista',
+        'Línea Horizontal', 'Línea Vertical', 'Diagonal Principal', 'Diagonal Secundaria',
+        'Cartón Lleno', 'Figura Avión', 'X', 'Marco Completo', 'Corazón',
+        'Caída de Nieve', 'Marco Pequeño', 'Árbol o Flecha', 'Spoutnik', 'ING', 'NGO', 'Autopista',
         // Figuras legendarias
-        'Reloj de Arena', 'Doble Línea V', 'Figura la Suegra', 'Figura Comodín',
-        'Letra FE', 'Figura C Loca', 'Figura Bandera', 'Figura Triple Línea', 'Diagonal Derecha'
+        'Reloj de Arena', 'Doble Línea V', 'Figura la Suegra', 'Figura Infinito', 'Letra FE',
+        'Figura C Loca', 'Figura Bandera', 'Figura Triple Línea', 'Diagonal Derecha'
       ];
       
       // Detectar TODOS los patrones ganadores
@@ -805,7 +804,7 @@ class AppProvider extends ChangeNotifier {
         }
         return true;
         
-      case '5 Casillas Diagonales':
+      case 'Figura Avión':
         return _checkCustomPattern(cartilla, calledNumbers, [
           [1,0,0,0,1],
           [0,1,0,1,0],
@@ -859,7 +858,7 @@ class AppProvider extends ChangeNotifier {
           [0,0,1,0,0],
         ]);
         
-      case 'ING':
+      case 'I':
         return _checkCustomPattern(cartilla, calledNumbers, [
           [1,0,0,0,1],
           [1,0,0,0,1],
@@ -868,7 +867,7 @@ class AppProvider extends ChangeNotifier {
           [1,1,1,1,1],
         ]);
         
-      case 'NGO':
+      case 'N':
         return _checkCustomPattern(cartilla, calledNumbers, [
           [1,1,1,1,1],
           [1,0,0,0,1],
@@ -914,7 +913,7 @@ class AppProvider extends ChangeNotifier {
           [1,0,1,0,1],
         ]);
         
-      case 'Figura Comodín':
+      case 'Figura Infinito':
         return _checkCustomPattern(cartilla, calledNumbers, [
           [1,0,1,0,1],
           [0,1,0,1,0],

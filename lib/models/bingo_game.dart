@@ -336,8 +336,8 @@ class BingoGame {
     
     // Nuevos patrones especiales
     if (_checkPattern(cartilla, calledNumbers, _diagonal5Pattern())) {
-      completedPatterns.add('5 Casillas Diagonales');
-      print('DEBUG: 5 Casillas Diagonales completadas');
+      completedPatterns.add('Figura Avión');
+      print('DEBUG: Figura Avión completadas');
     }
     if (_checkPattern(cartilla, calledNumbers, _xPattern())) {
       completedPatterns.add('X');
@@ -368,12 +368,12 @@ class BingoGame {
       print('DEBUG: Spoutnik completado');
     }
     if (_checkPattern(cartilla, calledNumbers, _ingPattern())) {
-      completedPatterns.add('ING');
-      print('DEBUG: ING completado');
+      completedPatterns.add('I');
+      print('DEBUG: I completado');
     }
     if (_checkPattern(cartilla, calledNumbers, _ngoPattern())) {
-      completedPatterns.add('NGO');
-      print('DEBUG: NGO completado');
+      completedPatterns.add('N');
+      print('DEBUG: N completado');
     }
     if (_checkPattern(cartilla, calledNumbers, _highwayPattern())) {
       completedPatterns.add('Autopista');
@@ -394,8 +394,8 @@ class BingoGame {
       print('DEBUG: Figura la Suegra completada');
     }
     if (_checkPattern(cartilla, calledNumbers, _figuraComodinPattern())) {
-      completedPatterns.add('Figura Comodín');
-      print('DEBUG: Figura Comodín completada');
+      completedPatterns.add('Figura Infinito');
+      print('DEBUG: Figura Infinito completada');
     }
     if (_checkPattern(cartilla, calledNumbers, _letraFEPattern())) {
       completedPatterns.add('Letra FE');
@@ -484,7 +484,7 @@ class BingoGame {
     if (full) completedPatterns.add('Cartón Lleno');
     
     // Nuevos patrones especiales
-    if (_checkPattern(cartilla, calledNumbers, _diagonal5Pattern())) completedPatterns.add('5 Casillas Diagonales');
+    if (_checkPattern(cartilla, calledNumbers, _diagonal5Pattern())) completedPatterns.add('Figura Avión');
     if (_checkPattern(cartilla, calledNumbers, _xPattern())) completedPatterns.add('X');
     if (_checkPattern(cartilla, calledNumbers, _fullFramePattern())) completedPatterns.add('Marco Completo');
     if (_checkPattern(cartilla, calledNumbers, _heartPattern())) completedPatterns.add('Corazón');
@@ -500,7 +500,7 @@ class BingoGame {
     if (_checkPattern(cartilla, calledNumbers, _relojArenaPattern())) completedPatterns.add('Reloj de Arena');
     if (_checkPattern(cartilla, calledNumbers, _dobleLineaVPattern())) completedPatterns.add('Doble Línea V');
     if (_checkPattern(cartilla, calledNumbers, _figuraSuegraPattern())) completedPatterns.add('Figura la Suegra');
-    if (_checkPattern(cartilla, calledNumbers, _figuraComodinPattern())) completedPatterns.add('Figura Comodín');
+    if (_checkPattern(cartilla, calledNumbers, _figuraComodinPattern())) completedPatterns.add('Figura Infinito');
     if (_checkPattern(cartilla, calledNumbers, _letraFEPattern())) completedPatterns.add('Letra FE');
     if (_checkPattern(cartilla, calledNumbers, _figuraCLocaPattern())) completedPatterns.add('Figura C Loca');
     if (_checkPattern(cartilla, calledNumbers, _figuraBanderaPattern())) completedPatterns.add('Figura Bandera');
@@ -651,7 +651,7 @@ class BingoGame {
       'Diagonal Principal': diagMain,
       'Diagonal Secundaria': diagAnti,
       'Cartón Lleno': full,
-      '5 Casillas Diagonales': diagonal5,
+      'Figura Avión': diagonal5,
       'X': x,
       'Marco Completo': fullFrame,
       'Corazón': heart,
@@ -659,14 +659,14 @@ class BingoGame {
       'Marco Pequeño': smallFrame,
       'Árbol o Flecha': treeArrow,
       'Spoutnik': spoutnik,
-      'ING': ing,
-      'NGO': ngo,
+      'I': ing,
+      'N': ngo,
       'Autopista': highway,
       // Figuras legendarias - SIEMPRE incluidas
       'Reloj de Arena': relojArena,
       'Doble Línea V': dobleLineaV,
       'Figura la Suegra': figuraSuegra,
-      'Figura Comodín': figuraComodin,
+      'Figura Infinito': figuraComodin,
       'Letra FE': letraFE,
       'Figura C Loca': figuraCLoca,
       'Figura Bandera': figuraBandera,
@@ -934,7 +934,7 @@ class BingoGame {
       'totalWinningCards': uniqueWinningCardIndices.length, // Número real de cartillas físicas ganadoras
       'totalPatternsCompleted': winningCards.length, // Total de patrones completados
       'message': hasAnyBingo 
-          ? '¡BINGO! Se completaron ${uniqueWinningCardIndices.length} cartilla${uniqueWinningCardIndices.length > 1 ? 's' : ''} con ${winningCards.length} patrón${winningCards.length > 1 ? 'es' : ''}'
+          ? '¡BINGO VERIFICADO!'
           : 'No hay bingo aún'
     };
   }
@@ -998,7 +998,7 @@ class BingoGame {
       'totalWinningCards': uniqueWinningCardIndices.length, // Número real de cartillas físicas ganadoras
       'totalPatternsCompleted': winningCards.length, // Total de patrones completados
       'message': hasAnyBingo 
-          ? '¡BINGO! Se completaron ${uniqueWinningCardIndices.length} cartilla${uniqueWinningCardIndices.length > 1 ? 's' : ''} con ${winningCards.length} patrón${winningCards.length > 1 ? 'es' : ''}'
+          ? '¡BINGO VERIFICADO!'
           : 'No hay bingo aún'
     };
   }

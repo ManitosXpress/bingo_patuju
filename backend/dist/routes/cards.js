@@ -1,12 +1,15 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import { db } from '../index';
-const createCardSchema = z.object({
-    numbers: z.array(z.array(z.number())),
-    cardNo: z.number().int().positive().optional(),
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.router = void 0;
+const express_1 = require("express");
+const zod_1 = require("zod");
+const index_1 = require("../index");
+const createCardSchema = zod_1.z.object({
+    numbers: zod_1.z.array(zod_1.z.array(zod_1.z.number())),
+    cardNo: zod_1.z.number().int().positive().optional(),
 });
-const assignSchema = z.object({
-    vendorId: z.string(),
+const assignSchema = zod_1.z.object({
+    vendorId: zod_1.z.string(),
 });
 function flattenGrid(grid) {
     const flat = [];
@@ -50,8 +53,8 @@ function generateRandomBingoNumbers() {
     grid[2][2] = 0;
     return grid;
 }
-export const router = Router();
-router.post('/', async (req, res) => {
+exports.router = (0, express_1.Router)();
+exports.router.post('/', async (req, res) => {
     try {
         const parsed = createCardSchema.parse(req.body);
         const flat = flattenGrid(parsed.numbers);
@@ -65,14 +68,14 @@ router.post('/', async (req, res) => {
         let docId;
         if (parsed.cardNo) {
             docId = String(parsed.cardNo);
-            const ref = db.collection('cards').doc(docId);
+            const ref = index_1.db.collection('cards').doc(docId);
             await ref.set(dataToSave, { merge: false });
             const snap = await ref.get();
             const data = snap.data();
             const numbers = expandGrid(data.numbersFlat ?? [], data.gridSize ?? 5);
             return res.status(201).json({ id: docId, numbers, assignedTo: data.assignedTo, sold: data.sold, createdAt: data.createdAt });
         }
-        const ref = await db.collection('cards').add(dataToSave);
+        const ref = await index_1.db.collection('cards').add(dataToSave);
         const snap = await ref.get();
         const data = snap.data();
         const size = data.gridSize ?? 5;
@@ -90,9 +93,9 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ error: e.message });
     }
 });
-router.get('/', async (_req, res) => {
+exports.router.get('/', async (_req, res) => {
     const { assignedTo, sold, limit } = _req.query;
-    let q = db.collection('cards');
+    let q = index_1.db.collection('cards');
     if (assignedTo)
         q = q.where('assignedTo', '==', assignedTo);
     if (sold === 'true')
@@ -131,11 +134,11 @@ router.get('/', async (_req, res) => {
     });
     return res.json(out);
 });
-router.post('/:id/assign', async (req, res) => {
+exports.router.post('/:id/assign', async (req, res) => {
     try {
         const parsed = assignSchema.parse(req.body);
         const id = req.params.id;
-        const cardRef = db.collection('cards').doc(id);
+        const cardRef = index_1.db.collection('cards').doc(id);
         const card = await cardRef.get();
         if (!card.exists)
             return res.status(404).json({ error: 'Card not found' });
@@ -157,7 +160,7 @@ router.post('/:id/assign', async (req, res) => {
     }
 });
 // Endpoint para asignar múltiples cartillas por rango o números específicos
-router.post('/bulk-assign', async (req, res) => {
+exports.router.post('/bulk-assign', async (req, res) => {
     try {
         const { vendorId, cardNumbers, startRange, endRange, step = 10 } = req.body;
         if (!vendorId) {
@@ -195,12 +198,12 @@ router.post('/bulk-assign', async (req, res) => {
         console.log(`🃏 Asignando ${targetCardNumbers.length} cartilla${targetCardNumbers.length > 1 ? 's' : ''} a vendor ${vendorId}`);
         console.log(`📋 Números solicitados: ${targetCardNumbers.join(', ')}`);
         // Buscar las cartillas por cardNo
-        const batch = db.batch();
+        const batch = index_1.db.batch();
         const assignedCards = [];
         const notFoundCards = [];
         for (const cardNo of targetCardNumbers) {
             // Buscar cartilla por cardNo
-            const cardsSnapshot = await db.collection('cards')
+            const cardsSnapshot = await index_1.db.collection('cards')
                 .where('cardNo', '==', cardNo)
                 .where('sold', '==', false)
                 .limit(1)
@@ -264,7 +267,7 @@ router.post('/bulk-assign', async (req, res) => {
     }
 });
 // Endpoint para generar cartillas automáticamente
-router.post('/generate', async (req, res) => {
+exports.router.post('/generate', async (req, res) => {
     try {
         const { count = 1 } = req.body;
         if (count < 1 || count > 100) {
@@ -274,7 +277,7 @@ router.post('/generate', async (req, res) => {
         }
         console.log(`🃏 Generando ${count} cartilla${count > 1 ? 's' : ''} de Bingo...`);
         // Obtener el siguiente número de cartilla disponible
-        const existingCards = await db.collection('cards').get();
+        const existingCards = await index_1.db.collection('cards').get();
         let nextCardNo = 1;
         if (!existingCards.empty) {
             const cardNumbers = [];
@@ -288,7 +291,7 @@ router.post('/generate', async (req, res) => {
                 nextCardNo = Math.max(...cardNumbers) + 1;
             }
         }
-        const batch = db.batch();
+        const batch = index_1.db.batch();
         const generatedCards = [];
         for (let i = 0; i < count; i++) {
             const numbers = generateRandomBingoNumbers();
@@ -301,7 +304,7 @@ router.post('/generate', async (req, res) => {
                 createdAt: Date.now(),
                 cardNo: nextCardNo + i, // Número secuencial de cartilla
             };
-            const cardRef = db.collection('cards').doc();
+            const cardRef = index_1.db.collection('cards').doc();
             batch.set(cardRef, dataToSave);
             generatedCards.push({
                 id: cardRef.id,
@@ -326,12 +329,12 @@ router.post('/generate', async (req, res) => {
     }
 });
 // Endpoint para eliminar TODAS las cartillas (DEBE ir ANTES de /:id)
-router.delete('/clear', async (_req, res) => {
+exports.router.delete('/clear', async (_req, res) => {
     try {
         console.log('⚠️ ADVERTENCIA: Eliminando TODAS las cartillas de la base de datos...');
         // Obtener todas las cartillas
-        const allCards = await db.collection('cards').get();
-        const batch = db.batch();
+        const allCards = await index_1.db.collection('cards').get();
+        const batch = index_1.db.batch();
         // Agregar todas las cartillas al batch de eliminación
         allCards.docs.forEach((doc) => {
             batch.delete(doc.ref);
@@ -351,10 +354,10 @@ router.delete('/clear', async (_req, res) => {
     }
 });
 // Endpoint para eliminar una cartilla
-router.delete('/:id', async (req, res) => {
+exports.router.delete('/:id', async (req, res) => {
     try {
         const id = req.params.id;
-        const cardRef = db.collection('cards').doc(id);
+        const cardRef = index_1.db.collection('cards').doc(id);
         const card = await cardRef.get();
         if (!card.exists) {
             return res.status(404).json({ error: 'Card not found' });
@@ -368,10 +371,10 @@ router.delete('/:id', async (req, res) => {
     }
 });
 // Endpoint para desasignar una cartilla
-router.post('/:id/unassign', async (req, res) => {
+exports.router.post('/:id/unassign', async (req, res) => {
     try {
         const id = req.params.id;
-        const cardRef = db.collection('cards').doc(id);
+        const cardRef = index_1.db.collection('cards').doc(id);
         const card = await cardRef.get();
         if (!card.exists) {
             return res.status(404).json({ error: 'Card not found' });
@@ -394,10 +397,10 @@ router.post('/:id/unassign', async (req, res) => {
     }
 });
 // Endpoint para marcar cartilla como vendida
-router.post('/:id/sold', async (req, res) => {
+exports.router.post('/:id/sold', async (req, res) => {
     try {
         const id = req.params.id;
-        const cardRef = db.collection('cards').doc(id);
+        const cardRef = index_1.db.collection('cards').doc(id);
         const card = await cardRef.get();
         if (!card.exists) {
             return res.status(404).json({ error: 'Card not found' });
@@ -442,13 +445,13 @@ function validateBingoCard(numbers) {
     return true;
 }
 // Endpoint para validar y corregir cartillas existentes según las reglas del BINGO
-router.post('/validate-and-fix', async (_req, res) => {
+exports.router.post('/validate-and-fix', async (_req, res) => {
     try {
         console.log('🔍 Validando y corrigiendo cartillas existentes...');
-        const existingCards = await db.collection('cards').get();
+        const existingCards = await index_1.db.collection('cards').get();
         let correctedCount = 0;
         let validCount = 0;
-        const batch = db.batch();
+        const batch = index_1.db.batch();
         for (const doc of existingCards.docs) {
             const data = doc.data();
             const currentNumbers = data.numbers ? data.numbers : expandGrid(data.numbersFlat ?? [], 5);
@@ -488,4 +491,4 @@ router.post('/validate-and-fix', async (_req, res) => {
         return res.status(500).json({ error: e.message });
     }
 });
-export default router;
+exports.default = exports.router;

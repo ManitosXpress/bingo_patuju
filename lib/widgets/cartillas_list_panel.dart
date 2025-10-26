@@ -141,57 +141,7 @@ class _CartillasListPanelState extends State<CartillasListPanel> {
   }
 
   Widget _buildFirebaseActions(AppProvider appProvider) {
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: appProvider.isLoadingFirebase 
-              ? null 
-              : () => appProvider.refreshFirebaseCartillas(),
-            icon: appProvider.isLoadingFirebase 
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.refresh),
-            label: Text(
-              appProvider.isLoadingFirebase 
-                ? 'Refrescando...' 
-                : 'Refrescar Firebase',
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: appProvider.isLoadingFirebase 
-              ? null 
-              : () => _showCreateCartillaDialog(context, appProvider),
-            icon: appProvider.isLoadingFirebase 
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.add),
-            label: Text(
-              appProvider.isLoadingFirebase 
-                ? 'Creando...' 
-                : 'Nueva Cartilla',
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ),
-      ],
-    );
+    return const SizedBox.shrink(); // Botones eliminados
   }
 
   Widget _buildEmptyState() {
@@ -823,12 +773,12 @@ class _CartillaListItem extends StatelessWidget {
                               final cartillaWidget = MaterialApp(
                                 home: Scaffold(
                                   backgroundColor: Colors.white,
-                                  body: Center(
-                                    child: Container(
-                                      width: 612, // Ancho de hoja carta (8.5" x 72 DPI)
-                                      height: 792, // Alto de hoja carta (11" x 72 DPI)
-                                      child: SingleChildScrollView(
-                                        child: CartillaWidget(
+                  body: Center(
+                    child: Container(
+                      width: 550, // Ancho reducido para mejor ajuste
+                      height: 800, // Alto ajustado para mejor ajuste
+                      child: Center(
+                        child: CartillaWidget(
                                           numbers: firebaseCartilla.numbers,
                                           cardNumber: firebaseCartilla.cardNo?.toString() ?? firebaseCartilla.displayNumber,
                                           date: DateTime.now().toString().split(' ')[0],

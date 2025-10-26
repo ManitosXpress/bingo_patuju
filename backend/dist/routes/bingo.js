@@ -1,12 +1,19 @@
-import express from 'express';
-import { db } from '../index.js';
-import admin from 'firebase-admin';
-const router = express.Router();
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.bingoRouter = void 0;
+const express_1 = __importDefault(require("express"));
+const index_js_1 = require("../index.js");
+const firebase_admin_1 = __importDefault(require("firebase-admin"));
+const router = express_1.default.Router();
+exports.bingoRouter = router;
 const COLLECTION_NAME = 'bingo_games';
 // GET /api/bingo - Obtener todos los juegos de bingo
 router.get('/', async (req, res) => {
     try {
-        const snapshot = await db
+        const snapshot = await index_js_1.db
             .collection(COLLECTION_NAME)
             .orderBy('createdAt', 'desc')
             .get();
@@ -42,7 +49,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const doc = await db.collection(COLLECTION_NAME).doc(id).get();
+        const doc = await index_js_1.db.collection(COLLECTION_NAME).doc(id).get();
         if (!doc.exists) {
             return res.status(404).json({
                 success: false,
@@ -99,7 +106,7 @@ router.post('/', async (req, res) => {
             updatedAt: now,
             isCompleted: false,
         };
-        const docRef = await db.collection(COLLECTION_NAME).add(newGame);
+        const docRef = await index_js_1.db.collection(COLLECTION_NAME).add(newGame);
         res.status(201).json({
             success: true,
             data: {
@@ -122,7 +129,7 @@ router.put('/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const updateData = req.body;
-        const docRef = db.collection(COLLECTION_NAME).doc(id);
+        const docRef = index_js_1.db.collection(COLLECTION_NAME).doc(id);
         const doc = await docRef.get();
         if (!doc.exists) {
             return res.status(404).json({
@@ -152,7 +159,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const docRef = db.collection(COLLECTION_NAME).doc(id);
+        const docRef = index_js_1.db.collection(COLLECTION_NAME).doc(id);
         const doc = await docRef.get();
         if (!doc.exists) {
             return res.status(404).json({
@@ -185,7 +192,7 @@ router.post('/:id/rounds', async (req, res) => {
                 error: 'Nombre y patrones son requeridos'
             });
         }
-        const docRef = db.collection(COLLECTION_NAME).doc(id);
+        const docRef = index_js_1.db.collection(COLLECTION_NAME).doc(id);
         const doc = await docRef.get();
         if (!doc.exists) {
             return res.status(404).json({
@@ -204,7 +211,7 @@ router.post('/:id/rounds', async (req, res) => {
         };
         // Agregar la nueva ronda al array de rondas
         await docRef.update({
-            rounds: admin.firestore.FieldValue.arrayUnion(newRound),
+            rounds: firebase_admin_1.default.firestore.FieldValue.arrayUnion(newRound),
             updatedAt: now
         });
         res.status(201).json({
@@ -226,7 +233,7 @@ router.put('/:id/rounds/:roundId', async (req, res) => {
     try {
         const { id, roundId } = req.params;
         const updateData = req.body;
-        const docRef = db.collection(COLLECTION_NAME).doc(id);
+        const docRef = index_js_1.db.collection(COLLECTION_NAME).doc(id);
         const doc = await docRef.get();
         if (!doc.exists) {
             return res.status(404).json({
@@ -270,7 +277,7 @@ router.put('/:id/rounds/:roundId', async (req, res) => {
 router.delete('/:id/rounds/:roundId', async (req, res) => {
     try {
         const { id, roundId } = req.params;
-        const docRef = db.collection(COLLECTION_NAME).doc(id);
+        const docRef = index_js_1.db.collection(COLLECTION_NAME).doc(id);
         const doc = await docRef.get();
         if (!doc.exists) {
             return res.status(404).json({
@@ -304,4 +311,3 @@ router.delete('/:id/rounds/:roundId', async (req, res) => {
         });
     }
 });
-export { router as bingoRouter };

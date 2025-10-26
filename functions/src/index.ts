@@ -2,6 +2,10 @@ import { onRequest } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
 import express from 'express';
 import cors from 'cors';
+import { router as vendorsRouter } from './routes/vendors';
+import { router as cardsRouter } from './routes/cards';
+import { router as salesRouter } from './routes/sales';
+import { router as reportsRouter } from './routes/reports';
 
 // Inicializar Firebase Admin
 admin.initializeApp();
@@ -18,12 +22,6 @@ app.use(express.json());
 
 // Ruta de salud
 app.get('/health', (_req, res) => res.json({ ok: true }));
-
-// Importar las rutas después de exportar db
-import { router as vendorsRouter } from './routes/vendors';
-import { router as cardsRouter } from './routes/cards';
-import { router as salesRouter } from './routes/sales';
-import { router as reportsRouter } from './routes/reports';
 
 // Agregar prefijo /api a todas las rutas
 app.use('/api/vendors', vendorsRouter);

@@ -1,26 +1,32 @@
-import { Router } from 'express';
-import { z } from 'zod';
-import { db } from '../index';
-const vendorSchema = z.object({
-    name: z.string().min(2),
-    phone: z.string().min(6).optional(),
-    role: z.enum(['LEADER', 'SELLER']),
-    leaderId: z.string().optional(),
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.router = void 0;
+const express_1 = require("express");
+const zod_1 = require("zod");
+const index_1 = require("../index");
+const vendorSchema = zod_1.z.object({
+    name: zod_1.z.string().min(2),
+    phone: zod_1.z.string().min(6).optional(),
+    role: zod_1.z.enum(['LEADER', 'SELLER', 'SUBSELLER']),
+    leaderId: zod_1.z.string().optional(),
 });
-export const router = Router();
-const updateSchema = z.object({
-    name: z.string().min(2).optional(),
-    phone: z.string().min(6).optional(),
-    leaderId: z.string().optional(),
+exports.router = (0, express_1.Router)();
+const updateSchema = zod_1.z.object({
+    name: zod_1.z.string().min(2).optional(),
+    phone: zod_1.z.string().min(6).optional(),
+    leaderId: zod_1.z.string().optional(),
 });
 // Create vendor (leaders can only create SELLERs)
-router.post('/', async (req, res) => {
+exports.router.post('/', async (req, res) => {
     try {
         const parsed = vendorSchema.parse(req.body);
         if (parsed.role === 'SELLER' && !parsed.leaderId) {
             return res.status(400).json({ error: 'SELLER requires leaderId' });
         }
-        const ref = await db.collection('vendors').add({
+        if (parsed.role === 'SUBSELLER' && !parsed.leaderId) {
+            return res.status(400).json({ error: 'SUBSELLER requires leaderId' });
+        }
+        const ref = await index_1.db.collection('vendors').add({
             name: parsed.name,
             phone: parsed.phone ?? null,
             role: parsed.role,
@@ -36,9 +42,9 @@ router.post('/', async (req, res) => {
     }
 });
 // List vendors (optionally by leader)
-router.get('/', async (req, res) => {
+exports.router.get('/', async (req, res) => {
     const { leaderId } = req.query;
-    let q = db.collection('vendors');
+    let q = index_1.db.collection('vendors');
     if (leaderId)
         q = q.where('leaderId', '==', leaderId);
     const snaps = await q.get();
@@ -46,22 +52,22 @@ router.get('/', async (req, res) => {
     return res.json(vendors);
 });
 // Get vendor detail with team
-router.get('/:id', async (req, res) => {
+exports.router.get('/:id', async (req, res) => {
     const id = req.params.id;
-    const doc = await db.collection('vendors').doc(id).get();
+    const doc = await index_1.db.collection('vendors').doc(id).get();
     if (!doc.exists)
         return res.status(404).json({ error: 'Vendor not found' });
     const data = { id: doc.id, ...doc.data() };
-    const team = await db.collection('vendors').where('leaderId', '==', id).get();
+    const team = await index_1.db.collection('vendors').where('leaderId', '==', id).get();
     const sellers = team.docs.map((d) => ({ id: d.id, ...d.data() }));
     return res.json({ ...data, sellers });
 });
 // Update vendor (assign leader, update name/phone)
-router.patch('/:id', async (req, res) => {
+exports.router.patch('/:id', async (req, res) => {
     try {
         const id = req.params.id;
         const parsed = updateSchema.parse(req.body);
-        const ref = db.collection('vendors').doc(id);
+        const ref = index_1.db.collection('vendors').doc(id);
         const snap = await ref.get();
         if (!snap.exists)
             return res.status(404).json({ error: 'Vendor not found' });
@@ -73,4 +79,4 @@ router.patch('/:id', async (req, res) => {
         return res.status(400).json({ error: e.message });
     }
 });
-export default router;
+exports.default = exports.router;

@@ -7,6 +7,7 @@ import '../widgets/prize_wheel_widget.dart';
 import '../widgets/bingo_games_panel.dart';
 import 'dart:math' as math;
 import '../screens/crm_screen.dart'; // Added import for CRM screen
+import '../screens/blackjack_screen.dart'; // Added import for Blackjack screen
 import '../providers/app_provider.dart'; // Added import for AppProvider
 import 'package:provider/provider.dart'; // Added import for Provider
 
@@ -157,6 +158,19 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
         title: const Text('Bingo 5x5 - 75 Números'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.blue.shade600,
+                Colors.blue.shade800,
+              ],
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.people_alt),
@@ -177,45 +191,111 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
             onPressed: _togglePrizeWheel,
             tooltip: 'Ruleta de Premios',
           ),
+          IconButton(
+            icon: const Icon(Icons.spa),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const BlackjackScreen()),
+              );
+            },
+            tooltip: 'Mesa de Blackjack',
+          ),
         ],
       ),
-      body: _showCrystalBall 
-        ? _buildCrystalBallView()
-        : _showPrizeWheel
-          ? _buildPrizeWheelView()
-          : _buildNormalView(),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.grey.shade50,
+              Colors.grey.shade100,
+            ],
+          ),
+        ),
+        child: _showCrystalBall 
+          ? _buildCrystalBallView()
+          : _showPrizeWheel
+            ? _buildPrizeWheelView()
+            : _buildNormalView(),
+      ),
     );
   }
 
   Widget _buildNormalView() {
-    return Row(
-      children: [
-        // Panel izquierdo - Todos los números del bingo
-        Expanded(
-          flex: 1,
-          child: Consumer<AppProvider>(
-            builder: (context, appProvider, child) {
-              return NumbersPanel(
-                allNumbers: appProvider.bingoGame.allNumbers,
-                calledNumbers: appProvider.bingoGame.calledNumbers,
-              );
-            },
+    return Padding(
+      padding: const EdgeInsets.all(4.0),
+      child: Row(
+        children: [
+          // Panel izquierdo - Todos los números del bingo
+          Expanded(
+            flex: 1,
+            child: Container(
+              margin: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Consumer<AppProvider>(
+                builder: (context, appProvider, child) {
+                  return NumbersPanel(
+                    allNumbers: appProvider.bingoGame.allNumbers,
+                    calledNumbers: appProvider.bingoGame.calledNumbers,
+                  );
+                },
+              ),
+            ),
           ),
-        ),
-        // Panel central - Bola actual y controles
-        Expanded(
-          flex: 1,
-          child: ControlPanel(
-            bingoGame: _bingoGame,
-            onStateChanged: _onGameStateChanged,
+          // Panel central - Bola actual y controles
+          Expanded(
+            flex: 1,
+            child: Container(
+              margin: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: ControlPanel(
+                bingoGame: _bingoGame,
+                onStateChanged: _onGameStateChanged,
+              ),
+            ),
           ),
-        ),
-        // Panel derecho - Juegos de bingo
-        Expanded(
-          flex: 1,
-          child: BingoGamesPanel(),
-        ),
-      ],
+          // Panel derecho - Juegos de bingo
+          Expanded(
+            flex: 1,
+            child: Container(
+              margin: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: BingoGamesPanel(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

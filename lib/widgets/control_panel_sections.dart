@@ -62,13 +62,11 @@ class CurrentBallDisplay extends StatelessWidget {
 class ActionButtonsRow extends StatelessWidget {
   final VoidCallback onCallNumber;
   final VoidCallback onVerifyBingo;
-  final VoidCallback? onCheckBingoRealTime; // Nuevo callback para verificación en tiempo real
 
   const ActionButtonsRow({
     super.key,
     required this.onCallNumber,
     required this.onVerifyBingo,
-    this.onCheckBingoRealTime, // Opcional
   });
 
   @override
@@ -104,25 +102,7 @@ class ActionButtonsRow extends StatelessWidget {
             ),
           ],
         ),
-        if (onCheckBingoRealTime != null) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: onCheckBingoRealTime,
-                  icon: const Icon(Icons.auto_awesome),
-                  label: const Text('Verificar en Tiempo Real'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.amber,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+
       ],
     );
   }

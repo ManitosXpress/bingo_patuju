@@ -158,51 +158,7 @@ class CartillasFiltersPanel extends StatelessWidget {
   Widget _buildActionButtons() {
     return Consumer<AppProvider>(
       builder: (context, appProvider, child) {
-        return Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  await appProvider.refreshCartillasData();
-                },
-                icon: const Icon(Icons.refresh),
-                label: const Text('Refrescar Estado'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  await appProvider.syncAllCartillas();
-                },
-                icon: const Icon(Icons.sync),
-                label: const Text('Sincronizar Todo'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  await appProvider.syncAssignedCartillas();
-                },
-                icon: const Icon(Icons.sync_alt),
-                label: const Text('Sinc. Seleccionadas'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        );
+        return const SizedBox.shrink(); // Botones eliminados
       },
     );
   }

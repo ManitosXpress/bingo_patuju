@@ -37,7 +37,7 @@ class BingoPatternsPanel extends StatelessWidget {
                 _patternTile('Diagonal Principal', _mainDiagonalPattern(), probs['Diagonal Principal']!, Colors.orange, gridSize, cellSize, completed['Diagonal Principal'] ?? false),
                 _patternTile('Diagonal Secundaria', _antiDiagonalPattern(), probs['Diagonal Secundaria']!, Colors.purple, gridSize, cellSize, completed['Diagonal Secundaria'] ?? false),
                 _patternTile('Cartón Lleno', _fullCardPattern(), probs['Cartón Lleno']!, Colors.red, gridSize, cellSize, completed['Cartón Lleno'] ?? false),
-                _patternTile('5 Casillas Diagonales', _diagonal5Pattern(), probs['5 Casillas Diagonales']!, Colors.teal, gridSize, cellSize, completed['5 Casillas Diagonales'] ?? false),
+                _patternTile('Figura Avión', _diagonal5Pattern(), probs['Figura Avión']!, Colors.teal, gridSize, cellSize, completed['Figura Avión'] ?? false),
                 _patternTile('X', _xPattern(), probs['X']!, Colors.indigo, gridSize, cellSize, completed['X'] ?? false),
                 _patternTile('Marco Completo', _fullFramePattern(), probs['Marco Completo']!, Colors.amber, gridSize, cellSize, completed['Marco Completo'] ?? false),
                 _patternTile('Corazón', _heartPattern(), probs['Corazón']!, Colors.pink, gridSize, cellSize, completed['Corazón'] ?? false),
@@ -45,15 +45,15 @@ class BingoPatternsPanel extends StatelessWidget {
                 _patternTile('Marco Pequeño', _smallFramePattern(), probs['Marco Pequeño']!, Colors.lime, gridSize, cellSize, completed['Marco Pequeño'] ?? false),
                 _patternTile('Árbol o Flecha', _treeArrowPattern(), probs['Árbol o Flecha']!, Colors.brown, gridSize, cellSize, completed['Árbol o Flecha'] ?? false),
                 _patternTile('Spoutnik', _spoutnikPattern(), probs['Spoutnik']!, Colors.deepPurple, gridSize, cellSize, completed['Spoutnik'] ?? false),
-                _patternTile('ING', _ingPattern(), probs['ING']!, Colors.blueGrey, gridSize, cellSize, completed['ING'] ?? false),
-                _patternTile('NGO', _ngoPattern(), probs['NGO']!, Colors.deepOrange, gridSize, cellSize, completed['NGO'] ?? false),
+                _patternTile('I', _ingPattern(), probs['I']!, Colors.blueGrey, gridSize, cellSize, completed['I'] ?? false),
+                _patternTile('N', _ngoPattern(), probs['N']!, Colors.deepOrange, gridSize, cellSize, completed['N'] ?? false),
                 _patternTile('Autopista', _highwayPattern(), probs['Autopista']!, Colors.grey, gridSize, cellSize, completed['Autopista'] ?? false),
                 
                 // Nuevas figuras legendarias
                 _patternTile('Reloj de Arena', _relojArenaPattern(), probs['Reloj de Arena']!, Colors.teal, gridSize, cellSize, completed['Reloj de Arena'] ?? false),
                 _patternTile('Doble Línea V', _dobleLineaVPattern(), probs['Doble Línea V']!, Colors.indigo, gridSize, cellSize, completed['Doble Línea V'] ?? false),
                 _patternTile('Figura la Suegra', _figuraSuegraPattern(), probs['Figura la Suegra']!, Colors.purple, gridSize, cellSize, completed['Figura la Suegra'] ?? false),
-                _patternTile('Figura Comodín', _figuraComodinPattern(), probs['Figura Comodín']!, Colors.orange, gridSize, cellSize, completed['Figura Comodín'] ?? false),
+                _patternTile('Figura Infinito', _figuraComodinPattern(), probs['Figura Infinito']!, Colors.orange, gridSize, cellSize, completed['Figura Infinito'] ?? false),
                 _patternTile('Letra FE', _letraFEPattern(), probs['Letra FE']!, Colors.blue, gridSize, cellSize, completed['Letra FE'] ?? false),
                 _patternTile('Figura C Loca', _figuraCLocaPattern(), probs['Figura C Loca']!, Colors.green, gridSize, cellSize, completed['Figura C Loca'] ?? false),
                 _patternTile('Figura Bandera', _figuraBanderaPattern(), probs['Figura Bandera']!, Colors.red, gridSize, cellSize, completed['Figura Bandera'] ?? false),
@@ -80,10 +80,10 @@ class BingoPatternsPanel extends StatelessWidget {
     // Inicializar contadores
     final patterns = [
       'Línea Horizontal', 'Línea Vertical', 'Diagonal Principal', 'Diagonal Secundaria',
-      'Cartón Lleno', '5 Casillas Diagonales', 'X', 'Marco Completo', 'Corazón',
+      'Cartón Lleno', 'Figura Avión', 'X', 'Marco Completo', 'Corazón',
       'Caída de Nieve', 'Marco Pequeño', 'Árbol o Flecha', 'Spoutnik', 'ING', 'NGO', 'Autopista',
       // Nuevas figuras legendarias
-      'Reloj de Arena', 'Doble Línea V', 'Figura la Suegra', 'Figura Comodín', 'Letra FE',
+      'Reloj de Arena', 'Doble Línea V', 'Figura la Suegra', 'Figura Infinito', 'Letra FE',
       'Figura C Loca', 'Figura Bandera', 'Figura Triple Línea', 'Diagonal Derecha'
     ];
     
@@ -129,7 +129,7 @@ class BingoPatternsPanel extends StatelessWidget {
       'Diagonal Principal': 2.0,    // ~10 cartillas de 500 pueden lograr diagonal principal
       'Diagonal Secundaria': 2.0,  // ~10 cartillas de 500 pueden lograr diagonal secundaria
       'Cartón Lleno': 0.1,         // Muy raro, casi imposible
-      '5 Casillas Diagonales': 8.0, // ~40 cartillas de 500
+      'Figura Avión': 8.0, // ~40 cartillas de 500
       'X': 8.0,                    // ~40 cartillas de 500
       'Marco Completo': 15.0,      // ~75 cartillas de 500
       'Corazón': 12.0,             // ~60 cartillas de 500
@@ -144,7 +144,7 @@ class BingoPatternsPanel extends StatelessWidget {
       'Reloj de Arena': 12.0,      // ~60 cartillas de 500
       'Doble Línea V': 10.0,      // ~50 cartillas de 500
       'Figura la Suegra': 14.0,    // ~70 cartillas de 500
-      'Figura Comodín': 16.0,      // ~80 cartillas de 500
+      'Figura Infinito': 16.0,      // ~80 cartillas de 500
       'Letra FE': 18.0,            // ~90 cartillas de 500
       'Figura C Loca': 15.0,       // ~75 cartillas de 500
       'Figura Bandera': 20.0,      // ~100 cartillas de 500
@@ -179,7 +179,7 @@ class BingoPatternsPanel extends StatelessWidget {
         return _canAchieveAntiDiagonal(cartilla, calledNumbers);
       case 'Cartón Lleno':
         return _canAchieveFullCard(cartilla, calledNumbers);
-      case '5 Casillas Diagonales':
+      case 'Figura Avión':
         patternMatrix = _diagonal5Pattern();
         break;
       case 'X':
@@ -203,10 +203,10 @@ class BingoPatternsPanel extends StatelessWidget {
       case 'Spoutnik':
         patternMatrix = _spoutnikPattern();
         break;
-      case 'ING':
+      case 'I':
         patternMatrix = _ingPattern();
         break;
-      case 'NGO':
+      case 'N':
         patternMatrix = _ngoPattern();
         break;
       case 'Autopista':
@@ -222,7 +222,7 @@ class BingoPatternsPanel extends StatelessWidget {
       case 'Figura la Suegra':
         patternMatrix = _figuraSuegraPattern();
         break;
-      case 'Figura Comodín':
+      case 'Figura Infinito':
         patternMatrix = _figuraComodinPattern();
         break;
       case 'Letra FE':

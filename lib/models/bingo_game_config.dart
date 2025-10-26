@@ -4,6 +4,7 @@ enum BingoPattern {
   diagonalPrincipal,
   diagonalSecundaria,
   lineaHorizontal,
+  lineaVertical, // Agregado
   marcoCompleto,
   marcoPequeno,
   spoutnik,
@@ -11,6 +12,13 @@ enum BingoPattern {
   cartonLleno,
   consuelo,
   x,
+  // Patrones adicionales
+  figuraAvion, // Agregado
+  caidaNieve, // Agregado
+  arbolFlecha, // Agregado
+  letraI, // Agregado
+  letraN, // Agregado
+  autopista, // Agregado
   // Nuevas figuras legendarias
   relojArena,
   dobleLineaV,
@@ -145,6 +153,8 @@ class BingoGameRound {
         return 'Diagonal Secundaria';
       case BingoPattern.lineaHorizontal:
         return 'Línea Horizontal';
+      case BingoPattern.lineaVertical:
+        return 'Línea Vertical';
       case BingoPattern.marcoCompleto:
         return 'Marco Completo';
       case BingoPattern.marcoPequeno:
@@ -159,6 +169,19 @@ class BingoGameRound {
         return 'Consuelo';
       case BingoPattern.x:
         return 'X';
+      // Patrones adicionales
+      case BingoPattern.figuraAvion:
+        return 'Figura Avión';
+      case BingoPattern.caidaNieve:
+        return 'Caída de Nieve';
+      case BingoPattern.arbolFlecha:
+        return 'Árbol o Flecha';
+      case BingoPattern.letraI:
+        return 'LETRA I';
+      case BingoPattern.letraN:
+        return 'LETRA N';
+      case BingoPattern.autopista:
+        return 'Autopista';
       // Nuevas figuras legendarias
       case BingoPattern.relojArena:
         return 'Reloj de Arena';
@@ -167,7 +190,7 @@ class BingoGameRound {
       case BingoPattern.figuraSuegra:
         return 'Figura la Suegra';
       case BingoPattern.figuraComodin:
-        return 'Figura Comodín';
+        return 'Figura Infinito';
       case BingoPattern.letraFE:
         return 'Letra FE';
       case BingoPattern.figuraCLoca:

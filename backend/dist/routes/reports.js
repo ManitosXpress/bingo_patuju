@@ -1,13 +1,16 @@
-import { Router } from 'express';
-import { db } from '../index';
-export const router = Router();
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.router = void 0;
+const express_1 = require("express");
+const index_1 = require("../index");
+exports.router = (0, express_1.Router)();
 // GET /reports/vendors-summary
-router.get('/vendors-summary', async (req, res) => {
+exports.router.get('/vendors-summary', async (req, res) => {
     const from = req.query.from ? Number(req.query.from) : undefined;
     const to = req.query.to ? Number(req.query.to) : undefined;
     const leaderFilter = req.query.leaderId;
     // Load vendors
-    const vendorSnaps = await db.collection('vendors').get();
+    const vendorSnaps = await index_1.db.collection('vendors').get();
     const vendors = new Map();
     vendorSnaps.docs.forEach((d) => vendors.set(d.id, { id: d.id, ...d.data() }));
     // Prepare stats
@@ -24,7 +27,7 @@ router.get('/vendors-summary', async (req, res) => {
         leaderCommissionBs: 0,
     });
     // Iterate sales
-    let q = db.collection('sales');
+    let q = index_1.db.collection('sales');
     if (from)
         q = q.where('createdAt', '>=', from);
     if (to)
@@ -51,13 +54,29 @@ router.get('/vendors-summary', async (req, res) => {
             lStat.commissionsBs += sale.commissions?.leader ?? 0;
             lStat.leaderCommissionBs += sale.commissions?.leader ?? 0;
         }
+        // Subleader (vendedor padre de subvendedores)
+        if (sale.subleaderId) {
+            const slStat = ensure(sale.subleaderId);
+            slStat.commissionsBs += sale.commissions?.subleader ?? 0;
+            slStat.subleaderCommissionBs = (slStat.subleaderCommissionBs ?? 0) + (sale.commissions?.subleader ?? 0);
+        }
     });
-    // Attach children (sellers under leaders)
+    // Attach children (sellers under leaders and subsellers under sellers)
     const byLeader = {};
+    const bySeller = {};
     vendors.forEach((v) => {
         if (v.leaderId) {
-            byLeader[v.leaderId] = byLeader[v.leaderId] || [];
-            byLeader[v.leaderId].push(v.id);
+            if (v.role === 'SELLER') {
+                byLeader[v.leaderId] = byLeader[v.leaderId] || [];
+                byLeader[v.leaderId].push(v.id);
+            }
+            else if (v.role === 'SUBSELLER') {
+                // Los subvendedores también se agregan al líder para mostrar en la jerarquía
+                byLeader[v.leaderId] = byLeader[v.leaderId] || [];
+                byLeader[v.leaderId].push(v.id);
+                // También los agregamos a su vendedor padre si existe
+                // Esto requeriría una lógica más compleja para determinar el vendedor padre específico
+            }
         }
     });
     let result = Array.from(vendors.values()).map((v) => ({
@@ -70,7 +89,7 @@ router.get('/vendors-summary', async (req, res) => {
     res.json({ vendors: result });
 });
 // POST /reports/clear-commissions - ELIMINA TODOS LOS DATOS DE SALES Y BALANCES
-router.post('/clear-commissions', async (req, res) => {
+exports.router.post('/clear-commissions', async (req, res) => {
     try {
         const { confirm, dryRun = false } = req.body;
         // Verificar confirmación para evitar ejecuciones accidentales
@@ -81,10 +100,10 @@ router.post('/clear-commissions', async (req, res) => {
         }
         console.log(`Iniciando ELIMINACIÓN COMPLETA de datos. Modo dry run: ${dryRun}`);
         // 1. Contar TODAS las ventas para eliminar
-        const salesSnapshot = await db.collection('sales').get();
+        const salesSnapshot = await index_1.db.collection('sales').get();
         const totalSales = salesSnapshot.size;
         // 2. Contar TODOS los balances para eliminar
-        const balancesSnapshot = await db.collection('balances').get();
+        const balancesSnapshot = await index_1.db.collection('balances').get();
         const totalBalances = balancesSnapshot.size;
         console.log(`Encontrados ${totalSales} ventas y ${totalBalances} balances para ELIMINAR COMPLETAMENTE`);
         if (dryRun) {
@@ -101,7 +120,7 @@ router.post('/clear-commissions', async (req, res) => {
         }
         // ⚠️ EJECUCIÓN REAL - ELIMINAR TODOS LOS DATOS
         console.log('🚨 INICIANDO ELIMINACIÓN PERMANENTE DE TODOS LOS DATOS...');
-        const batch = db.batch();
+        const batch = index_1.db.batch();
         let salesDeleted = 0;
         let balancesDeleted = 0;
         // Eliminar TODAS las ventas
@@ -136,4 +155,4 @@ router.post('/clear-commissions', async (req, res) => {
         });
     }
 });
-export default router;
+exports.default = exports.router;
