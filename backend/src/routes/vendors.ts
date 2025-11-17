@@ -108,4 +108,72 @@ router.patch('/:id', async (req: any, res: any) => {
   }
 });
 
+// Delete vendor
+router.delete('/:id', async (req: any, res: any) => {
+  try {
+    const id = req.params.id;
+    const vendorRef = db.collection('vendors').doc(id);
+    const vendorSnap = await vendorRef.get();
+    
+    if (!vendorSnap.exists) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+    
+    const vendorData = vendorSnap.data() as any;
+    const vendorRole = vendorData.role;
+    const vendorId = vendorSnap.id;
+    
+    // Si es un líder, verificar que no tenga vendedores asignados
+    if (vendorRole === 'LEADER') {
+      const sellersQuery = await db.collection('vendors').where('leaderId', '==', vendorId).get();
+      if (!sellersQuery.empty) {
+        return res.status(400).json({ 
+          error: 'Cannot delete leader with assigned sellers. Reassign or delete sellers first.' 
+        });
+      }
+    }
+    
+    // Si es un vendedor, verificar que no tenga subvendedores asignados
+    if (vendorRole === 'SELLER') {
+      const subsellersQuery = await db.collection('vendors').where('sellerId', '==', vendorId).get();
+      if (!subsellersQuery.empty) {
+        return res.status(400).json({ 
+          error: 'Cannot delete seller with assigned subsellers. Reassign or delete subsellers first.' 
+        });
+      }
+      
+      // También verificar que no tenga cartillas asignadas
+      const cardsQuery = await db.collection('cards').where('assignedTo', '==', vendorId).get();
+      if (!cardsQuery.empty) {
+        return res.status(400).json({ 
+          error: 'Cannot delete seller with assigned cards. Reassign or sell cards first.' 
+        });
+      }
+    }
+    
+    // Verificar que no tenga ventas registradas
+    const salesQuery = await db.collection('sales').where('sellerId', '==', vendorId).get();
+    if (!salesQuery.empty) {
+      return res.status(400).json({ 
+        error: 'Cannot delete vendor with sales history. Sales records must be preserved.' 
+      });
+    }
+    
+    // Eliminar el vendor
+    await vendorRef.delete();
+    
+    return res.json({ 
+      message: 'Vendor deleted successfully',
+      deletedVendor: {
+        id: vendorId,
+        name: vendorData.name,
+        role: vendorData.role
+      }
+    });
+    
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 export default router; 

@@ -1,3 +1,5 @@
+import '../utils/debug_logger.dart';
+
 class FirebaseCartilla {
   final String id;
   final List<List<int>> numbers;
@@ -17,8 +19,7 @@ class FirebaseCartilla {
 
   factory FirebaseCartilla.fromJson(Map<String, dynamic> json) {
     try {
-      // DEBUG: Imprimir el JSON recibido
-      print('DEBUG: FirebaseCartilla.fromJson - JSON recibido: $json');
+      debugLog('FirebaseCartilla.fromJson - JSON recibido: $json');
       
       // Validar que el ID exista y sea una cadena
       final id = json['id'] as String?;
@@ -26,9 +27,8 @@ class FirebaseCartilla {
         throw FormatException('ID de cartilla inválido o faltante');
       }
       
-      // DEBUG: Verificar cardNo
       final cardNo = json['cardNo'];
-      print('DEBUG: cardNo raw: $cardNo, tipo: ${cardNo.runtimeType}');
+      debugLog('cardNo raw: $cardNo, tipo: ${cardNo.runtimeType}');
       
       // Validar que numbers exista y sea una lista
       final numbersData = json['numbers'] as List?;
@@ -64,14 +64,13 @@ class FirebaseCartilla {
         cardNo: json['cardNo'] as int?,
       );
       
-      // DEBUG: Verificar el objeto creado
-      print('DEBUG: FirebaseCartilla creada - cardNo: ${cartilla.cardNo}, displayNumber: ${cartilla.displayNumber}');
+      debugLog('FirebaseCartilla creada - cardNo: ${cartilla.cardNo}, displayNumber: ${cartilla.displayNumber}');
       
       return cartilla;
     } catch (e) {
       // Si hay un error de formato, crear una cartilla por defecto o re-lanzar
-      print('Error creando FirebaseCartilla desde JSON: $e');
-      print('JSON recibido: $json');
+      debugLog('Error creando FirebaseCartilla desde JSON: $e');
+      debugLog('JSON recibido: $json');
       rethrow;
     }
   }
@@ -106,22 +105,22 @@ class FirebaseCartilla {
 
   // Obtener el número de cartilla para mostrar
   String get displayNumber {
-    print('DEBUG: displayNumber - cardNo: $cardNo, id: $id');
+    debugLog('displayNumber - cardNo: $cardNo, id: $id');
     
     if (cardNo != null) {
       final result = 'Cartilla $cardNo';
-      print('DEBUG: displayNumber retorna: $result');
+      debugLog('displayNumber retorna: $result');
       return result;
     }
     
     // Fallback: mostrar ID truncado si no hay número de cartilla
     if (id.length >= 8) {
       final result = 'Cartilla ${id.substring(0, 8)}...';
-      print('DEBUG: displayNumber fallback: $result');
+      debugLog('displayNumber fallback: $result');
       return result;
     } else {
       final result = 'Cartilla $id';
-      print('DEBUG: displayNumber fallback corto: $result');
+      debugLog('displayNumber fallback corto: $result');
       return result;
     }
   }

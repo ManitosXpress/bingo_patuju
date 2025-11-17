@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/bingo_game.dart';
 import '../models/firebase_cartilla.dart';
 import '../services/cartillas_service.dart';
+import '../utils/debug_logger.dart';
 import 'game_state_provider.dart';
 import 'ui_state_provider.dart';
 
@@ -34,13 +35,13 @@ class AppProvider extends ChangeNotifier {
   Future<void> _initializeData() async {
     try {
       await loadVendors();
-      print('DEBUG: Vendedores cargados automáticamente: ${vendors.length}');
+      debugLog('Vendedores cargados automáticamente: ${vendors.length}');
       
       // Cargar cartillas automáticamente al inicializar
       await loadFirebaseCartillas();
-      print('DEBUG: Cartillas cargadas automáticamente: ${_allFirebaseCartillas.length}');
+      debugLog('Cartillas cargadas automáticamente: ${_allFirebaseCartillas.length}');
     } catch (e) {
-      print('DEBUG: Error cargando datos automáticamente: $e');
+      debugLog('Error cargando datos automáticamente: $e');
     }
   }
   
@@ -163,11 +164,11 @@ class AppProvider extends ChangeNotifier {
       _firebaseError = null;
       notifyListeners();
       
-      print('DEBUG: Cargando todas las cartillas de Firebase...');
+      debugLog('Cargando todas las cartillas de Firebase...');
       
       // Cargar vendedores primero para asegurar que estén disponibles
       await loadVendors();
-      print('DEBUG: Vendedores cargados antes de cartillas: ${vendors.length}');
+      debugLog('Vendedores cargados antes de cartillas: ${vendors.length}');
       
       // Cargar todas las cartillas de Firebase de una vez (máximo 2000)
       final cartillasData = await CartillaService.getCartillas(
@@ -177,26 +178,26 @@ class AppProvider extends ChangeNotifier {
         limit: 2000, // Límite alto para cargar todas las cartillas (600+)
       );
       
-      print('DEBUG: Cartillas recibidas de Firebase: ${cartillasData.length}');
+      debugLog('Cartillas recibidas de Firebase: ${cartillasData.length}');
       
       // Procesar solo las cartillas válidas
       final validCartillas = <FirebaseCartilla>[];
       for (int i = 0; i < cartillasData.length; i++) {
         try {
           final data = cartillasData[i];
-          print('DEBUG: Procesando cartilla $i - ID: ${data['id']}, Numbers: ${data['numbers']}');
+          debugLog('Procesando cartilla $i - ID: ${data['id']}, Numbers: ${data['numbers']}');
           
           final cartilla = FirebaseCartilla.fromJson(data);
           
           if (cartilla.isValidStructure) {
             validCartillas.add(cartilla);
-            print('DEBUG: Cartilla $i válida - ID: ${cartilla.id}, Filas: ${cartilla.numbers.length}, Columnas: ${cartilla.numbers.isNotEmpty ? cartilla.numbers[0].length : 0}');
+            debugLog('Cartilla $i válida - ID: ${cartilla.id}, Filas: ${cartilla.numbers.length}, Columnas: ${cartilla.numbers.isNotEmpty ? cartilla.numbers[0].length : 0}');
           } else {
-            print('DEBUG: Cartilla $i inválida - ID: ${cartilla.id}, Filas: ${cartilla.numbers.length}');
+            debugLog('Cartilla $i inválida - ID: ${cartilla.id}, Filas: ${cartilla.numbers.length}');
           }
         } catch (e) {
-          print('DEBUG: Error procesando cartilla $i: $e');
-          print('DEBUG: Datos de la cartilla: ${cartillasData[i]}');
+          debugLog('Error procesando cartilla $i: $e');
+          debugLog('Datos de la cartilla: ${cartillasData[i]}');
           // Continuar con la siguiente cartilla en lugar de fallar completamente
           continue;
         }
@@ -212,7 +213,7 @@ class AppProvider extends ChangeNotifier {
       // Actualizar la lista de cartillas visibles (página actual)
       _updateVisibleCartillas();
       
-      print('DEBUG: Total cartillas cargadas: ${_allFirebaseCartillas.length}, Visibles: ${_firebaseCartillas.length}, ¿Hay más datos? $_hasMoreData');
+      debugLog('Total cartillas cargadas: ${_allFirebaseCartillas.length}, Visibles: ${_firebaseCartillas.length}, ¿Hay más datos? $_hasMoreData');
       
       // Sincronizar con el juego local
       await _syncFirebaseWithLocal();
@@ -238,7 +239,7 @@ class AppProvider extends ChangeNotifier {
       final startIndex = (_currentPage - 1) * _pageSize;
       final endIndex = startIndex + _pageSize;
       
-      print('DEBUG: Actualizando cartillas visibles - Página: $_currentPage, Start: $startIndex, End: $endIndex, Total: ${_allFirebaseCartillas.length}');
+      debugLog('Actualizando cartillas visibles - Página: $_currentPage, Start: $startIndex, End: $endIndex, Total: ${_allFirebaseCartillas.length}');
       
       if (startIndex < _allFirebaseCartillas.length) {
         // Mostrar las cartillas de la página actual
@@ -246,13 +247,13 @@ class AppProvider extends ChangeNotifier {
           startIndex, 
           endIndex.clamp(0, _allFirebaseCartillas.length)
         );
-        print('DEBUG: Cartillas visibles actualizadas: ${_firebaseCartillas.length}');
+        debugLog('Cartillas visibles actualizadas: ${_firebaseCartillas.length}');
       } else {
         _firebaseCartillas = [];
-        print('DEBUG: No hay cartillas para mostrar en esta página');
+        debugLog('No hay cartillas para mostrar en esta página');
       }
     } catch (e) {
-      print('DEBUG: Error actualizando cartillas visibles: $e');
+      debugLog('Error actualizando cartillas visibles: $e');
       _firebaseCartillas = [];
     }
   }
@@ -271,9 +272,9 @@ class AppProvider extends ChangeNotifier {
       if (_currentPage < totalPages) {
         _currentPage++;
         _updateVisibleCartillas();
-        print('DEBUG: Avanzando a página $_currentPage de $totalPages');
+        debugLog('Avanzando a página $_currentPage de $totalPages');
       } else {
-        print('DEBUG: Ya estás en la última página ($_currentPage de $totalPages)');
+        debugLog('Ya estás en la última página ($_currentPage de $totalPages)');
       }
       
     } finally {
@@ -287,7 +288,7 @@ class AppProvider extends ChangeNotifier {
     if (_currentPage > 1) {
       _currentPage--;
       _updateVisibleCartillas();
-      print('DEBUG: Retrocediendo a página $_currentPage');
+      debugLog('Retrocediendo a página $_currentPage');
       notifyListeners();
     }
   }
@@ -369,14 +370,14 @@ class AppProvider extends ChangeNotifier {
   // Sincronizar cartillas de Firebase con el juego local
   Future<void> _syncFirebaseWithLocal() async {
     try {
-      print('DEBUG: Iniciando sincronización de Firebase con juego local');
+      debugLog('Iniciando sincronización de Firebase con juego local');
       
       // Convertir cartillas de Firebase al formato del juego local
       final localCartillas = _allFirebaseCartillas
           .map((fc) => fc.numbers)
           .toList();
       
-      print('DEBUG: ${localCartillas.length} cartillas convertidas para sincronización');
+      debugLog('${localCartillas.length} cartillas convertidas para sincronización');
       
       // Sincronizar usando el nuevo método del GameStateProvider
       await _gameState.syncFirebaseCartillasWithGame(localCartillas);
@@ -384,14 +385,14 @@ class AppProvider extends ChangeNotifier {
       // Verificar bingo después de la sincronización
       final bingoCheck = _gameState.checkBingoInRealTime();
       if (bingoCheck['hasBingo'] == true) {
-        print('DEBUG: ¡BINGO detectado en AppProvider!');
-        print('DEBUG: ${bingoCheck['message']}');
+        debugLog('¡BINGO detectado en AppProvider!');
+        debugLog('${bingoCheck['message']}');
       }
       
       // Actualizar estado de sincronización
       await refreshSyncStatus();
       
-      print('DEBUG: Sincronización completada exitosamente');
+      debugLog('Sincronización completada exitosamente');
       
     } catch (e) {
       print('Error sincronizando Firebase con local: $e');
@@ -465,7 +466,7 @@ class AppProvider extends ChangeNotifier {
         
         // Si no hay más cartillas visibles en la página actual, ir a la página anterior
         if (_firebaseCartillas.isEmpty && _currentPage > 1) {
-          print('DEBUG: No hay cartillas visibles después de eliminar, retrocediendo a página anterior...');
+          debugLog('No hay cartillas visibles después de eliminar, retrocediendo a página anterior...');
           _currentPage--;
           _updateVisibleCartillas();
         }
@@ -496,7 +497,7 @@ class AppProvider extends ChangeNotifier {
         // Recargar las cartillas después de generar
         await loadFirebaseCartillas();
         
-        print('DEBUG: Se generaron $count cartillas en Firebase');
+        debugLog('Se generaron $count cartillas en Firebase');
         return true;
       }
       
@@ -529,7 +530,7 @@ class AppProvider extends ChangeNotifier {
         
         notifyListeners();
         
-        print('DEBUG: Se eliminaron todas las cartillas. Resultado: $result');
+        debugLog('Se eliminaron todas las cartillas. Resultado: $result');
         return true;
       }
       
@@ -546,7 +547,7 @@ class AppProvider extends ChangeNotifier {
   // Método para recargar automáticamente cartillas cuando sea necesario
   Future<void> autoReloadIfNeeded() async {
     if (_firebaseCartillas.isEmpty && _allFirebaseCartillas.isNotEmpty) {
-      print('DEBUG: Recarga automática necesaria - cartillas visibles vacías');
+      debugLog('Recarga automática necesaria - cartillas visibles vacías');
       
       // Si no hay cartillas visibles pero hay datos cargados, ir a la primera página
       if (_currentPage > 1) {
@@ -573,18 +574,18 @@ class AppProvider extends ChangeNotifier {
   // Método para verificar bingo con patrones específicos de una ronda
   Map<String, dynamic> checkBingoForSpecificRoundPatterns(List<String> roundPatterns) {
     if (roundPatterns.isEmpty) {
-      print('DEBUG: No hay patrones de ronda para verificar, usando verificación general');
+      debugLog('No hay patrones de ronda para verificar, usando verificación general');
       return checkBingoInRealTime();
     }
     
-    print('DEBUG: Verificando bingo para patrones específicos de ronda: $roundPatterns');
+    debugLog('Verificando bingo para patrones específicos de ronda: $roundPatterns');
     return _gameState.checkBingoForRoundPatterns(roundPatterns);
   }
   
   // Método para obtener patrones completados solo de la ronda actual
   Map<String, bool> getCompletedPatternsForCurrentRound(List<String> currentRoundPatterns) {
     if (currentRoundPatterns.isEmpty) {
-      print('DEBUG: No hay patrones de ronda actual, devolviendo mapa vacío');
+      debugLog('No hay patrones de ronda actual, devolviendo mapa vacío');
       return {};
     }
     
@@ -595,8 +596,8 @@ class AppProvider extends ChangeNotifier {
       roundCompletedPatterns[pattern] = allCompletedPatterns[pattern] ?? false;
     }
     
-    print('DEBUG: Patrones de ronda actual: $currentRoundPatterns');
-    print('DEBUG: Patrones completados de ronda: $roundCompletedPatterns');
+    debugLog('Patrones de ronda actual: $currentRoundPatterns');
+    debugLog('Patrones completados de ronda: $roundCompletedPatterns');
     
     return roundCompletedPatterns;
   }
@@ -607,6 +608,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   // Método para llamar un número específico
+  // Optimizado: NO verifica bingo automáticamente para mejorar rendimiento
   void callSpecificNumber(int number) {
     if (!_gameState.bingoGame.calledNumbers.contains(number)) {
       // Llamar el número específico
@@ -614,23 +616,12 @@ class AppProvider extends ChangeNotifier {
       _gameState.bingoGame.availableNumbers.remove(number);
       _gameState.bingoGame.currentBall = number;
       
-      print('DEBUG: Número específico $number llamado desde AppProvider');
-      print('DEBUG: Total números llamados: ${_gameState.bingoGame.calledNumbers.length}');
-      
-      // Verificar automáticamente si hay patrones de bingo completados
-      final bingoCheck = checkBingoInRealTime();
-      if (bingoCheck['hasBingo'] == true) {
-        print('DEBUG: ¡BINGO detectado después de llamar número $number!');
-        print('DEBUG: ${bingoCheck['message']}');
-        print('DEBUG: Patrones completados: ${bingoCheck['completedPatterns'].entries.where((e) => e.value).length}');
-        // NO mostrar notificación automática - solo marcar patrones en las figuras
-      }
+      // NO verificar bingo automáticamente - solo se verifica cuando se presiona "Verificar Bingo"
+      // Esto mejora significativamente el rendimiento, especialmente con muchas cartillas
       
       // Notificar cambios
       _gameState.notifyListeners();
       notifyListeners();
-    } else {
-      print('DEBUG: El número $number ya fue llamado anteriormente');
     }
   }
 
@@ -641,10 +632,10 @@ class AppProvider extends ChangeNotifier {
         (c) => c.cardNo == cardNumber,
         orElse: () => throw Exception('Cartilla no encontrada'),
       );
-      print('DEBUG: Cartilla $cardNumber encontrada: ${cartilla.id}');
+      debugLog('Cartilla $cardNumber encontrada: ${cartilla.id}');
       return cartilla;
     } catch (e) {
-      print('DEBUG: Cartilla $cardNumber no encontrada: $e');
+      debugLog('Cartilla $cardNumber no encontrada: $e');
       return null;
     }
   }
@@ -660,8 +651,8 @@ class AppProvider extends ChangeNotifier {
         };
       }
 
-      print('DEBUG: Verificando cartilla $cardNumber con números: ${cartilla.numbers}');
-      print('DEBUG: Números llamados: ${bingoGame.calledNumbers}');
+      debugLog('Verificando cartilla $cardNumber con números: ${cartilla.numbers}');
+      debugLog('Números llamados: ${bingoGame.calledNumbers}');
 
       // Verificar directamente si esta cartilla específica tiene un patrón completado
       final cartillaNumbers = cartilla.numbers;
@@ -683,7 +674,7 @@ class AppProvider extends ChangeNotifier {
       for (final pattern in patternsToCheck) {
         if (_checkCartillaPattern(cartillaNumbers, calledNumbers, pattern)) {
           allWinningPatterns.add(pattern);
-          print('DEBUG: Patrón detectado: $pattern');
+          debugLog('Patrón detectado: $pattern');
         }
       }
 
@@ -693,7 +684,7 @@ class AppProvider extends ChangeNotifier {
             ? '¡Cartilla $cardNumber es GANADORA para la ronda actual!'
             : '¡Cartilla $cardNumber es GANADORA!';
             
-        print('DEBUG: ¡Cartilla $cardNumber GANÓ con ${allWinningPatterns.length} patrones: $allWinningPatterns!');
+        debugLog('¡Cartilla $cardNumber GANÓ con ${allWinningPatterns.length} patrones: $allWinningPatterns!');
             
         return {
           'found': true,
@@ -710,7 +701,7 @@ class AppProvider extends ChangeNotifier {
             ? 'Cartilla $cardNumber no es ganadora para la ronda actual aún'
             : 'Cartilla $cardNumber no es ganadora aún';
             
-        print('DEBUG: Cartilla $cardNumber no ganó ningún patrón');
+        debugLog('Cartilla $cardNumber no ganó ningún patrón');
             
         return {
           'found': true,
@@ -720,7 +711,7 @@ class AppProvider extends ChangeNotifier {
         };
       }
     } catch (e) {
-      print('DEBUG: Error verificando cartilla $cardNumber: $e');
+      debugLog('Error verificando cartilla $cardNumber: $e');
       return {
         'found': false,
         'message': 'Error verificando cartilla: $e',

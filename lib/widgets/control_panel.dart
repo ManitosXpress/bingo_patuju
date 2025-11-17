@@ -56,12 +56,9 @@ class _ControlPanelState extends State<ControlPanel> {
                     appProvider.callNumber();
                     widget.onStateChanged();
                     
-                    // Solo verificar patrones, NO mostrar notificaciones automáticas
-                    final bingoCheck = appProvider.checkBingoInRealTime();
-                    if (bingoCheck['hasBingo'] == true) {
-                      print('DEBUG: ¡BINGO detectado después de llamar número!');
-                      // NO mostrar notificación automática - solo marcar patrones
-                    }
+                    // NO verificar bingo automáticamente al cantar bola
+                    // La verificación solo se hace cuando se presiona "Verificar Bingo"
+                    // Esto mejora significativamente el rendimiento
                   },
                   onVerifyBingo: () {
                     _showBingoVerificationDialog(context);
@@ -78,8 +75,7 @@ class _ControlPanelState extends State<ControlPanel> {
                     _showCartillasDialog(context, bingoGame);
                   },
                   onReset: () {
-                    appProvider.resetGame();
-                    widget.onStateChanged();
+                    _showResetConfirmationDialog(context, appProvider);
                   },
                 ),
                 
@@ -114,6 +110,87 @@ class _ControlPanelState extends State<ControlPanel> {
       context: context,
       builder: (BuildContext context) {
         return CartillasDialog(bingoGame: bingoGame);
+      },
+    );
+  }
+
+  void _showResetConfirmationDialog(BuildContext context, AppProvider appProvider) {
+    final bingoGame = appProvider.bingoGame;
+    final calledCount = bingoGame.calledNumbers.length;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning, color: Colors.orange, size: 28),
+              SizedBox(width: 8),
+              Text('Confirmar Reseteo'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '¿Estás seguro de que quieres resetear el juego?',
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              if (calledCount > 0)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '⚠️ Se perderá el progreso actual:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange.shade900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('• $calledCount números llamados'),
+                      Text('• Todas las cartillas marcadas'),
+                      Text('• Estado actual del juego'),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                appProvider.resetGame();
+                widget.onStateChanged();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✅ Juego reseteado exitosamente'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Sí, Resetear'),
+            ),
+          ],
+        );
       },
     );
   }

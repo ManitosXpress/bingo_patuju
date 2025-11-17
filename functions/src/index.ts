@@ -7,8 +7,10 @@ import { router as cardsRouter } from './routes/cards';
 import { router as salesRouter } from './routes/sales';
 import { router as reportsRouter } from './routes/reports';
 
-// Inicializar Firebase Admin
-admin.initializeApp();
+// Inicializar Firebase Admin (solo si no está ya inicializado)
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
 // Exportar la base de datos Firestore
 export const db = admin.firestore();

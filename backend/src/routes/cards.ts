@@ -119,8 +119,9 @@ router.get('/', async (_req: any, res: any) => {
   if (sold === 'true') q = q.where('sold', '==', true);
   if (sold === 'false') q = q.where('sold', '==', false);
   
-  // Usar el límite del query string o un valor alto por defecto
-  const limitValue = limit ? parseInt(limit) : 2000;
+  // Usar el límite del query string o un valor muy alto por defecto para obtener todas las cartillas
+  // Si no se especifica límite, usar 50000 para obtener todas las cartillas disponibles
+  const limitValue = limit ? parseInt(limit) : 50000;
   const snaps = await q.limit(limitValue).get();
   
   const out = snaps.docs.map((d: any) => {
@@ -220,9 +221,11 @@ router.post('/bulk-assign', async (req: any, res: any) => {
       return res.status(400).json({ error: 'No se generaron números de cartilla válidos' });
     }
 
-    if (targetCardNumbers.length > 100) {
+    // Aumentar el límite para asignaciones por bloques (puede haber más de 100 cartillas)
+    // Firebase tiene un límite de 500 operaciones por batch, así que limitamos a 500
+    if (targetCardNumbers.length > 500) {
       return res.status(400).json({ 
-        error: 'No se pueden asignar más de 100 cartillas a la vez' 
+        error: 'No se pueden asignar más de 500 cartillas a la vez (límite de Firebase batch)' 
       });
     }
 
@@ -310,61 +313,105 @@ router.post('/generate', async (req: any, res: any) => {
   try {
     const { count = 1 } = req.body as { count?: number };
     
-    if (count < 1 || count > 100) {
+    if (count < 0 || count > 1000) {
       return res.status(400).json({ 
-        error: 'La cantidad debe estar entre 1 y 100' 
+        error: 'La cantidad debe estar entre 0 y 1000' 
+      });
+    }
+    
+    if (count === 0) {
+      return res.status(201).json({
+        message: 'No se generaron cartillas (cantidad 0)',
+        count: 0,
+        cards: []
       });
     }
     
     console.log(`🃏 Generando ${count} cartilla${count > 1 ? 's' : ''} de Bingo...`);
     
-    // Obtener el siguiente número de cartilla disponible
-    const existingCards = await db.collection('cards').get();
+    // Optimizar: Obtener el siguiente número de cartilla usando una consulta ordenada
+    // Esto es más eficiente que cargar todas las cartillas
     let nextCardNo = 1;
-    if (!existingCards.empty) {
-      const cardNumbers: number[] = [];
-      existingCards.docs.forEach(doc => {
-        const data = doc.data();
-        if (data.cardNo && typeof data.cardNo === 'number') {
-          cardNumbers.push(data.cardNo);
-        }
-      });
+    try {
+      const lastCardQuery = await db.collection('cards')
+        .orderBy('cardNo', 'desc')
+        .limit(1)
+        .get();
       
-      if (cardNumbers.length > 0) {
-        nextCardNo = Math.max(...cardNumbers) + 1;
+      if (!lastCardQuery.empty) {
+        const lastCard = lastCardQuery.docs[0].data();
+        if (lastCard.cardNo && typeof lastCard.cardNo === 'number') {
+          nextCardNo = lastCard.cardNo + 1;
+        }
+      }
+    } catch (e) {
+      // Si falla la consulta ordenada, usar método alternativo
+      console.warn('No se pudo usar índice ordenado, usando método alternativo');
+      const existingCards = await db.collection('cards').get();
+      
+      if (!existingCards.empty) {
+        const cardNumbers: number[] = [];
+        existingCards.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.cardNo && typeof data.cardNo === 'number') {
+            cardNumbers.push(data.cardNo);
+          }
+        });
+        
+        if (cardNumbers.length > 0) {
+          nextCardNo = Math.max(...cardNumbers) + 1;
+        }
       }
     }
     
-    const batch = db.batch();
-    const generatedCards = [];
+    // Firebase limita a 500 operaciones por batch
+    const BATCH_SIZE = 500;
+    const generatedCards: any[] = [];
+    const totalBatches = Math.ceil(count / BATCH_SIZE);
     
-    for (let i = 0; i < count; i++) {
-      const numbers = generateRandomBingoNumbers();
-      const flat = flattenGrid(numbers);
+    // Procesar en múltiples batches
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const batchStart = batchIndex * BATCH_SIZE;
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, count);
+      const batchCount = batchEnd - batchStart;
       
-      const dataToSave = {
-        numbersFlat: flat,
-        gridSize: 5,
-        assignedTo: null,
-        sold: false,
-        createdAt: Date.now(),
-        cardNo: nextCardNo + i, // Número secuencial de cartilla
-      };
+      const batch = db.batch();
+      const batchCards: any[] = [];
       
-      const cardRef = db.collection('cards').doc();
-      batch.set(cardRef, dataToSave);
+      // Generar todas las cartillas del batch en memoria primero
+      for (let i = 0; i < batchCount; i++) {
+        const numbers = generateRandomBingoNumbers();
+        const flat = flattenGrid(numbers);
+        const cardNo = nextCardNo + batchStart + i;
+        
+        const dataToSave = {
+          numbersFlat: flat,
+          gridSize: 5,
+          assignedTo: null,
+          sold: false,
+          createdAt: Date.now(),
+          cardNo: cardNo,
+        };
+        
+        const cardRef = db.collection('cards').doc();
+        batch.set(cardRef, dataToSave);
+        
+        batchCards.push({
+          id: cardRef.id,
+          numbers,
+          assignedTo: null,
+          sold: false,
+          createdAt: dataToSave.createdAt,
+          cardNo: dataToSave.cardNo,
+        });
+      }
       
-      generatedCards.push({
-        id: cardRef.id,
-        numbers,
-        assignedTo: null,
-        sold: false,
-        createdAt: dataToSave.createdAt,
-        cardNo: dataToSave.cardNo,
-      });
+      // Commit del batch
+      await batch.commit();
+      generatedCards.push(...batchCards);
+      
+      console.log(`✅ Batch ${batchIndex + 1}/${totalBatches} completado (${batchCount} cartillas)`);
     }
-    
-    await batch.commit();
     
     console.log(`✅ Se generaron ${count} cartilla${count > 1 ? 's' : ''} exitosamente`);
     
@@ -562,6 +609,50 @@ router.post('/validate-and-fix', async (_req: any, res: any) => {
     });
   } catch (e: any) {
     console.error('❌ Error validando cartillas:', e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Endpoint para obtener el total de cartillas y el número máximo de cartilla
+router.get('/total', async (_req: any, res: any) => {
+  try {
+    console.log('🔍 Obteniendo total de cartillas...');
+    
+    // Obtener la cartilla con el número más alto usando orderBy
+    const maxCardQuery = await db.collection('cards')
+      .orderBy('cardNo', 'desc')
+      .limit(1)
+      .get();
+    
+    let maxCardNo = 0;
+    let totalCards = 0;
+    
+    if (!maxCardQuery.empty) {
+      const maxCard = maxCardQuery.docs[0].data();
+      maxCardNo = maxCard.cardNo || 0;
+    }
+    
+    // También contar el total de documentos (puede ser diferente si hay cartillas sin número)
+    const allCardsSnapshot = await db.collection('cards')
+      .limit(50000)
+      .get();
+    
+    totalCards = allCardsSnapshot.size;
+    
+    // El total real es el máximo entre el número máximo de cartilla y el total de documentos
+    const actualTotal = Math.max(maxCardNo, totalCards);
+    
+    console.log(`📊 Total de cartillas: ${actualTotal}`);
+    console.log(`📊 Número máximo de cartilla: ${maxCardNo}`);
+    console.log(`📊 Total de documentos: ${totalCards}`);
+    
+    return res.json({
+      totalCards: actualTotal,
+      maxCardNo: maxCardNo,
+      totalDocuments: totalCards,
+    });
+  } catch (e: any) {
+    console.error('❌ Error obteniendo total de cartillas:', e);
     return res.status(500).json({ error: e.message });
   }
 });

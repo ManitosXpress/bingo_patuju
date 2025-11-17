@@ -43,7 +43,6 @@ class BlackjackCardWidget extends StatelessWidget {
   Widget _buildFaceUpCard() {
     Color cardColor = _getCardColor();
     Color textColor = _getTextColor();
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,

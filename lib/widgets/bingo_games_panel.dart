@@ -296,78 +296,6 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     );
   }
 
-  void _loadGamesWithLegendaryFigures() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.auto_awesome, color: Colors.orange.shade600),
-              const SizedBox(width: 8),
-              const Text('Cargar Figuras Legendarias'),
-            ],
-          ),
-          content: const Text(
-            '¿Deseas cargar automáticamente todos los juegos con las nuevas figuras legendarias incluidas?\n\n'
-            'Esto creará juegos predefinidos para cada día de la semana con figuras legendarias distribuidas en todas las rondas.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancelar'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                _loadLegendaryGames();
-                Navigator.of(context).pop();
-              },
-              icon: const Icon(Icons.auto_awesome),
-              label: const Text('Cargar Figuras Legendarias'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange.shade600,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-  
-  void _loadLegendaryGames() async {
-    final legendaryGames = BingoGamePresets.getGamesWithLegendaryFigures();
-    
-    setState(() {
-      _games = legendaryGames;
-      _selectedGame = legendaryGames.first;
-      _currentRoundIndex = 0;
-    });
-    
-    // Guardar las rondas del primer juego legendario
-    if (legendaryGames.isNotEmpty) {
-      await RoundsPersistenceService.saveGameRounds(legendaryGames.first);
-    }
-    
-    // Mostrar mensaje de confirmación
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.auto_awesome, color: Colors.white),
-            const SizedBox(width: 8),
-            const Text('¡Figuras legendarias cargadas exitosamente!'),
-          ],
-        ),
-        backgroundColor: Colors.orange.shade600,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-    
-    // Actualizar la variable estática
-    await _updateCurrentRoundIndex(0);
-  }
-
   void _markCurrentRoundAsCompleted() async {
     if (_selectedGame != null && _currentRoundIndex < _selectedGame!.rounds.length) {
       setState(() {
@@ -727,12 +655,6 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                         icon: Icon(Icons.add_circle_outline, color: Colors.green.shade600, size: 20),
                         tooltip: 'Crear Nuevo Juego',
                       ),
-                      // Botón para cargar juegos con figuras legendarias
-                      IconButton(
-                        onPressed: () => _loadGamesWithLegendaryFigures(),
-                        icon: Icon(Icons.auto_awesome, color: Colors.orange.shade600, size: 20),
-                        tooltip: 'Cargar Figuras Legendarias',
-                      ),
                     ],
                   ),
                 ),
@@ -810,7 +732,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                '${appProvider.totalCartillas} cartillas disponibles',
+                                'cartillas disponibles',
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: Colors.green.shade700,
@@ -980,14 +902,14 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
            Consumer<AppProvider>(
              builder: (context, appProvider, child) {
                final totalCartillas = appProvider.totalCartillas;
-               return Text(
-                 'Cartillas Cargadas: $totalCartillas',
-                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                   fontSize: 10,
-                   color: totalCartillas > 0 ? Colors.green.shade700 : Colors.orange.shade700,
-                   fontWeight: totalCartillas > 0 ? FontWeight.bold : FontWeight.normal,
-                 ),
-               );
+              return Text(
+                'Cartillas Cargadas',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 10,
+                  color: totalCartillas > 0 ? Colors.green.shade700 : Colors.orange.shade700,
+                  fontWeight: totalCartillas > 0 ? FontWeight.bold : FontWeight.normal,
+                ),
+              );
              },
            ),
           if (_isGameCompleted)
@@ -2325,6 +2247,17 @@ class _RoundEditorState extends State<_RoundEditor> {
     widget.onUpdate(updatedRound);
   }
 
+  /// Obtener patrones ordenados alfabéticamente por su nombre de visualización
+  List<BingoPattern> _getSortedPatterns() {
+    final patterns = List<BingoPattern>.from(BingoPattern.values);
+    patterns.sort((a, b) {
+      final nameA = _getPatternDisplayName(a).toLowerCase();
+      final nameB = _getPatternDisplayName(b).toLowerCase();
+      return nameA.compareTo(nameB);
+    });
+    return patterns;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -2369,7 +2302,7 @@ class _RoundEditorState extends State<_RoundEditor> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: BingoPattern.values.map((pattern) {
+              children: _getSortedPatterns().map((pattern) {
                 final isSelected = _selectedPatterns.contains(pattern);
                 return FilterChip(
                   label: Text(_getPatternDisplayName(pattern)),
@@ -2706,6 +2639,17 @@ class _EditRoundDialogState extends State<_EditRoundDialog> {
     _selectedPatterns = List.from(widget.round.patterns);
   }
 
+  /// Obtener patrones ordenados alfabéticamente por su nombre de visualización
+  List<BingoPattern> _getSortedPatterns() {
+    final patterns = List<BingoPattern>.from(BingoPattern.values);
+    patterns.sort((a, b) {
+      final nameA = _getPatternDisplayName(a).toLowerCase();
+      final nameB = _getPatternDisplayName(b).toLowerCase();
+      return nameA.compareTo(nameB);
+    });
+    return patterns;
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -2797,11 +2741,11 @@ class _EditRoundDialogState extends State<_EditRoundDialog> {
                     ),
                     const SizedBox(height: 12),
                     
-                    // Grid de patrones seleccionables
+                    // Grid de patrones seleccionables (ordenados alfabéticamente)
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: BingoPattern.values.map((pattern) {
+                      children: _getSortedPatterns().map((pattern) {
                         final isSelected = _selectedPatterns.contains(pattern);
                         return FilterChip(
                           label: Text(_getPatternDisplayName(pattern)),

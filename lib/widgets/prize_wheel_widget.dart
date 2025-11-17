@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PrizeWheelWidget extends StatefulWidget {
   final List<int> cartillaNumbers;
@@ -69,23 +71,21 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
     final available = _availableCartillas;
     if (available.isEmpty) return [];
     
-    // Si hay 12 o menos cartillas disponibles, mostrar todas
+    // Si hay 12 o menos cartillas disponibles, mostrar todas mezcladas
     if (available.length <= 12) {
-      return available;
+      final shuffled = List<int>.from(available);
+      final random = math.Random.secure();
+      shuffled.shuffle(random);
+      return shuffled;
     }
     
-    // Si hay más de 12, seleccionar 12 números distribuidos uniformemente
-    final selected = <int>[];
-    final step = available.length / 12;
+    // Si hay más de 12, seleccionar 12 números completamente aleatorios
+    final shuffled = List<int>.from(available);
+    final random = math.Random.secure();
+    shuffled.shuffle(random);
     
-    for (int i = 0; i < 12; i++) {
-      final index = (i * step).round();
-      if (index < available.length) {
-        selected.add(available[index]);
-      }
-    }
-    
-    return selected;
+    // Tomar los primeros 12 después de mezclar
+    return shuffled.take(12).toList();
   }
 
   // Obtener números visibles en la ruleta (solo los que están en _wheelNumbers)
@@ -98,29 +98,32 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
     final available = _availableCartillas;
     if (available.isEmpty) return [];
     
-    // Si hay más de 50 cartillas, mostrar solo 50 para que sean visibles
-    if (available.length > 50) {
-      final selected = <int>[];
-      final step = available.length / 50;
+    // Si hay más de 500 cartillas, seleccionar 500 completamente aleatorias
+    if (available.length > 500) {
+      // Crear una copia y mezclarla completamente
+      final shuffled = List<int>.from(available);
+      final random = math.Random.secure();
+      shuffled.shuffle(random);
       
-      for (int i = 0; i < 50; i++) {
-        final index = (i * step).round();
-        if (index < available.length) {
-          selected.add(available[index]);
-        }
-      }
-      return selected;
+      // Tomar las primeras 500 después de mezclar
+      return shuffled.take(500).toList();
     }
     
-    // Si hay 50 o menos, mostrar todas
-    return available;
+    // Si hay 500 o menos, devolver todas mezcladas para aleatoriedad completa
+    final shuffled = List<int>.from(available);
+    final random = math.Random.secure();
+    shuffled.shuffle(random);
+    return shuffled;
   }
+
+  static const String _winnersKey = 'prize_wheel_winners';
+  static const String _usedCartillasKey = 'prize_wheel_used_cartillas';
 
   @override
   void initState() {
     super.initState();
     _spinController = AnimationController(
-      duration: const Duration(seconds: 3), // Exactamente 3 segundos
+      duration: const Duration(milliseconds: 2000), // Reducido a 2 segundos para más rapidez
       vsync: this,
     );
     _spinAnimation = Tween<double>(
@@ -128,8 +131,110 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
       end: 1.0,
     ).animate(CurvedAnimation(
       parent: _spinController,
-      curve: Curves.easeInOut, // Suave aceleración y desaceleración
+      curve: Curves.easeOutCubic, // Acelera rápido y desacelera suavemente (más emocionante)
     ));
+    
+    // Cargar ganadores guardados
+    _loadWinners();
+  }
+
+  // Cargar ganadores desde SharedPreferences
+  Future<void> _loadWinners() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final winnersJson = prefs.getString(_winnersKey);
+      final usedCartillasJson = prefs.getString(_usedCartillasKey);
+      
+      if (winnersJson != null) {
+        final winnersList = jsonDecode(winnersJson) as List<dynamic>;
+        setState(() {
+          _winners = winnersList.map((e) => e as int).toList();
+        });
+      }
+      
+      if (usedCartillasJson != null) {
+        final usedList = jsonDecode(usedCartillasJson) as List<dynamic>;
+        setState(() {
+          _usedCartillas = usedList.map((e) => e as int).toSet();
+        });
+      }
+    } catch (e) {
+      print('Error cargando ganadores: $e');
+    }
+  }
+
+  // Guardar ganadores en SharedPreferences
+  Future<void> _saveWinners() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_winnersKey, jsonEncode(_winners));
+      await prefs.setString(_usedCartillasKey, jsonEncode(_usedCartillas.toList()));
+    } catch (e) {
+      print('Error guardando ganadores: $e');
+    }
+  }
+
+  // Eliminar todos los ganadores
+  Future<void> _clearWinners() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.delete_forever, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Eliminar Ganadores'),
+          ],
+        ),
+        content: Text(
+          '¿Estás seguro de que quieres eliminar todos los ganadores registrados?',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_winnersKey);
+        await prefs.remove(_usedCartillasKey);
+        
+        setState(() {
+          _winners = [];
+          _usedCartillas = {};
+          _selectedCartilla = null;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Ganadores eliminados correctamente'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error eliminando ganadores: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -157,12 +262,16 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
     setState(() {
       _isSpinning = true;
       _selectedCartilla = null;
+      _spinningSequence = null; // Resetear la secuencia para cada nuevo giro
     });
     
-    // Seleccionar un número directamente de todas las cartillas disponibles
-    final random = math.Random();
-    final selectedIndex = random.nextInt(allNumbers.length);
-    final selectedCartilla = allNumbers[selectedIndex];
+    // Crear una copia de la lista y mezclarla completamente para aleatoriedad real
+    final shuffledNumbers = List<int>.from(allNumbers);
+    final random = math.Random.secure(); // Usar Random.secure() para mejor aleatoriedad
+    shuffledNumbers.shuffle(random);
+    
+    // Seleccionar un número completamente aleatorio de la lista mezclada
+    final selectedCartilla = shuffledNumbers[random.nextInt(shuffledNumbers.length)];
     
     // Resetear la animación para que siempre gire
     _spinController.reset();
@@ -175,6 +284,9 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
         _usedCartillas.add(selectedCartilla);
       });
       
+      // Guardar ganadores después de agregar uno nuevo
+      _saveWinners();
+      
       // Llamar al callback con la cartilla seleccionada
       if (widget.onPrizeSelected != null) {
         widget.onPrizeSelected!(selectedCartilla);
@@ -182,6 +294,9 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
     });
   }
 
+  // Lista de números mezclados para mostrar durante el giro
+  List<int>? _spinningSequence;
+  
   // Método para obtener el número que se muestra mientras gira
   String _getSpinningNumber() {
     if (!_isSpinning) return '';
@@ -189,15 +304,25 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
     final allNumbers = _allWheelNumbers;
     if (allNumbers.isEmpty) return '';
     
+    // Crear una secuencia aleatoria mezclada al inicio del giro
+    if (_spinningSequence == null || _spinningSequence!.isEmpty) {
+      _spinningSequence = List<int>.from(allNumbers);
+      final random = math.Random.secure();
+      _spinningSequence!.shuffle(random);
+    }
+    
     // Calcular qué número mostrar basado en el progreso de la animación
     final progress = _spinAnimation.value;
-    final totalNumbers = allNumbers.length;
+    final totalNumbers = _spinningSequence!.length;
     
-    // Crear un efecto de "ruleta" que acelera y luego desacelera
-    final easedProgress = Curves.easeInOut.transform(progress);
-    final index = (easedProgress * totalNumbers * 10) % totalNumbers;
+    // Optimización: Usar la misma curva que la animación para consistencia
+    // Crear efecto de ruleta que acelera rápido al inicio y desacelera al final
+    // Usar más ciclos al inicio (rápido) y menos al final (lento)
+    final speedMultiplier = 1.0 + (1.0 - progress) * 2.0; // Más rápido al inicio
+    final cycles = 20.0 * speedMultiplier; // Ciclos dinámicos que se reducen con el tiempo
+    final index = ((progress * totalNumbers * cycles) % totalNumbers).floor();
     
-    return '${allNumbers[index.floor()]}';
+    return '${_spinningSequence![index]}';
   }
 
   @override
@@ -282,6 +407,7 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
                               _selectedCartilla = null;
                               _spinsCount = 0;
                             });
+                            _saveWinners(); // Guardar después de reiniciar
                           },
                           icon: const Icon(Icons.refresh),
                           label: const Text('Reiniciar'),
@@ -291,7 +417,22 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           ),
                         ),
-                      const SizedBox(width: 8),
+                      if (_allWheelNumbers.isEmpty)
+                        const SizedBox(width: 8),
+                      // Botón para eliminar ganadores (solo se muestra si hay ganadores)
+                      if (_winners.isNotEmpty)
+                        ElevatedButton.icon(
+                          onPressed: _clearWinners,
+                          icon: const Icon(Icons.delete_sweep),
+                          label: const Text('Eliminar Ganadores'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          ),
+                        ),
+                      if (_winners.isNotEmpty)
+                        const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: () {
                           if (widget.onClose != null) {
@@ -341,68 +482,83 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
                     Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Ruleta giratoria (solo colores, sin números)
-                        AnimatedBuilder(
-                          animation: _spinAnimation,
-                          builder: (context, child) {
-                            return Transform.rotate(
-                              angle: _spinAnimation.value * 50 * math.pi, // Más rotaciones
-                              child: Container(
-                                width: 280,
-                                height: 280,
-                                child: CustomPaint(
-                                  painter: CartillaWheelPainter(
-                                    wheelNumbers: _allWheelNumbers.isNotEmpty ? _allWheelNumbers : widget.cartillaNumbers,
-                                    selectedCartilla: _selectedCartilla,
-                                    isSpinning: _isSpinning,
-                                    showNumbers: false, // No mostrar números en la ruleta
-                                    showIndicator: false,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        
-                        // Números girando en el centro
-                        if (_isSpinning)
-                          AnimatedBuilder(
+                        // Ruleta giratoria (solo colores, sin números) - Optimizada con RepaintBoundary
+                        RepaintBoundary(
+                          child: AnimatedBuilder(
                             animation: _spinAnimation,
                             builder: (context, child) {
-                              return Container(
-                                width: 200,
-                                height: 200,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.white.withOpacity(0.9),
-                                  border: Border.all(color: Colors.orange, width: 4),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.3),
-                                      blurRadius: 10,
-                                      spreadRadius: 2,
-                                    ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _getSpinningNumber(),
-                                    style: TextStyle(
-                                      fontSize: 48,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.orange.shade800,
-                                      shadows: [
-                                        Shadow(
-                                          color: Colors.black.withOpacity(0.3),
-                                          offset: Offset(2, 2),
-                                          blurRadius: 4,
-                                        ),
-                                      ],
+                              // Optimización: Calcular el ángulo una sola vez
+                              // Reducir rotaciones para mejor rendimiento (de 50 a 30)
+                              final rotationAngle = _spinAnimation.value * 30 * math.pi;
+                              return Transform.rotate(
+                                angle: rotationAngle,
+                                child: Container(
+                                  width: 280,
+                                  height: 280,
+                                  child: CustomPaint(
+                                    painter: CartillaWheelPainter(
+                                      wheelNumbers: _allWheelNumbers.isNotEmpty ? _allWheelNumbers : widget.cartillaNumbers,
+                                      selectedCartilla: _selectedCartilla,
+                                      isSpinning: _isSpinning,
+                                      showNumbers: false, // No mostrar números en la ruleta
+                                      showIndicator: false,
                                     ),
                                   ),
                                 ),
                               );
                             },
+                          ),
+                        ),
+                        
+                        // Números girando en el centro - Optimizado con RepaintBoundary
+                        if (_isSpinning)
+                          RepaintBoundary(
+                            child: AnimatedBuilder(
+                              animation: _spinAnimation,
+                              builder: (context, _) {
+                                return Container(
+                                  width: 200,
+                                  height: 200,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Colors.orange.shade400,
+                                        Colors.orange.shade600,
+                                        Colors.orange.shade800,
+                                      ],
+                                    ),
+                                    border: Border.all(color: Colors.orange.shade900, width: 4),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.orange.withOpacity(0.5),
+                                        blurRadius: 15,
+                                        spreadRadius: 3,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      _getSpinningNumber(),
+                                      style: TextStyle(
+                                        fontSize: 48,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.black.withOpacity(0.3),
+                                            offset: const Offset(2, 2),
+                                            blurRadius: 4,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         
                         // Número ganador final en el centro

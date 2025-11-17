@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/bingo_game.dart';
 import '../widgets/numbers_panel.dart';
 import '../widgets/control_panel.dart';
@@ -153,71 +154,142 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bingo 5x5 - 75 Números'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.blue.shade600,
-                Colors.blue.shade800,
+    return Shortcuts(
+      shortcuts: <LogicalKeySet, Intent>{
+        LogicalKeySet(LogicalKeyboardKey.space): const _CallNumberIntent(),
+        LogicalKeySet(LogicalKeyboardKey.keyV): const _VerifyBingoIntent(),
+        LogicalKeySet(LogicalKeyboardKey.keyR): const _ResetGameIntent(),
+        LogicalKeySet(LogicalKeyboardKey.keyC): const _ViewCartillasIntent(),
+        LogicalKeySet(LogicalKeyboardKey.escape): const _CloseDialogIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _CallNumberIntent: CallbackAction<_CallNumberIntent>(
+            onInvoke: (_) {
+              final appProvider = Provider.of<AppProvider>(context, listen: false);
+              appProvider.callNumber();
+              _onGameStateChanged();
+              return null;
+            },
+          ),
+          _VerifyBingoIntent: CallbackAction<_VerifyBingoIntent>(
+            onInvoke: (_) {
+              // La verificación se maneja desde el ControlPanel
+              return null;
+            },
+          ),
+          _ResetGameIntent: CallbackAction<_ResetGameIntent>(
+            onInvoke: (_) {
+              // El reset se maneja desde el ControlPanel con confirmación
+              return null;
+            },
+          ),
+          _ViewCartillasIntent: CallbackAction<_ViewCartillasIntent>(
+            onInvoke: (_) {
+              final appProvider = Provider.of<AppProvider>(context, listen: false);
+              // Abrir diálogo de cartillas - esto se maneja desde ControlPanel
+              return null;
+            },
+          ),
+          _CloseDialogIntent: CallbackAction<_CloseDialogIntent>(
+            onInvoke: (_) {
+              Navigator.of(context).pop();
+              return null;
+            },
+          ),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Bingo 5x5 - 75 Números'),
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              flexibleSpace: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.blue.shade600,
+                      Colors.blue.shade800,
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.people_alt),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const CrmScreen()),
+                    );
+                  },
+                  tooltip: 'CRM Vendedores',
+                ),
+                IconButton(
+                  icon: Icon(_showCrystalBall ? Icons.visibility_off : Icons.visibility),
+                  onPressed: _toggleCrystalBall,
+                  tooltip: 'Mostrar/Ocultar Esfera de Cristal',
+                ),
+                IconButton(
+                  icon: Icon(Icons.casino),
+                  onPressed: _togglePrizeWheel,
+                  tooltip: 'Ruleta de Premios',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.spa),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const BlackjackScreen()),
+                    );
+                  },
+                  tooltip: 'Mesa de Blackjack',
+                ),
+                // Indicador de atajos de teclado
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.keyboard),
+                  tooltip: 'Atajos de Teclado',
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'help',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Atajos de Teclado:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          SizedBox(height: 8),
+                          Text('Espacio: Llamar número'),
+                          Text('V: Verificar bingo'),
+                          Text('R: Resetear juego'),
+                          Text('C: Ver cartillas'),
+                          Text('Esc: Cerrar diálogos'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ],
+            ),
+            body: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.grey.shade50,
+                    Colors.grey.shade100,
+                  ],
+                ),
+              ),
+              child: _showCrystalBall 
+                ? _buildCrystalBallView()
+                : _showPrizeWheel
+                  ? _buildPrizeWheelView()
+                  : _buildNormalView(),
             ),
           ),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.people_alt),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CrmScreen()),
-              );
-            },
-            tooltip: 'CRM Vendedores',
-          ),
-          IconButton(
-            icon: Icon(_showCrystalBall ? Icons.visibility_off : Icons.visibility),
-            onPressed: _toggleCrystalBall,
-            tooltip: 'Mostrar/Ocultar Esfera de Cristal',
-          ),
-          IconButton(
-            icon: Icon(Icons.casino),
-            onPressed: _togglePrizeWheel,
-            tooltip: 'Ruleta de Premios',
-          ),
-          IconButton(
-            icon: const Icon(Icons.spa),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const BlackjackScreen()),
-              );
-            },
-            tooltip: 'Mesa de Blackjack',
-          ),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.grey.shade50,
-              Colors.grey.shade100,
-            ],
-          ),
-        ),
-        child: _showCrystalBall 
-          ? _buildCrystalBallView()
-          : _showPrizeWheel
-            ? _buildPrizeWheelView()
-            : _buildNormalView(),
       ),
     );
   }
@@ -572,4 +644,25 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
       ),
     );
   }
+}
+
+// Intents para los atajos de teclado
+class _CallNumberIntent extends Intent {
+  const _CallNumberIntent();
+}
+
+class _VerifyBingoIntent extends Intent {
+  const _VerifyBingoIntent();
+}
+
+class _ResetGameIntent extends Intent {
+  const _ResetGameIntent();
+}
+
+class _ViewCartillasIntent extends Intent {
+  const _ViewCartillasIntent();
+}
+
+class _CloseDialogIntent extends Intent {
+  const _CloseDialogIntent();
 } 

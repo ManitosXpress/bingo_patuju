@@ -55,23 +55,15 @@ exports.router.post('/', async (req, res) => {
             leaderCommission = 1.5;
         }
         else if (seller.role === 'SUBSELLER') {
-            // Subvendedor vendiendo - vendedor recibe 1.5 Bs, líder recibe 1.5 Bs
-            leaderCommission = 1.5; // Para el líder
+            // Subvendedor vendiendo - vendedor padre recibe 1.5 Bs, líder NO recibe nada
+            leaderCommission = 0; // El líder NO recibe del subvendedor
             subleaderCommission = 1.5; // Para el vendedor padre
         }
         // Obtener el vendedor padre si es un subvendedor
         let subleaderId = null;
-        if (seller.role === 'SUBSELLER') {
-            // Buscar el vendedor padre (SELLER) que tiene este subvendedor
-            const subleaderQuery = await index_1.db.collection('vendors')
-                .where('role', '==', 'SELLER')
-                .where('leaderId', '==', leaderId)
-                .get();
-            if (!subleaderQuery.empty) {
-                // Asumimos que el subvendedor pertenece al primer vendedor encontrado
-                // En un sistema más complejo, necesitaríamos un campo específico
-                subleaderId = subleaderQuery.docs[0].id;
-            }
+        if (seller.role === 'SUBSELLER' && seller.sellerId) {
+            // Usar el sellerId directamente del subvendedor
+            subleaderId = seller.sellerId;
         }
         // Create sale
         const saleRef = await index_1.db.collection('sales').add({

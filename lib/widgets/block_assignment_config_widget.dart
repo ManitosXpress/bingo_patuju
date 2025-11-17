@@ -23,6 +23,8 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
 
   Map<String, dynamic>? _blockInfo;
   List<String> _validationErrors = [];
+  int _totalCards = 1000; // Valor por defecto, se actualizará dinámicamente
+  bool _isLoadingTotalCards = true;
 
   @override
   void initState() {
@@ -30,7 +32,32 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
     
     _assignToAllVendors = true; // Siempre habilitado para asignación por bloques
     
-    _updateBlockInfo();
+    _loadTotalCards();
+  }
+
+  Future<void> _loadTotalCards() async {
+    try {
+      setState(() {
+        _isLoadingTotalCards = true;
+      });
+      
+      final totalCards = await widget.service.getTotalCardsAvailable();
+      
+      setState(() {
+        _totalCards = totalCards;
+        _isLoadingTotalCards = false;
+      });
+      
+      // Actualizar la información de bloques después de obtener el total
+      _updateBlockInfo();
+    } catch (e) {
+      setState(() {
+        _isLoadingTotalCards = false;
+      });
+      print('Error cargando total de cartillas: $e');
+      // Continuar con el valor por defecto
+      _updateBlockInfo();
+    }
   }
 
   @override
@@ -55,11 +82,17 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
 
   BlockAssignmentConfig? _createConfigFromInputs() {
     try {
-      // Configuración automática fija - el sistema calculará la cantidad óptima
+      // Configuración automática - calcular totalBlocks dinámicamente
       const blockSize = 5;
       const skipBlocks = 0;
       const startCard = 1;
-      const totalBlocks = 200;
+      
+      // Calcular totalBlocks basándose en el total de cartillas disponibles
+      // totalBlocks = totalCards / blockSize (redondeado hacia arriba)
+      final totalBlocks = (_totalCards / blockSize).ceil();
+      
+      print('📊 Calculando totalBlocks: $_totalCards cartillas / $blockSize = $totalBlocks bloques');
+      
       // La cantidad se calculará automáticamente basada en los vendedores disponibles
       const quantityBlocks = 0; // Se calculará automáticamente
 
@@ -73,6 +106,7 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
         assignToAllVendors: _assignToAllVendors,
       );
     } catch (e) {
+      print('Error creando configuración: $e');
       return null;
     }
   }
@@ -124,9 +158,10 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 '• Tamaño de bloque: 5 cartillas por bloque\n'
-                '• Total de bloques: 200 bloques disponibles\n'
+                '• Total de cartillas: $_totalCards cartillas disponibles\n'
+                '• Total de bloques: ${(_totalCards / 5).ceil()} bloques (calculado dinámicamente)\n'
                 '• Cartilla inicial: Desde la cartilla 1\n'
                 '• Bloques a saltar: 0 (todos los bloques disponibles)\n'
                 '• Selección aleatoria: Habilitada por defecto\n'
@@ -134,8 +169,25 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
                 '• Cantidad de bloques: Calculada automáticamente\n'
                 '• Bloques por vendedor: Optimizados automáticamente\n'
                 '• Ajuste inteligente: Se adapta a los bloques disponibles',
-                style: TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 14),
               ),
+              if (_isLoadingTotalCards) ...[
+                const SizedBox(height: 8),
+                const Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Cargando total de cartillas...',
+                      style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

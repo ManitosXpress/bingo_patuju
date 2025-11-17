@@ -129,39 +129,130 @@ class NumbersPanel extends StatelessWidget {
   }
 
   Widget _buildNumberColumn(String letter, int start, int end) {
+    // Colores vibrantes por columna
+    final columnColors = {
+      'B': [Colors.blue.shade400, Colors.blue.shade600],
+      'I': [Colors.cyan.shade400, Colors.cyan.shade600],
+      'N': [Colors.grey.shade400, Colors.grey.shade600],
+      'G': [Colors.green.shade400, Colors.green.shade600],
+      'O': [Colors.orange.shade400, Colors.orange.shade600],
+    };
+    
+    final colors = columnColors[letter] ?? [Colors.grey.shade400, Colors.grey.shade600];
+    
     return Container(
-      width: 65, // Reducido de 70 a 65 para mejor ajuste
+      width: 65,
       child: Column(
         children: List.generate(end - start + 1, (index) {
           int number = start + index;
           bool isCalled = calledNumbers.contains(number);
-          return Container(
-            width: 60, // Reducido de 60 a 55 para que se vean los últimos
-            height: 34, // Reducido de 35 a 32 para que se vean los últimos
-            margin: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 0.5), // Reducido más el espaciado
+          return _AnimatedNumberTile(
+            number: number,
+            isCalled: isCalled,
+            colors: colors,
+            letter: letter,
+          );
+        }),
+      ),
+    );
+  }
+}
+
+// Widget animado para cada número
+class _AnimatedNumberTile extends StatefulWidget {
+  final int number;
+  final bool isCalled;
+  final List<Color> colors;
+  final String letter;
+
+  const _AnimatedNumberTile({
+    required this.number,
+    required this.isCalled,
+    required this.colors,
+    required this.letter,
+  });
+
+  @override
+  State<_AnimatedNumberTile> createState() => _AnimatedNumberTileState();
+}
+
+class _AnimatedNumberTileState extends State<_AnimatedNumberTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _scaleAnimation;
+  bool _wasCalled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
+    );
+    _wasCalled = widget.isCalled;
+  }
+
+  @override
+  void didUpdateWidget(_AnimatedNumberTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isCalled && !_wasCalled) {
+      _wasCalled = true;
+      _pulseController.forward(from: 0).then((_) {
+        _pulseController.reverse();
+      });
+    } else if (!widget.isCalled && _wasCalled) {
+      _wasCalled = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _scaleAnimation,
+      builder: (context, _) {
+        return Transform.scale(
+          scale: widget.isCalled ? _scaleAnimation.value : 1.0,
+          child: Container(
+            width: 60,
+            height: 34,
+            margin: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 0.5),
             decoration: BoxDecoration(
-              gradient: isCalled 
+              gradient: widget.isCalled 
                 ? LinearGradient(
-                    colors: [Colors.red.shade400, Colors.red.shade500],
+                    colors: [Colors.red.shade400, Colors.red.shade600],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
                 : LinearGradient(
-                    colors: [Colors.grey.shade50, Colors.grey.shade100],
+                    colors: [
+                      widget.colors[0].withValues(alpha: 0.3),
+                      widget.colors[1].withValues(alpha: 0.5),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-              borderRadius: BorderRadius.circular(8), // Aumentado de 6 a 8
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isCalled ? Colors.red.shade600 : Colors.grey.shade300,
-                width: isCalled ? 2.0 : 1.5, // Aumentado el grosor del borde
+                color: widget.isCalled 
+                  ? Colors.red.shade700 
+                  : widget.colors[1].withValues(alpha: 0.5),
+                width: widget.isCalled ? 2.5 : 1.5,
               ),
-              boxShadow: isCalled ? [
+              boxShadow: widget.isCalled ? [
                 BoxShadow(
-                  color: Colors.red.shade200,
-                  blurRadius: 4,
-                  spreadRadius: 0.5,
-                  offset: const Offset(0, 1),
+                  color: Colors.red.shade300,
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                  offset: const Offset(0, 2),
                 ),
               ] : [
                 BoxShadow(
@@ -173,24 +264,24 @@ class NumbersPanel extends StatelessWidget {
             ),
             child: Center(
               child: Text(
-                number.toString(),
+                widget.number.toString(),
                 style: TextStyle(
-                  fontSize: 14, // Reducido de 16 a 14 para mejor ajuste
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: isCalled ? Colors.white : Colors.grey.shade700,
-                  shadows: isCalled ? [
+                  color: widget.isCalled ? Colors.white : Colors.grey.shade700,
+                  shadows: widget.isCalled ? [
                     Shadow(
-                      color: Colors.black.withValues(alpha: 0.2),
+                      color: Colors.black.withValues(alpha: 0.3),
                       offset: const Offset(0, 1),
-                      blurRadius: 1,
+                      blurRadius: 2,
                     ),
                   ] : null,
                 ),
               ),
             ),
-          );
-        }),
-      ),
+          ),
+        );
+      },
     );
   }
 } 

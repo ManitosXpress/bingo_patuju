@@ -315,7 +315,7 @@ class CartillasFiltersPanel extends StatelessWidget {
                         children: [
                           const Text(
                             '¿Cuántas cartillas quieres generar?\n\n'
-                            'Ingresa un número entre 1 y 100:',
+                            'Ingresa un número entre 0 y 1000:',
                           ),
                           const SizedBox(height: 16),
                           TextField(
@@ -340,7 +340,7 @@ class CartillasFiltersPanel extends StatelessWidget {
                         ElevatedButton(
                           onPressed: () {
                             final count = int.tryParse(textController.text);
-                            if (count != null && count >= 1 && count <= 100) {
+                            if (count != null && count >= 0 && count <= 1000) {
                               Navigator.pop(context, true);
                             }
                           },

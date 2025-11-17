@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/bingo_game.dart';
 
-class CurrentBallDisplay extends StatelessWidget {
+class CurrentBallDisplay extends StatefulWidget {
   final BingoGame bingoGame;
   final int calledNumbersCount;
   final int totalBalls;
@@ -14,38 +14,168 @@ class CurrentBallDisplay extends StatelessWidget {
   });
 
   @override
+  State<CurrentBallDisplay> createState() => _CurrentBallDisplayState();
+}
+
+class _CurrentBallDisplayState extends State<CurrentBallDisplay>
+    with TickerProviderStateMixin {
+  late AnimationController _rotationController;
+  late AnimationController _pulseController;
+  late Animation<double> _rotationAnimation;
+  late Animation<double> _pulseAnimation;
+  int _previousBall = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _rotationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    
+    _rotationAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _rotationController, curve: Curves.easeOut),
+    );
+    
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    
+    _previousBall = widget.bingoGame.currentBall;
+  }
+
+  @override
+  void didUpdateWidget(CurrentBallDisplay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.bingoGame.currentBall != _previousBall && widget.bingoGame.currentBall > 0) {
+      _previousBall = widget.bingoGame.currentBall;
+      _rotationController.forward(from: 0);
+      _pulseController.forward(from: 0).then((_) {
+        _pulseController.reverse();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 120,
-        height: 120,
-        decoration: BoxDecoration(
-          color: Colors.red,
-          shape: BoxShape.circle,
+    final screenWidth = MediaQuery.of(context).size.width;
+    final ballSize = screenWidth > 1200 ? 150.0 : 120.0;
+    
+    return Column(
+      children: [
+        // Bola actual con animaciones
+        Center(
+          child: AnimatedBuilder(
+            animation: _pulseAnimation,
+            builder: (context, _) {
+              return AnimatedBuilder(
+                animation: _rotationAnimation,
+                builder: (context, _) {
+                  return Transform.scale(
+                    scale: _pulseAnimation.value,
+                    child: Transform.rotate(
+                      angle: _rotationAnimation.value * 2 * 3.14159,
+                      child: Container(
+                        width: ballSize,
+                        height: ballSize,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.red.shade600,
+                              Colors.red.shade800,
+                              Colors.red.shade900,
+                            ],
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withValues(alpha: 0.5),
+                              blurRadius: 20,
+                              spreadRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Efecto de brillo (shimmer)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Colors.white.withValues(alpha: 0.3),
+                                      Colors.transparent,
+                                      Colors.transparent,
+                                      Colors.white.withValues(alpha: 0.1),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // Contenido centrado
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  widget.bingoGame.currentBall > 0 
+                                    ? _getBallLabel(widget.bingoGame.currentBall)
+                                    : '',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: ballSize * 0.2,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withValues(alpha: 0.5),
+                                        offset: const Offset(2, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${widget.calledNumbersCount}/${widget.totalBalls}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: ballSize * 0.12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              bingoGame.currentBall > 0 
-                ? _getBallLabel(bingoGame.currentBall)
-                : '',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              '$calledNumbersCount/$totalBalls',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
@@ -213,11 +343,6 @@ class GameStatsCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'Bolas restantes: $remainingBalls',
-            style: const TextStyle(fontSize: 16),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Cartillas generadas: $cartillasCount',
             style: const TextStyle(fontSize: 16),
           ),
         ],

@@ -63,7 +63,6 @@ exports.router.get('/vendors-summary', async (req, res) => {
     });
     // Attach children (sellers under leaders and subsellers under sellers)
     const byLeader = {};
-    const bySeller = {};
     vendors.forEach((v) => {
         if (v.leaderId) {
             if (v.role === 'SELLER') {
@@ -80,6 +79,7 @@ exports.router.get('/vendors-summary', async (req, res) => {
         }
     });
     let result = Array.from(vendors.values()).map((v) => ({
+        ...v, // Incluir todos los campos del vendedor (incluyendo sellerId)
         ...(stats[v.id] ?? ensure(v.id)),
         children: byLeader[v.id] || [],
     }));

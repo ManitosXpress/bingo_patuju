@@ -133,8 +133,16 @@ router.delete('/:id', async (req: any, res: any) => {
       }
     }
     
-    // Si es un vendedor, verificar que no tenga cartillas asignadas
+    // Si es un vendedor, verificar que no tenga subvendedores asignados
     if (vendorRole === 'SELLER') {
+      const subsellersQuery = await db.collection('vendors').where('sellerId', '==', vendorId).get();
+      if (!subsellersQuery.empty) {
+        return res.status(400).json({ 
+          error: 'Cannot delete seller with assigned subsellers. Reassign or delete subsellers first.' 
+        });
+      }
+      
+      // También verificar que no tenga cartillas asignadas
       const cardsQuery = await db.collection('cards').where('assignedTo', '==', vendorId).get();
       if (!cardsQuery.empty) {
         return res.status(400).json({ 

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'dart:html' as html;
 import 'package:screenshot/screenshot.dart';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:provider/provider.dart';
 import '../config/backend_config.dart';
 import '../widgets/cartilla_widget.dart';
@@ -294,67 +295,169 @@ class _CrmScreenState extends State<CrmScreen> {
     }
   }
 
-  // Método para descargar cartilla en PNG con resolución optimizada (720x1020)
-  Future<void> _downloadCartilla(Map<String, dynamic> card) async {
+  // Captura la cartilla y retorna los bytes de la imagen
+  Future<Uint8List?> _captureCartillaImage(Map<String, dynamic> card) async {
     try {
       // Crear un ScreenshotController para capturar la cartilla
       final screenshotController = ScreenshotController();
       
-      // Crear un widget temporal con la cartilla para capturar
-      final cartillaWidget = MaterialApp(
-        home: Scaffold(
-          backgroundColor: Colors.white,
-          body: Center(
-            child: Container(
-              width: 650, // Ancho reducido para mejor ajuste
-              height: 900, // Alto ajustado para mejor ajuste
-              child: Center(
-                child: CartillaWidget(
-                  numbers: _convertNumbersToIntList(card['numbers'] ?? []),
-                  cardNumber: card['cardNo']?.toString() ?? card['id'],
-                  date: DateTime.now().toString().split(' ')[0],
-                  price: "Bs. 20",
-                  compact: false,
-                ),
+      // Tamaño exacto según la imagen de referencia (720×1020)
+      // Proporción optimizada para impresión
+      const double containerWidth = 720;
+      const double containerHeight = 1020;
+      
+      // Crear un widget aislado sin MaterialApp para que capture solo el área definida
+      final cartillaWidget = Directionality(
+        textDirection: ui.TextDirection.ltr,
+        child: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(containerWidth, containerHeight),
+            devicePixelRatio: 1.0,
+          ),
+          child: SizedBox(
+            width: containerWidth,
+            height: containerHeight,
+            child: DecoratedBox(
+              decoration: const BoxDecoration(color: Colors.white),
+              child: CartillaWidget(
+                numbers: _convertNumbersToIntList(card['numbers'] ?? []),
+                cardNumber: card['cardNo']?.toString() ?? card['id'],
+                date: DateTime.now().toString().split(' ')[0],
+                price: "Bs. 20",
+                compact: false,
+                forPrint: true,
               ),
             ),
           ),
         ),
       );
       
-      // Capturar la cartilla con resolución optimizada
       final imageBytes = await screenshotController.captureFromWidget(
         cartillaWidget,
-        context: context,
         delay: const Duration(milliseconds: 500),
-        pixelRatio: 2.0, // Aumentar la densidad de píxeles para mejor calidad
+        pixelRatio: 1.0, // Resolución exacta: 720×1080 píxeles
       );
+
+      return imageBytes;
+    } catch (e) {
+      debugPrint('Error capturando cartilla: $e');
+      return null;
+    }
+  }
+
+  // Método para descargar cartilla en PNG con resolución optimizada
+  Future<void> _downloadCartilla(Map<String, dynamic> card) async {
+    try {
+      final imageBytes = await _captureCartillaImage(card);
       
-      if (imageBytes.isNotEmpty) {
-        // Descargar la imagen
-        await _saveImageToDevice(imageBytes, 'cartilla_${card['cardNo'] ?? card['id']}.png');
-        
+      if (imageBytes == null || imageBytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error al capturar la cartilla'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+      
+      await _saveImageToDevice(imageBytes, 'cartilla_${card['cardNo'] ?? card['id']}.png');
+      
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Cartilla ${card['cardNo'] ?? card['id']} descargada exitosamente'),
             backgroundColor: Colors.green,
           ),
         );
-      } else {
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error al capturar la cartilla'),
+          SnackBar(
+            content: Text('Error al descargar: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
+    }
+  }
+
+  // Abrir ventana de impresión web para evitar recortes al imprimir
+  Future<void> _printCartilla(Map<String, dynamic> card) async {
+    try {
+      final imageBytes = await _captureCartillaImage(card);
+      
+      if (imageBytes == null || imageBytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudo preparar la cartilla para imprimir'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+      
+      final encoded = base64Encode(imageBytes);
+      final htmlContent = '''
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Imprimir cartilla ${card['cardNo'] ?? card['id']}</title>
+    <style>
+      @page {
+        size: legal portrait;
+        margin: 10mm;
+      }
+      html, body {
+        height: 100%;
+        margin: 0;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      img {
+        max-width: 90%;
+        max-height: 90%;
+        object-fit: contain;
+      }
+    </style>
+  </head>
+  <body>
+    <img src="data:image/png;base64,$encoded" onload="setTimeout(function(){ window.print(); setTimeout(function(){ window.close(); }, 400); }, 100);" />
+  </body>
+</html>
+''';
+      
+      final dataUrl = Uri.dataFromString(
+        htmlContent,
+        mimeType: 'text/html',
+        encoding: utf8,
+      ).toString();
+      
+      final printWindow = html.window.open(dataUrl, '_blank');
+      if (printWindow == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('El navegador bloqueó la ventana de impresión'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al descargar: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al preparar impresión: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -1478,218 +1581,20 @@ class _CrmScreenState extends State<CrmScreen> {
   
   // Método para mostrar diálogo de cartillas asignadas
   Future<void> _showAssignedCardsDialog(String vendorId) async {
-    try {
-      // Cargar todas las cartillas asignadas a este vendedor
-      final response = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$vendorId'));
-      
-      if (!mounted) return;
-      
-      if (response.statusCode >= 300) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar cartillas: ${response.body}')),
-        );
-        return;
-      }
-      
-      final cards = List<Map<String, dynamic>>.from(json.decode(response.body));
-      
-      if (cards.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No hay cartillas asignadas a este vendedor')),
-        );
-        return;
-      }
-      
-      // Mostrar diálogo con todas las cartillas asignadas
-      await showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.assignment, color: Colors.green),
-              SizedBox(width: 8),
-              Text('Cartillas Asignadas'),
-            ],
-          ),
-          content: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.6,
-            height: MediaQuery.of(context).size.height * 0.6,
-            child: Column(
-              children: [
-                Text(
-                  'Total: ${cards.length} cartillas asignadas',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: Colors.green.shade700,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.blue.shade200),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.info_outline, color: Colors.blue.shade600, size: 16),
-                            SizedBox(width: 6),
-                            Text(
-                              'Haz clic en el botón rojo para desasignar cartillas individuales',
-                              style: TextStyle(
-                                color: Colors.blue.shade700,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                                         SizedBox(width: 12),
-                     ElevatedButton.icon(
-                       onPressed: () => _downloadAllAssignedCards(cards, vendorId),
-                       icon: Icon(Icons.download, color: Colors.white),
-                       label: Text('Descargar Todas (${cards.length})'),
-                       style: ElevatedButton.styleFrom(
-                         backgroundColor: Colors.green,
-                         foregroundColor: Colors.white,
-                         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                       ),
-                     ),
-                     SizedBox(width: 8),
-                     ElevatedButton.icon(
-                       onPressed: () => _deleteAllAssignedCards(cards, vendorId),
-                       icon: Icon(Icons.person_remove, color: Colors.white),
-                       label: Text('Desasignar Todas (${cards.length})'),
-                       style: ElevatedButton.styleFrom(
-                         backgroundColor: Colors.red,
-                         foregroundColor: Colors.white,
-                         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                       ),
-                     ),
-                  ],
-                ),
-                SizedBox(height: 16),
-                Expanded(
-                  child: GridView.builder(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 8,
-                      childAspectRatio: 1.2,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                    ),
-                    itemCount: cards.length,
-                    itemBuilder: (context, index) {
-                      final card = cards[index];
-                      final cardNumber = card['cardNo']?.toString() ?? card['id'];
-                      
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green.shade300),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.green.shade200,
-                              blurRadius: 4,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Stack(
-                          children: [
-                            // Botón de eliminación en la esquina superior derecha
-                            Positioned(
-                              top: 2,
-                              right: 2,
-                              child: Tooltip(
-                                message: 'Desasignar cartilla $cardNumber',
-                                child: GestureDetector(
-                                  onTap: () => _deleteIndividualCard(card, vendorId),
-                                  child: Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      borderRadius: BorderRadius.circular(10),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.red.shade300,
-                                          blurRadius: 2,
-                                          offset: Offset(0, 1),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Icon(
-                                      Icons.close,
-                                      size: 14,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // Contenido principal de la cartilla
-                            GestureDetector(
-                              onTap: () => _openCartilla(card),
-                              child: Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      cardNumber,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: Colors.green.shade800,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      'Cartilla',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.green.shade600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cerrar'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    // Mostrar diálogo inmediatamente con widget optimizado
+    await showDialog(
+      context: context,
+      builder: (context) => _AssignedCardsDialog(
+        vendorId: vendorId,
+        apiBase: _apiBase,
+        onDownloadAll: (cards) => _downloadAllAssignedCards(cards, vendorId),
+        onDeleteAll: (cards) => _deleteAllAssignedCards(cards, vendorId),
+        onOpenCartilla: (card) => _openCartilla(card),
+        onDeleteCard: (card) => _deleteIndividualCard(card, vendorId),
+      ),
+    );
   }
+
 
   // Método para abrir una cartilla específica
   Future<void> _openCartilla(Map<String, dynamic> card) async {
@@ -1785,19 +1690,129 @@ class _CrmScreenState extends State<CrmScreen> {
 
   Future<void> _showInventoryDialog() async {
     List<Map<String, dynamic>> cards = [];
-    Future<void> load() async {
-      final r = await http.get(Uri.parse('$_apiBase/cards?sold=false'));
-      if (r.statusCode < 300) {
-        cards = List<Map<String, dynamic>>.from(json.decode(r.body));
+    bool isLoadingCards = false;
+    
+    // Crear mapa de IDs a nombres para búsqueda rápida
+    Map<String, String> vendorIdToName = {};
+    
+    // Cargar vendedores y construir mapa
+    await _load(withLeaders: true);
+    for (var vendor in _vendorsAll) {
+      final id = vendor['id'] as String?;
+      final name = vendor['name'] as String?;
+      if (id != null && name != null) {
+        vendorIdToName[id] = name;
       }
     }
-    await _load(withLeaders: true);
-    await load();
+    
+    // Función helper para obtener el nombre del vendedor
+    String getVendorName(String? vendorId) {
+      if (vendorId == null) return 'Sin asignar';
+      return vendorIdToName[vendorId] ?? vendorId;
+    }
+    
+    // Cargar cartillas inicialmente
+    final initialResp = await http.get(Uri.parse('$_apiBase/cards?sold=false'));
+    if (initialResp.statusCode < 300) {
+      cards = List<Map<String, dynamic>>.from(json.decode(initialResp.body));
+      // Ordenar cartillas por número
+      cards.sort((a, b) {
+        // Intentar parsear como número
+        int getCardNumber(Map<String, dynamic> card) {
+          final cardNo = card['cardNo'];
+          if (cardNo == null) return 0;
+          if (cardNo is int) return cardNo;
+          if (cardNo is String) {
+            return int.tryParse(cardNo) ?? 0;
+          }
+          if (cardNo is num) return cardNo.toInt();
+          return 0;
+        }
+        return getCardNumber(a).compareTo(getCardNumber(b));
+      });
+    }
+    
     String? vendorId;
+    int displayedCount = 10; // Mostrar inicialmente 10 cartillas
+    String filterType = 'Todas'; // 'Todas', 'Asignadas', 'No asignadas'
+    final searchController = TextEditingController();
+    
     await showDialog(context: context, builder: (_) {
       return StatefulBuilder(builder: (context, setSt) {
+        Future<void> loadCards() async {
+          setSt(() => isLoadingCards = true);
+          final r = await http.get(Uri.parse('$_apiBase/cards?sold=false'));
+          if (r.statusCode < 300) {
+            cards = List<Map<String, dynamic>>.from(json.decode(r.body));
+            // Ordenar cartillas por número
+            cards.sort((a, b) {
+              // Intentar parsear como número
+              int getCardNumber(Map<String, dynamic> card) {
+                final cardNo = card['cardNo'];
+                if (cardNo == null) return 0;
+                if (cardNo is int) return cardNo;
+                if (cardNo is String) {
+                  return int.tryParse(cardNo) ?? 0;
+                }
+                if (cardNo is num) return cardNo.toInt();
+                return 0;
+              }
+              return getCardNumber(a).compareTo(getCardNumber(b));
+            });
+          }
+          setSt(() {
+            isLoadingCards = false;
+            displayedCount = 10; // Resetear a 10 al recargar
+          });
+        }
+        
+        // Aplicar búsqueda y filtro
+        final searchQuery = searchController.text;
+        
+        var filteredCards = filterType == 'Asignadas' 
+            ? cards.where((c) => c['assignedTo'] != null).toList()
+            : filterType == 'No asignadas'
+                ? cards.where((c) => c['assignedTo'] == null).toList()
+                : cards;
+        
+        // Aplicar búsqueda por número
+        if (searchQuery.isNotEmpty) {
+          filteredCards = filteredCards.where((c) {
+            final cardNo = c['cardNo'];
+            final cardNoStr = cardNo?.toString() ?? '';
+            final cardId = (c['id'] ?? '').toString();
+            
+            // Buscar coincidencia exacta en el número
+            if (cardNoStr == searchQuery) return true;
+            
+            // Buscar coincidencia en el ID
+            if (cardId.toLowerCase().contains(searchQuery.toLowerCase())) return true;
+            
+            // Buscar coincidencia parcial en el número
+            return cardNoStr.contains(searchQuery);
+          }).toList();
+        }
+        
+        final displayedCards = filteredCards.take(displayedCount).toList();
+        final hasMore = displayedCount < filteredCards.length;
+        
         return AlertDialog(
-          title: const Text('Inventario de Cartillas (backend)'),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Inventario de Cartillas (backend)'),
+              Text(
+                searchQuery.isNotEmpty
+                    ? 'Mostrando ${displayedCards.length} de ${filteredCards.length} resultados para "$searchQuery"'
+                    : 'Mostrando ${displayedCards.length} de ${filteredCards.length} cartillas ${filterType != 'Todas' ? '($filterType)' : ''}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.normal,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
           content: SizedBox(
             width: MediaQuery.of(context).size.width * 0.8,
             height: MediaQuery.of(context).size.height * 0.7,
@@ -1815,46 +1830,234 @@ class _CrmScreenState extends State<CrmScreen> {
                     ),
                     const SizedBox(width: 8),
                     OutlinedButton.icon(
-                      onPressed: () async { await load(); setSt(() {}); },
-                      icon: const Icon(Icons.refresh),
+                      onPressed: isLoadingCards ? null : () async { 
+                        await loadCards(); 
+                      },
+                      icon: isLoadingCards 
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh),
                       label: const Text('Actualizar'),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: cards.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 6),
-                    itemBuilder: (_, i) {
-                      final c = cards[i];
-                      return Card(
-                        child: ListTile(
-                          title: Text('Card ${c['id']}'),
-                          subtitle: Text(c['assignedTo'] != null ? 'Asignada a: ${c['assignedTo']}' : 'Sin asignar'),
-                          trailing: ElevatedButton(
-                            onPressed: vendorId == null
-                                ? null
-                                : () async {
-                                    final rr = await http.post(
-                                      Uri.parse('$_apiBase/cards/${c['id']}/assign'), 
-                                      headers: {'Content-Type': 'application/json'}, 
-                                      body: json.encode({'vendorId': vendorId}),
-                                    );
-                                    if (rr.statusCode < 300) {
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Asignada')));
-                                      await load();
-                                      setSt(() {});
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${rr.body}')));
-                                    }
+                // Buscador por número de cartilla
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: searchController,
+                        decoration: InputDecoration(
+                          labelText: 'Buscar por número de cartilla',
+                          hintText: 'Ej: 11, 25, 100',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    searchController.clear();
+                                    setSt(() {
+                                      displayedCount = 10;
+                                    });
                                   },
-                            child: const Text('Asignar'),
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                      );
-                    },
-                  ),
+                        onChanged: (value) {
+                          setSt(() {
+                            displayedCount = 10; // Resetear contador al buscar
+                          });
+                        },
+                      ),
+                    ),
+                    if (searchQuery.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          searchController.clear();
+                          setSt(() {
+                            displayedCount = 10;
+                          });
+                        },
+                        icon: const Icon(Icons.clear),
+                        label: const Text('Limpiar'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade200,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Filtro de cartillas
+                Row(
+                  children: [
+                    const Icon(Icons.filter_list, size: 20, color: Colors.indigo),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Filtrar:',
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: filterType,
+                        items: const [
+                          DropdownMenuItem(value: 'Todas', child: Text('Todas')),
+                          DropdownMenuItem(value: 'Asignadas', child: Text('Asignadas')),
+                          DropdownMenuItem(value: 'No asignadas', child: Text('No asignadas')),
+                        ],
+                        onChanged: (v) {
+                          setSt(() {
+                            filterType = v ?? 'Todas';
+                            displayedCount = 10; // Resetear contador al cambiar filtro
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(),
+                        ),
+                        isExpanded: false,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: filteredCards.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                searchQuery.isNotEmpty ? Icons.search_off : Icons.inbox,
+                                size: 64,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                searchQuery.isNotEmpty
+                                    ? 'No se encontraron cartillas con el número "$searchQuery"'
+                                    : 'No hay cartillas ${filterType == 'Todas' ? '' : filterType.toLowerCase()}',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.shade600,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              if (searchQuery.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    searchController.clear();
+                                    setSt(() {
+                                      displayedCount = 10;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.clear),
+                                  label: const Text('Limpiar búsqueda'),
+                                ),
+                              ],
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                              itemCount: displayedCards.length + (hasMore ? 1 : 0),
+                              separatorBuilder: (_, __) => const SizedBox(height: 6),
+                              itemBuilder: (_, i) {
+                                // Botón "Cargar más" al final
+                                if (i == displayedCards.length) {
+                                  return Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        setSt(() {
+                                          displayedCount += 10;
+                                        });
+                                      },
+                                      icon: const Icon(Icons.expand_more),
+                                      label: Text('Cargar más (${filteredCards.length - displayedCount} restantes)'),
+                                      style: ElevatedButton.styleFrom(
+                                        minimumSize: const Size(double.infinity, 48),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                
+                                final c = displayedCards[i];
+                                final assignedToId = c['assignedTo'] as String?;
+                                final assignedToName = getVendorName(assignedToId);
+                                final cardNumber = c['cardNo']?.toString() ?? c['id'];
+                                
+                                return Card(
+                                  child: ListTile(
+                                    title: Text('Cartilla $cardNumber', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('ID: ${c['id']}'),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              assignedToId != null ? Icons.person : Icons.person_outline,
+                                              size: 14,
+                                              color: assignedToId != null ? Colors.green : Colors.grey,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              assignedToId != null ? 'Asignada a: $assignedToName' : 'Sin asignar',
+                                              style: TextStyle(
+                                                color: assignedToId != null ? Colors.green.shade700 : Colors.grey,
+                                                fontWeight: assignedToId != null ? FontWeight.w500 : FontWeight.normal,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    trailing: ElevatedButton(
+                                      onPressed: vendorId == null || isLoadingCards
+                                          ? null
+                                          : () async {
+                                              setSt(() => isLoadingCards = true);
+                                              final rr = await http.post(
+                                                Uri.parse('$_apiBase/cards/${c['id']}/assign'), 
+                                                headers: {'Content-Type': 'application/json'}, 
+                                                body: json.encode({'vendorId': vendorId}),
+                                              );
+                                              setSt(() => isLoadingCards = false);
+                                              
+                                              if (rr.statusCode < 300) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text('Cartilla asignada exitosamente'),
+                                                    backgroundColor: Colors.green,
+                                                  ),
+                                                );
+                                                await loadCards();
+                                              } else {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text('Error: ${rr.body}'),
+                                                    backgroundColor: Colors.red,
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                      child: const Text('Asignar'),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                 ),
               ],
             ),
@@ -2651,18 +2854,43 @@ class _CrmScreenState extends State<CrmScreen> {
           ),
           if (assignedValue != null && vendorId != null) ...[
             const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '$assignedValue asignadas',
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Colors.green,
-                  fontWeight: FontWeight.w500,
+            Tooltip(
+              message: 'Haz clic para ver todas las cartillas asignadas',
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: InkWell(
+                  onTap: () => _showAssignedCardsDialog(vendorId),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: Colors.green.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$assignedValue asignadas',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 8,
+                          color: Colors.green,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -3325,21 +3553,40 @@ class _CrmScreenState extends State<CrmScreen> {
         final cardNumber = card['cardNo']?.toString() ?? card['id'];
         
         try {
-          // Crear un widget temporal con la cartilla para capturar
-          final cartillaWidget = MaterialApp(
-            home: Scaffold(
-              backgroundColor: Colors.white,
-              body: Center(
-                child: Container(
-                  width: 650, // Ancho reducido para mejor ajuste
-                  height: 900, // Alto ajustado para mejor ajuste
+          // Tamaño fijo para la imagen final (720x1020 píxeles)
+          const double imageWidth = 720;
+          const double imageHeight = 1020;
+          
+          // Tamaño del contenedor con padding para centrar la cartilla
+          const double containerWidth = imageWidth;
+          const double containerHeight = imageHeight;
+          
+          // Crear un widget aislado con MediaQuery envolviendo MaterialApp
+          // para proporcionar el MediaQuery necesario para ScaffoldMessenger
+          final cartillaWidget = MediaQuery(
+            data: MediaQueryData(
+              size: Size(containerWidth, containerHeight),
+              devicePixelRatio: 2.0,
+            ),
+            child: MaterialApp(
+              debugShowCheckedModeBanner: false, // Ocultar banner DEBUG
+              home: Scaffold(
+                backgroundColor: Colors.white,
+                body: SizedBox(
+                  width: containerWidth,
+                  height: containerHeight,
                   child: Center(
-                    child: CartillaWidget(
-                      numbers: _convertNumbersToIntList(card['numbers'] ?? []),
-                      cardNumber: cardNumber,
-                      date: DateTime.now().toString().split(' ')[0],
-                      price: "Bs. 20",
-                      compact: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 85, vertical: 20),
+                      // Padding horizontal: (720 - 550) / 2 = 85px para centrar la cartilla de 550px
+                      child: CartillaWidget(
+                        numbers: _convertNumbersToIntList(card['numbers'] ?? []),
+                        cardNumber: cardNumber,
+                        date: DateTime.now().toString().split(' ')[0],
+                        price: "Bs. 20",
+                        compact: false,
+                        forPrint: true, // Usar modo impresión para evitar márgenes innecesarios
+                      ),
                     ),
                   ),
                 ),
@@ -3347,12 +3594,12 @@ class _CrmScreenState extends State<CrmScreen> {
             ),
           );
           
-          // Capturar la cartilla con resolución optimizada
+          // Capturar la cartilla sin usar el context de la pantalla actual
+          // para evitar capturar elementos de la UI
           final imageBytes = await screenshotController.captureFromWidget(
             cartillaWidget,
-            context: context,
             delay: const Duration(milliseconds: 300),
-            pixelRatio: 2.0, // Aumentar la densidad de píxeles para mejor calidad
+            pixelRatio: 2.0, // Resolución alta: 1440x2040 píxeles
           );
           
           if (imageBytes.isNotEmpty) {
@@ -4155,5 +4402,332 @@ class _CrmScreenState extends State<CrmScreen> {
         );
       }
     }
+  }
+}
+
+// Widget optimizado para el diálogo de cartillas asignadas
+class _AssignedCardsDialog extends StatefulWidget {
+  final String vendorId;
+  final String apiBase;
+  final Function(List<Map<String, dynamic>>) onDownloadAll;
+  final Function(List<Map<String, dynamic>>) onDeleteAll;
+  final Function(Map<String, dynamic>) onOpenCartilla;
+  final Function(Map<String, dynamic>) onDeleteCard;
+
+  const _AssignedCardsDialog({
+    required this.vendorId,
+    required this.apiBase,
+    required this.onDownloadAll,
+    required this.onDeleteAll,
+    required this.onOpenCartilla,
+    required this.onDeleteCard,
+  });
+
+  @override
+  State<_AssignedCardsDialog> createState() => _AssignedCardsDialogState();
+}
+
+class _AssignedCardsDialogState extends State<_AssignedCardsDialog> {
+  List<Map<String, dynamic>>? _cards;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCards();
+  }
+
+  Future<void> _loadCards() async {
+    try {
+      final response = await http.get(Uri.parse('${widget.apiBase}/cards?assignedTo=${widget.vendorId}'));
+      
+      if (!mounted) return;
+      
+      if (response.statusCode >= 300) {
+        setState(() {
+          _errorMessage = 'Error al cargar cartillas: ${response.body}';
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      final cards = List<Map<String, dynamic>>.from(json.decode(response.body));
+      
+      if (mounted) {
+        setState(() {
+          _cards = cards;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Error de conexión: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _refreshCards() {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    _loadCards();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.assignment, color: Colors.green),
+          SizedBox(width: 8),
+          Text('Cartillas Asignadas'),
+        ],
+      ),
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.6,
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: _isLoading
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Cargando cartillas...'),
+                  ],
+                ),
+              )
+            : _errorMessage != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red, size: 48),
+                        SizedBox(height: 16),
+                        Text(
+                          _errorMessage!,
+                          style: TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _refreshCards,
+                          icon: Icon(Icons.refresh),
+                          label: Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _cards == null || _cards!.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.assignment_outlined, color: Colors.grey, size: 48),
+                            SizedBox(height: 16),
+                            Text('No hay cartillas asignadas'),
+                          ],
+                        ),
+                      )
+                    : _buildContent(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cerrar'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContent() {
+    return Column(
+      children: [
+        Text(
+          'Total: ${_cards!.length} cartillas asignadas',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: Colors.green.shade700,
+          ),
+        ),
+        SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue.shade600, size: 16),
+                    SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Haz clic en el botón rojo para desasignar cartillas individuales',
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: () => widget.onDownloadAll(_cards!),
+              icon: Icon(Icons.download, color: Colors.white),
+              label: Text('Descargar Todas (${_cards!.length})'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            ),
+            SizedBox(width: 8),
+            ElevatedButton.icon(
+              onPressed: () async {
+                await widget.onDeleteAll(_cards!);
+                _refreshCards();
+              },
+              icon: Icon(Icons.person_remove, color: Colors.white),
+              label: Text('Desasignar Todas (${_cards!.length})'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 16),
+        Expanded(
+          child: GridView.builder(
+            // Optimizaciones de rendimiento
+            cacheExtent: 500,
+            addAutomaticKeepAlives: false,
+            addRepaintBoundaries: true,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 8,
+              childAspectRatio: 1.2,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount: _cards!.length,
+            itemBuilder: (context, index) {
+              final card = _cards![index];
+              final cardNumber = card['cardNo']?.toString() ?? card['id'];
+              
+              return RepaintBoundary(
+                child: _CardItemWidget(
+                  card: card,
+                  cardNumber: cardNumber,
+                  onTap: () => widget.onOpenCartilla(card),
+                  onDelete: () {
+                    widget.onDeleteCard(card);
+                    _refreshCards();
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Widget optimizado para cada item de cartilla
+class _CardItemWidget extends StatelessWidget {
+  final Map<String, dynamic> card;
+  final String cardNumber;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _CardItemWidget({
+    required this.card,
+    required this.cardNumber,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.green.shade100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.green.shade300, width: 1),
+      ),
+      child: Stack(
+        children: [
+          // Botón de eliminación
+          Positioned(
+            top: 2,
+            right: 2,
+            child: Tooltip(
+              message: 'Desasignar cartilla $cardNumber',
+              child: GestureDetector(
+                onTap: onDelete,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.close,
+                    size: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Contenido principal
+          GestureDetector(
+            onTap: onTap,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    cardNumber,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.green.shade800,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Cartilla',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.green.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -9,6 +9,7 @@ const vendorSchema = zod_1.z.object({
     phone: zod_1.z.string().min(6).optional(),
     role: zod_1.z.enum(['LEADER', 'SELLER', 'SUBSELLER']),
     leaderId: zod_1.z.string().optional(),
+    sellerId: zod_1.z.string().optional(), // Para subvendedores
 });
 exports.router = (0, express_1.Router)();
 const updateSchema = zod_1.z.object({
@@ -23,14 +24,25 @@ exports.router.post('/', async (req, res) => {
         if (parsed.role === 'SELLER' && !parsed.leaderId) {
             return res.status(400).json({ error: 'SELLER requires leaderId' });
         }
-        if (parsed.role === 'SUBSELLER' && !parsed.leaderId) {
-            return res.status(400).json({ error: 'SUBSELLER requires leaderId' });
+        if (parsed.role === 'SUBSELLER' && !parsed.sellerId) {
+            return res.status(400).json({ error: 'SUBSELLER requires sellerId' });
+        }
+        // Para subvendedores, obtener el leaderId del vendedor padre
+        let finalLeaderId = parsed.leaderId;
+        if (parsed.role === 'SUBSELLER' && parsed.sellerId) {
+            const sellerDoc = await index_1.db.collection('vendors').doc(parsed.sellerId).get();
+            if (!sellerDoc.exists) {
+                return res.status(400).json({ error: 'Seller not found' });
+            }
+            const sellerData = sellerDoc.data();
+            finalLeaderId = sellerData.leaderId;
         }
         const ref = await index_1.db.collection('vendors').add({
             name: parsed.name,
             phone: parsed.phone ?? null,
             role: parsed.role,
-            leaderId: parsed.leaderId ?? null,
+            leaderId: finalLeaderId ?? null,
+            sellerId: parsed.sellerId ?? null, // Nuevo campo para subvendedores
             createdAt: Date.now(),
             isActive: true,
         });

@@ -58,11 +58,11 @@ class CartillaWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: compact ? null : 550, // Ancho reducido para mejor ajuste en impresión
-        height: compact ? null : null, // Altura flexible para evitar overflow
-        constraints: compact ? null : const BoxConstraints(
-          maxHeight: 800, // Altura máxima ajustada para impresión
-        ),
+        width: compact ? null : (forPrint ? double.infinity : 550), // Ocupar todo el ancho si es para impresión
+        height: compact ? null : (forPrint ? double.infinity : null), // Ocupar toda la altura si es para impresión
+        constraints: compact ? null : (forPrint ? null : const BoxConstraints(
+          maxHeight: 800, // Altura máxima solo para visualización normal
+        )),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: compact ? BorderRadius.circular(12) : BorderRadius.zero, // Sin bordes redondeados para impresión
@@ -416,25 +416,25 @@ class CartillaWidget extends StatelessWidget {
                   for (String letter in ['B', 'I', 'N', 'G', 'O'])
                     Expanded(
                       child: Container(
-                        height: 50, // Altura reducida para ahorrar espacio
-                        margin: const EdgeInsets.all(2), // Margen reducido para mejor ajuste
+                        height: 70, // Altura optimizada para no cortar
+                        margin: const EdgeInsets.all(3), // Margen aumentado
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF8C00),
-                          border: Border.all(color: Colors.black, width: 2),
-                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.black, width: 3),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Center(
                           child: Text(
                             letter,
                             style: const TextStyle(
-                              fontSize: 20, // Fuente reducida para mejor ajuste
+                              fontSize: 30, // Fuente ajustada
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                               shadows: [
                                 Shadow(
                                   color: Colors.black54,
-                                  offset: Offset(1, 1),
-                                  blurRadius: 2,
+                                  offset: Offset(2, 2),
+                                  blurRadius: 3,
                                 ),
                               ],
                             ),
@@ -452,12 +452,12 @@ class CartillaWidget extends StatelessWidget {
                     for (int col = 0; col < 5; col++)
                       Expanded(
                         child: Container(
-                          height: 50, // Altura reducida para ahorrar espacio
-                          margin: const EdgeInsets.all(2), // Margen reducido para mejor ajuste
+                          height: 70, // Altura optimizada para no cortar
+                          margin: const EdgeInsets.all(3), // Margen aumentado
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            border: Border.all(color: Colors.black, width: 2),
-                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.black, width: 3),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Center(
                             child: _buildCellContent(row, col),
@@ -545,7 +545,7 @@ class CartillaWidget extends StatelessWidget {
         child: Text(
           "FREE",
           style: TextStyle(
-            fontSize: 18, // Fuente reducida para mejor ajuste
+            fontSize: 26, // Fuente ajustada para celdas de 70px
             fontWeight: FontWeight.bold,
             color: Color(0xFFFF8C00),
           ),
@@ -559,7 +559,7 @@ class CartillaWidget extends StatelessWidget {
       return Text(
         number.toString(),
         style: const TextStyle(
-          fontSize: 18, // Fuente reducida para mejor ajuste
+          fontSize: 30, // Fuente ajustada para celdas de 70px
           fontWeight: FontWeight.bold,
           color: Colors.black,
         ),

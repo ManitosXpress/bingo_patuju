@@ -185,8 +185,8 @@ class BingoPatternsDialog extends StatelessWidget {
                     children: [
                       Text(
                         currentRound != null
-                            ? 'Figuras de la ronda actual resaltadas en azul. Probabilidad de que cada figura sea la próxima en salir (se actualiza en tiempo real).'
-                            : 'Probabilidad de que cada figura sea la próxima en salir (se actualiza en tiempo real).',
+                            ? 'Figuras de la ronda actual resaltadas en azul.'
+                            : '',
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey.shade700,
@@ -263,7 +263,6 @@ class BingoPatternsDialog extends StatelessWidget {
     double cellSize,
     {bool isCurrentRoundPattern = false, bool isFullscreen = false}
   ) {
-    String displayProbability = completed ? 'COMPLETADO ✓' : probability;
     
     // Determinar colores basados en el estado
     Color borderColor;
@@ -370,37 +369,6 @@ class BingoPatternsDialog extends StatelessWidget {
                     ),
                   ],
                 ],
-              ),
-            ),
-            
-            SizedBox(width: isFullscreen ? 24 : 20),
-            
-            // Probability or completion status
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isFullscreen ? 20 : 16, 
-                vertical: isFullscreen ? 12 : 8
-              ),
-              decoration: BoxDecoration(
-                color: completed 
-                  ? Colors.green.shade100 
-                  : (isCurrentRoundPattern ? Colors.blue.shade100 : Colors.grey.shade100),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: completed 
-                    ? Colors.green.shade300 
-                    : (isCurrentRoundPattern ? Colors.blue.shade300 : Colors.grey.shade300),
-                ),
-              ),
-              child: Text(
-                displayProbability,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: isFullscreen ? 18 : 16,
-                  color: completed 
-                    ? Colors.green.shade700 
-                    : (isCurrentRoundPattern ? Colors.blue.shade700 : Colors.grey.shade700),
-                ),
               ),
             ),
           ],

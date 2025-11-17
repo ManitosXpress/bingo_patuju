@@ -7,6 +7,7 @@ import '../providers/app_provider.dart';
 import '../models/bingo_game.dart';
 import '../models/firebase_cartilla.dart';
 import '../widgets/cartilla_widget.dart'; // Added import for CartillaWidget
+import '../utils/debug_logger.dart';
 
 class CartillasListPanel extends StatefulWidget {
   final BingoGame bingoGame;
@@ -898,9 +899,9 @@ class _CartillaListItem extends StatelessWidget {
   void _showVendorSelectionDialog(BuildContext context) async {
     // Cargar vendedores antes de mostrar el diálogo
     final appProvider = Provider.of<AppProvider>(context, listen: false);
-    debugPrint('DEBUG: Iniciando carga de vendedores...');
+    debugLog('Iniciando carga de vendedores...');
     await appProvider.loadVendors();
-    debugPrint('DEBUG: Vendedores cargados: ${appProvider.vendors.length}');
+    debugLog('Vendedores cargados: ${appProvider.vendors.length}');
     
     if (!context.mounted) return;
     
@@ -910,7 +911,7 @@ class _CartillaListItem extends StatelessWidget {
         title: const Text('Seleccionar Vendedor'),
         content: Consumer<AppProvider>(
           builder: (context, appProvider, child) {
-            debugPrint('DEBUG: Construyendo diálogo con ${appProvider.vendors.length} vendedores');
+            debugLog('Construyendo diálogo con ${appProvider.vendors.length} vendedores');
             
             // Verificar si hay vendedores cargados
             if (appProvider.vendors.isEmpty) {

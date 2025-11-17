@@ -19,103 +19,69 @@ class BlackjackAvatarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Avatar
         Container(
           width: size,
           height: size,
           decoration: BoxDecoration(
+            color: Colors.white,
             shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDealer 
-                ? [Colors.grey.shade600, Colors.grey.shade800]
-                : isActive
-                  ? [Colors.blue.shade400, Colors.blue.shade600]
-                  : [Colors.grey.shade400, Colors.grey.shade600],
+            border: Border.all(
+              color: Colors.grey.shade300,
+              width: 4,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
+                color: Colors.black.withOpacity(0.13),
+                blurRadius: 9,
+                offset: const Offset(0, 6),
               ),
             ],
-            border: Border.all(
-              color: isActive ? Colors.yellow : Colors.white,
-              width: isActive ? 3 : 2,
+          ),
+          child: Center(
+            child: Icon(
+              Icons.person,
+              color: Colors.grey.shade400,
+              size: size * 0.54,
             ),
           ),
-          child: Stack(
-            children: [
-              // Icono del avatar
-              Center(
-                child: Icon(
-                  isDealer ? Icons.person_outline : Icons.person,
-                  size: size * 0.5,
-                  color: Colors.white,
-                ),
+        ),
+        const SizedBox(height: 9),
+        Text(
+          name,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.4,
+            color: const Color(0xFFDEE8DF),
+            shadows: [
+              Shadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 2,
+                offset: const Offset(1,2),
               ),
-              // Indicador de estado activo
-              if (isActive)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 12,
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        // Nombre
-        Flexible(
-          child: Text(
-            name,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withOpacity(0.5),
-                  blurRadius: 2,
-                  offset: const Offset(1, 1),
-                ),
-              ],
-            ),
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        const SizedBox(height: 4),
-        // Puntuación
+        const SizedBox(height: 7),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 21, vertical: 3),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.3)),
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(19),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 5,
+                offset: const Offset(0,2),
+              ),
+            ],
           ),
           child: Text(
             '$score',
             style: const TextStyle(
-              fontSize: 16,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
@@ -139,69 +105,68 @@ class DealerAvatarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade800.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isActive ? Colors.yellow : Colors.grey.shade600,
-          width: 2,
-        ),
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.38),
+            blurRadius: 15,
+            spreadRadius: 2,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Icono del crupier
           Container(
-            width: 50,
-            height: 50,
+            width: 54,
+            height: 54,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.grey.shade600,
-                  Colors.grey.shade800,
-                ],
-              ),
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: const Icon(
-              Icons.person_outline,
-              size: 25,
               color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey.shade300, width: 4),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.13),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Icon(Icons.person_outline, color: Colors.grey.shade400, size: 32),
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
+          const SizedBox(height: 11),
+          const Text(
             'CRUPIER',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
               color: Colors.white,
-              letterSpacing: 1,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.07),
+                  blurRadius: 2,
+                ),
+              ],
             ),
             child: Text(
               'Puntuación: $score',
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),

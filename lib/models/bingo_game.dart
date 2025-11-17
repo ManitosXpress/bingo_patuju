@@ -260,24 +260,24 @@ class BingoGame {
   int get totalCartillas => cartillas.length;
 
   /// Devuelve TODAS las figuras completadas para una cartilla específica
+  /// Optimizado: usa Set para búsquedas O(1) y sin logs de DEBUG
   List<String> getAllCompletedPatternsForCard(List<List<int>> cartilla, List<int> calledNumbers) {
     List<String> completedPatterns = [];
     
-    print('DEBUG: Verificando TODAS las figuras para cartilla con números: $cartilla');
-    print('DEBUG: Números llamados: $calledNumbers');
+    // Convertir a Set para búsquedas O(1) en lugar de O(n)
+    final calledSet = calledNumbers.toSet();
     
     // Horizontal
     for (int row = 0; row < 5; row++) {
       bool rowComplete = true;
       for (int col = 0; col < 5; col++) {
-        if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
+        if (cartilla[row][col] != 0 && !calledSet.contains(cartilla[row][col])) {
           rowComplete = false;
           break;
         }
       }
       if (rowComplete) {
         completedPatterns.add('Línea Horizontal');
-        print('DEBUG: Línea Horizontal completada en fila $row');
       }
     }
     
@@ -285,141 +285,118 @@ class BingoGame {
     for (int col = 0; col < 5; col++) {
       bool colComplete = true;
       for (int row = 0; row < 5; row++) {
-        if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
+        if (cartilla[row][col] != 0 && !calledSet.contains(cartilla[row][col])) {
           colComplete = false;
           break;
         }
       }
       if (colComplete) {
         completedPatterns.add('Línea Vertical');
-        print('DEBUG: Línea Vertical completada en columna $col');
       }
     }
     
     // Diagonal principal
     bool diagonal1Complete = true;
     for (int i = 0; i < 5; i++) {
-      if (cartilla[i][i] != 0 && !calledNumbers.contains(cartilla[i][i])) {
+      if (cartilla[i][i] != 0 && !calledSet.contains(cartilla[i][i])) {
         diagonal1Complete = false;
+        break;
       }
     }
     if (diagonal1Complete) {
       completedPatterns.add('Diagonal Principal');
-      print('DEBUG: Diagonal Principal completada');
     }
     
     // Diagonal secundaria
     bool diagonal2Complete = true;
     for (int i = 0; i < 5; i++) {
-      if (cartilla[i][4-i] != 0 && !calledNumbers.contains(cartilla[i][4-i])) {
+      if (cartilla[i][4-i] != 0 && !calledSet.contains(cartilla[i][4-i])) {
         diagonal2Complete = false;
+        break;
       }
     }
     if (diagonal2Complete) {
       completedPatterns.add('Diagonal Secundaria');
-      print('DEBUG: Diagonal Secundaria completada');
     }
     
     // Cartón lleno
     bool full = true;
     for (int row = 0; row < 5; row++) {
       for (int col = 0; col < 5; col++) {
-        if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
+        if (cartilla[row][col] != 0 && !calledSet.contains(cartilla[row][col])) {
           full = false;
+          break;
         }
       }
+      if (!full) break;
     }
     if (full) {
       completedPatterns.add('Cartón Lleno');
-      print('DEBUG: Cartón Lleno completado');
     }
     
-    // Nuevos patrones especiales
-    if (_checkPattern(cartilla, calledNumbers, _diagonal5Pattern())) {
+    // Nuevos patrones especiales (optimizado para usar Set)
+    if (_checkPatternOptimized(cartilla, calledSet, _diagonal5Pattern())) {
       completedPatterns.add('Figura Avión');
-      print('DEBUG: Figura Avión completadas');
     }
-    if (_checkPattern(cartilla, calledNumbers, _xPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _xPattern())) {
       completedPatterns.add('X');
-      print('DEBUG: X completada');
     }
-    if (_checkPattern(cartilla, calledNumbers, _fullFramePattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _fullFramePattern())) {
       completedPatterns.add('Marco Completo');
-      print('DEBUG: Marco Completo completado');
     }
-    if (_checkPattern(cartilla, calledNumbers, _heartPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _heartPattern())) {
       completedPatterns.add('Corazón');
-      print('DEBUG: Corazón completado');
     }
-    if (_checkPattern(cartilla, calledNumbers, _snowfallPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _snowfallPattern())) {
       completedPatterns.add('Caída de Nieve');
-      print('DEBUG: Caída de Nieve completada');
     }
-    if (_checkPattern(cartilla, calledNumbers, _smallFramePattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _smallFramePattern())) {
       completedPatterns.add('Marco Pequeño');
-      print('DEBUG: Marco Pequeño completado');
     }
-    if (_checkPattern(cartilla, calledNumbers, _treeArrowPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _treeArrowPattern())) {
       completedPatterns.add('Árbol o Flecha');
-      print('DEBUG: Árbol o Flecha completado');
     }
-    if (_checkPattern(cartilla, calledNumbers, _spoutnikPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _spoutnikPattern())) {
       completedPatterns.add('Spoutnik');
-      print('DEBUG: Spoutnik completado');
     }
-    if (_checkPattern(cartilla, calledNumbers, _ingPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _ingPattern())) {
       completedPatterns.add('I');
-      print('DEBUG: I completado');
     }
-    if (_checkPattern(cartilla, calledNumbers, _ngoPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _ngoPattern())) {
       completedPatterns.add('N');
-      print('DEBUG: N completado');
     }
-    if (_checkPattern(cartilla, calledNumbers, _highwayPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _highwayPattern())) {
       completedPatterns.add('Autopista');
-      print('DEBUG: Autopista completada');
     }
     
     // Nuevos patrones legendarios
-    if (_checkPattern(cartilla, calledNumbers, _relojArenaPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _relojArenaPattern())) {
       completedPatterns.add('Reloj de Arena');
-      print('DEBUG: Reloj de Arena completado');
     }
-    if (_checkPattern(cartilla, calledNumbers, _dobleLineaVPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _dobleLineaVPattern())) {
       completedPatterns.add('Doble Línea V');
-      print('DEBUG: Doble Línea V completada');
     }
-    if (_checkPattern(cartilla, calledNumbers, _figuraSuegraPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _figuraSuegraPattern())) {
       completedPatterns.add('Figura la Suegra');
-      print('DEBUG: Figura la Suegra completada');
     }
-    if (_checkPattern(cartilla, calledNumbers, _figuraComodinPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _figuraComodinPattern())) {
       completedPatterns.add('Figura Infinito');
-      print('DEBUG: Figura Infinito completada');
     }
-    if (_checkPattern(cartilla, calledNumbers, _letraFEPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _letraFEPattern())) {
       completedPatterns.add('Letra FE');
-      print('DEBUG: Letra FE completada');
     }
-    if (_checkPattern(cartilla, calledNumbers, _figuraCLocaPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _figuraCLocaPattern())) {
       completedPatterns.add('Figura C Loca');
-      print('DEBUG: Figura C Loca completada');
     }
-    if (_checkPattern(cartilla, calledNumbers, _figuraBanderaPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _figuraBanderaPattern())) {
       completedPatterns.add('Figura Bandera');
-      print('DEBUG: Figura Bandera completada');
     }
-    if (_checkPattern(cartilla, calledNumbers, _figuraTripleLineaPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _figuraTripleLineaPattern())) {
       completedPatterns.add('Figura Triple Línea');
-      print('DEBUG: Figura Triple Línea completada');
     }
-    if (_checkPattern(cartilla, calledNumbers, _diagonalDerechaPattern())) {
+    if (_checkPatternOptimized(cartilla, calledSet, _diagonalDerechaPattern())) {
       completedPatterns.add('Diagonal Derecha');
-      print('DEBUG: Diagonal Derecha completada');
     }
-    
-    print('DEBUG: Total de figuras completadas: ${completedPatterns.length}');
-    print('DEBUG: Figuras: $completedPatterns');
     
     return completedPatterns;
   }
@@ -520,6 +497,12 @@ class BingoGame {
 
   /// Verifica si un patrón específico está completo
   bool _checkPattern(List<List<int>> cartilla, List<int> calledNumbers, List<List<int>> pattern) {
+    final calledSet = calledNumbers.toSet();
+    return _checkPatternOptimized(cartilla, calledSet, pattern);
+  }
+
+  /// Versión optimizada que usa Set para búsquedas O(1)
+  bool _checkPatternOptimized(List<List<int>> cartilla, Set<int> calledNumbers, List<List<int>> pattern) {
     for (int row = 0; row < 5; row++) {
       for (int col = 0; col < 5; col++) {
         if (pattern[row][col] == 1) {
@@ -533,8 +516,11 @@ class BingoGame {
   }
 
   /// Devuelve un mapa con las figuras completadas en las cartillas actuales
-  /// Ahora verifica TODAS las figuras disponibles automáticamente
+  /// Optimizado: usa Set para búsquedas O(1) y se detiene cuando encuentra cada patrón
   Map<String, bool> getCompletedPatterns(List<int> calledNumbers) {
+    // Convertir a Set para búsquedas O(1)
+    final calledSet = calledNumbers.toSet();
+    
     // Figuras básicas
     bool horizontal = false;
     bool vertical = false;
@@ -564,84 +550,100 @@ class BingoGame {
     bool figuraTripleLinea = false;
     bool diagonalDerecha = false;
     
+    // Optimización: salir temprano si todas las figuras ya están completadas
     for (var cartilla in cartillas) {
-      // Verificar figuras básicas
-      // Horizontal
-      for (int row = 0; row < 5; row++) {
-        bool rowComplete = true;
-        for (int col = 0; col < 5; col++) {
-          if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
-            rowComplete = false;
-            break;
-          }
-        }
-        if (rowComplete) horizontal = true;
-      }
-      
-      // Vertical
-      for (int col = 0; col < 5; col++) {
-        bool colComplete = true;
+      // Verificar figuras básicas (solo si aún no están completadas)
+      if (!horizontal) {
         for (int row = 0; row < 5; row++) {
-          if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
-            colComplete = false;
+          bool rowComplete = true;
+          for (int col = 0; col < 5; col++) {
+            if (cartilla[row][col] != 0 && !calledSet.contains(cartilla[row][col])) {
+              rowComplete = false;
+              break;
+            }
+          }
+          if (rowComplete) {
+            horizontal = true;
             break;
           }
         }
-        if (colComplete) vertical = true;
       }
       
-      // Diagonal principal
-      bool diag1 = true;
-      for (int i = 0; i < 5; i++) {
-        if (cartilla[i][i] != 0 && !calledNumbers.contains(cartilla[i][i])) {
-          diag1 = false;
-        }
-      }
-      if (diag1) diagMain = true;
-      
-      // Diagonal secundaria
-      bool diag2 = true;
-      for (int i = 0; i < 5; i++) {
-        if (cartilla[i][4-i] != 0 && !calledNumbers.contains(cartilla[i][4-i])) {
-          diag2 = false;
-        }
-      }
-      if (diag2) diagAnti = true;
-      
-      // Cartón lleno
-      bool isFull = true;
-      for (int row = 0; row < 5; row++) {
+      if (!vertical) {
         for (int col = 0; col < 5; col++) {
-          if (cartilla[row][col] != 0 && !calledNumbers.contains(cartilla[row][col])) {
-            isFull = false;
+          bool colComplete = true;
+          for (int row = 0; row < 5; row++) {
+            if (cartilla[row][col] != 0 && !calledSet.contains(cartilla[row][col])) {
+              colComplete = false;
+              break;
+            }
+          }
+          if (colComplete) {
+            vertical = true;
+            break;
           }
         }
       }
-      if (isFull) full = true;
       
-      // Verificar TODAS las figuras especiales automáticamente
-      if (_checkPattern(cartilla, calledNumbers, _diagonal5Pattern())) diagonal5 = true;
-      if (_checkPattern(cartilla, calledNumbers, _xPattern())) x = true;
-      if (_checkPattern(cartilla, calledNumbers, _fullFramePattern())) fullFrame = true;
-      if (_checkPattern(cartilla, calledNumbers, _heartPattern())) heart = true;
-      if (_checkPattern(cartilla, calledNumbers, _snowfallPattern())) snowfall = true;
-      if (_checkPattern(cartilla, calledNumbers, _smallFramePattern())) smallFrame = true;
-      if (_checkPattern(cartilla, calledNumbers, _treeArrowPattern())) treeArrow = true;
-      if (_checkPattern(cartilla, calledNumbers, _spoutnikPattern())) spoutnik = true;
-      if (_checkPattern(cartilla, calledNumbers, _ingPattern())) ing = true;
-      if (_checkPattern(cartilla, calledNumbers, _ngoPattern())) ngo = true;
-      if (_checkPattern(cartilla, calledNumbers, _highwayPattern())) highway = true;
+      if (!diagMain) {
+        bool diag1 = true;
+        for (int i = 0; i < 5; i++) {
+          if (cartilla[i][i] != 0 && !calledSet.contains(cartilla[i][i])) {
+            diag1 = false;
+            break;
+          }
+        }
+        if (diag1) diagMain = true;
+      }
       
-      // Verificar TODAS las figuras legendarias automáticamente
-      if (_checkPattern(cartilla, calledNumbers, _relojArenaPattern())) relojArena = true;
-      if (_checkPattern(cartilla, calledNumbers, _dobleLineaVPattern())) dobleLineaV = true;
-      if (_checkPattern(cartilla, calledNumbers, _figuraSuegraPattern())) figuraSuegra = true;
-      if (_checkPattern(cartilla, calledNumbers, _figuraComodinPattern())) figuraComodin = true;
-      if (_checkPattern(cartilla, calledNumbers, _letraFEPattern())) letraFE = true;
-      if (_checkPattern(cartilla, calledNumbers, _figuraCLocaPattern())) figuraCLoca = true;
-      if (_checkPattern(cartilla, calledNumbers, _figuraBanderaPattern())) figuraBandera = true;
-      if (_checkPattern(cartilla, calledNumbers, _figuraTripleLineaPattern())) figuraTripleLinea = true;
-      if (_checkPattern(cartilla, calledNumbers, _diagonalDerechaPattern())) diagonalDerecha = true;
+      if (!diagAnti) {
+        bool diag2 = true;
+        for (int i = 0; i < 5; i++) {
+          if (cartilla[i][4-i] != 0 && !calledSet.contains(cartilla[i][4-i])) {
+            diag2 = false;
+            break;
+          }
+        }
+        if (diag2) diagAnti = true;
+      }
+      
+      if (!full) {
+        bool isFull = true;
+        for (int row = 0; row < 5; row++) {
+          for (int col = 0; col < 5; col++) {
+            if (cartilla[row][col] != 0 && !calledSet.contains(cartilla[row][col])) {
+              isFull = false;
+              break;
+            }
+          }
+          if (!isFull) break;
+        }
+        if (isFull) full = true;
+      }
+      
+      // Verificar TODAS las figuras especiales automáticamente (solo si aún no están completadas)
+      if (!diagonal5 && _checkPatternOptimized(cartilla, calledSet, _diagonal5Pattern())) diagonal5 = true;
+      if (!x && _checkPatternOptimized(cartilla, calledSet, _xPattern())) x = true;
+      if (!fullFrame && _checkPatternOptimized(cartilla, calledSet, _fullFramePattern())) fullFrame = true;
+      if (!heart && _checkPatternOptimized(cartilla, calledSet, _heartPattern())) heart = true;
+      if (!snowfall && _checkPatternOptimized(cartilla, calledSet, _snowfallPattern())) snowfall = true;
+      if (!smallFrame && _checkPatternOptimized(cartilla, calledSet, _smallFramePattern())) smallFrame = true;
+      if (!treeArrow && _checkPatternOptimized(cartilla, calledSet, _treeArrowPattern())) treeArrow = true;
+      if (!spoutnik && _checkPatternOptimized(cartilla, calledSet, _spoutnikPattern())) spoutnik = true;
+      if (!ing && _checkPatternOptimized(cartilla, calledSet, _ingPattern())) ing = true;
+      if (!ngo && _checkPatternOptimized(cartilla, calledSet, _ngoPattern())) ngo = true;
+      if (!highway && _checkPatternOptimized(cartilla, calledSet, _highwayPattern())) highway = true;
+      
+      // Verificar TODAS las figuras legendarias automáticamente (solo si aún no están completadas)
+      if (!relojArena && _checkPatternOptimized(cartilla, calledSet, _relojArenaPattern())) relojArena = true;
+      if (!dobleLineaV && _checkPatternOptimized(cartilla, calledSet, _dobleLineaVPattern())) dobleLineaV = true;
+      if (!figuraSuegra && _checkPatternOptimized(cartilla, calledSet, _figuraSuegraPattern())) figuraSuegra = true;
+      if (!figuraComodin && _checkPatternOptimized(cartilla, calledSet, _figuraComodinPattern())) figuraComodin = true;
+      if (!letraFE && _checkPatternOptimized(cartilla, calledSet, _letraFEPattern())) letraFE = true;
+      if (!figuraCLoca && _checkPatternOptimized(cartilla, calledSet, _figuraCLocaPattern())) figuraCLoca = true;
+      if (!figuraBandera && _checkPatternOptimized(cartilla, calledSet, _figuraBanderaPattern())) figuraBandera = true;
+      if (!figuraTripleLinea && _checkPatternOptimized(cartilla, calledSet, _figuraTripleLineaPattern())) figuraTripleLinea = true;
+      if (!diagonalDerecha && _checkPatternOptimized(cartilla, calledSet, _diagonalDerechaPattern())) diagonalDerecha = true;
     }
     
     // Retornar TODAS las figuras con su estado
@@ -878,6 +880,7 @@ class BingoGame {
   }
 
   /// Verifica si hay bingo en alguna cartilla y devuelve información detallada
+  /// Optimizado: solo se ejecuta cuando se presiona "Verificar Bingo", no automáticamente
   Map<String, dynamic> checkBingoInRealTime() {
     if (cartillas.isEmpty) {
       return {
@@ -897,17 +900,21 @@ class BingoGame {
       };
     }
     
+    // Optimizado: usar getCompletedPatterns que ya está optimizado
     final completedPatterns = getCompletedPatterns(calledNumbers);
     final hasAnyBingo = completedPatterns.values.any((completed) => completed);
     
-    // Buscar cartillas ganadoras usando el nuevo método
+    // Buscar cartillas ganadoras usando el nuevo método optimizado
     final winningCards = <Map<String, dynamic>>[];
     final uniqueWinningCardIndices = <int>{}; // Para contar cartillas únicas
+    
+    // Convertir a Set una sola vez para todas las verificaciones
+    final calledSet = calledNumbers.toSet();
     
     for (int i = 0; i < cartillas.length; i++) {
       final cartilla = cartillas[i];
       
-      // Usar el nuevo método que devuelve TODAS las figuras completadas
+      // Usar el método optimizado que usa Set internamente
       final allPatterns = getAllCompletedPatternsForCard(cartilla, calledNumbers);
       
       if (allPatterns.isNotEmpty) {

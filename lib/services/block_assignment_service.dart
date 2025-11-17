@@ -59,39 +59,106 @@ class BlockAssignmentService {
 
       print('✅ Cartillas generadas: ${cardNumbers.length} (${cardNumbers.take(10).toList()}...)');
 
-      // Llamar a la API para asignar las cartillas
-      print('📡 Enviando solicitud a la API: $apiBase/cards/bulk-assign');
-      final response = await http.post(
-        Uri.parse('$apiBase/cards/bulk-assign'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'vendorId': vendorId,
-          'cardNumbers': cardNumbers,
-          'assignmentType': 'blocks',
-          'config': config.toJson(),
-        }),
-      );
-      
-      print('📡 Respuesta de la API: ${response.statusCode}');
+      // Dividir cartillas en lotes de máximo 100 (límite de la API)
+      const maxCardsPerBatch = 100;
+      final batches = <List<int>>[];
+      for (int i = 0; i < cardNumbers.length; i += maxCardsPerBatch) {
+        final end = (i + maxCardsPerBatch < cardNumbers.length) 
+            ? i + maxCardsPerBatch 
+            : cardNumbers.length;
+        batches.add(cardNumbers.sublist(i, end));
+      }
 
-      if (response.statusCode == 200) {
-        final result = jsonDecode(response.body);
-        return {
-          'success': true,
-          'data': result,
-          'assignedCards': cardNumbers,
-          'config': config,
-          'blocksUsed': cardNumbers.length ~/ config.blockSize,
-          'alreadyAssignedBlocksExcluded': alreadyAssignedBlocks.length,
-        };
-      } else {
+      print('📦 Dividiendo en ${batches.length} lotes de máximo $maxCardsPerBatch cartillas cada uno');
+
+      // Asignar cada lote por separado
+      final allAssignedCards = <int>[];
+      final batchErrors = <String>[];
+
+      for (int batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        final batch = batches[batchIndex];
+        print('📡 Enviando lote ${batchIndex + 1}/${batches.length} con ${batch.length} cartillas...');
+        
+        final response = await http.post(
+          Uri.parse('$apiBase/cards/bulk-assign'),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'vendorId': vendorId,
+            'cardNumbers': batch,
+            'assignmentType': 'blocks',
+            'config': config.toJson(),
+          }),
+        );
+        
+        print('📡 Respuesta del lote ${batchIndex + 1}: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final result = jsonDecode(response.body) as Map<String, dynamic>;
+          
+          // La API devuelve assignedCards como lista de objetos, necesitamos extraer cardNo
+          final assignedCardsList = result['assignedCards'] as List<dynamic>?;
+          
+          if (assignedCardsList != null && assignedCardsList.isNotEmpty) {
+            // Extraer cardNo de cada objeto
+            final cardNumbers = assignedCardsList.map((card) {
+              if (card is Map) {
+                return card['cardNo'] as int?;
+              } else if (card is int) {
+                return card;
+              }
+              return null;
+            }).whereType<int>().toList();
+            
+            allAssignedCards.addAll(cardNumbers);
+            print('✅ Lote ${batchIndex + 1} asignado exitosamente: ${cardNumbers.length} cartillas');
+          } else {
+            // Si no hay assignedCards, usar el summary.assigned o los números originales
+            final summary = result['summary'] as Map<String, dynamic>?;
+            if (summary != null && summary['assigned'] != null) {
+              final assigned = summary['assigned'] as List<dynamic>?;
+              if (assigned != null) {
+                final cardNumbers = assigned.map((e) => e as int).toList();
+                allAssignedCards.addAll(cardNumbers);
+                print('✅ Lote ${batchIndex + 1} asignado exitosamente (usando summary): ${cardNumbers.length} cartillas');
+              } else {
+                // Fallback: usar los números originales del batch
+                allAssignedCards.addAll(batch);
+                print('✅ Lote ${batchIndex + 1} asignado exitosamente (usando batch original): ${batch.length} cartillas');
+              }
+            } else {
+              // Fallback: usar los números originales del batch
+              allAssignedCards.addAll(batch);
+              print('✅ Lote ${batchIndex + 1} asignado exitosamente (usando batch original): ${batch.length} cartillas');
+            }
+          }
+        } else {
+          final errorMsg = 'Error en el lote ${batchIndex + 1}: ${response.statusCode} - ${response.body}';
+          batchErrors.add(errorMsg);
+          print('❌ $errorMsg');
+        }
+      }
+
+      if (batchErrors.isNotEmpty) {
         return {
           'success': false,
-          'error': 'Error en la API: ${response.statusCode} - ${response.body}',
+          'error': 'Algunas asignaciones fallaron: ${batchErrors.join(', ')}',
+          'assignedCards': allAssignedCards,
         };
       }
+
+      return {
+        'success': true,
+        'data': {
+          'assignedCards': allAssignedCards,
+          'totalBatches': batches.length,
+        },
+        'assignedCards': allAssignedCards,
+        'config': config,
+        'blocksUsed': allAssignedCards.length ~/ config.blockSize,
+        'alreadyAssignedBlocksExcluded': alreadyAssignedBlocks.length,
+      };
     } catch (e) {
       return {
         'success': false,
@@ -129,115 +196,27 @@ class BlockAssignmentService {
       print('📊 Bloques ya asignados: ${alreadyAssignedBlocks.length}');
       print('📊 Bloques disponibles: $availableBlocksForAssignment');
 
-      // CALCULAR AUTOMÁTICAMENTE la cantidad óptima de bloques por vendedor
-      // Basándose en los bloques disponibles y el número de vendedores
-      final optimalBlocksPerVendor = _calculateOptimalBlocksPerVendor(
-        availableBlocksForAssignment, 
-        vendorIds.length
-      );
+      // USAR TODOS LOS BLOQUES DISPONIBLES para asignación automática
+      // Distribuir todos los bloques disponibles equitativamente entre todos los vendedores
+      print('🎯 Asignación automática: Usando TODOS los bloques disponibles ($availableBlocksForAssignment bloques)');
       
-      print('🎯 Cálculo automático: $optimalBlocksPerVendor bloques por vendedor');
-      
-      // Si no se pueden asignar bloques, usar distribución mínima
-      if (optimalBlocksPerVendor < 1) {
-        print('⚠️ No hay suficientes bloques para asignar 1 bloque por vendedor');
-        print('🔄 Ajustando a distribución mínima: 1 bloque por vendedor');
-        
-        // Verificar si al menos podemos asignar 1 bloque por vendedor
-        if (vendorIds.length > availableBlocksForAssignment) {
-          final errorMsg = 'No hay suficientes bloques para asignar al menos 1 bloque por vendedor. Hay ${vendorIds.length} vendedores pero solo ${availableBlocksForAssignment} bloques disponibles.';
-          print('❌ $errorMsg');
-          return {
-            'success': false,
-            'error': errorMsg,
-          };
-        }
-        
-        // Usar distribución mínima: 1 bloque por vendedor
-        final totalBlocksNeeded = vendorIds.length;
-        print('🎯 Distribución mínima: $totalBlocksNeeded bloques (1 por vendedor)');
-        
-        // Continuar con la asignación mínima
-        final selectedBlocks = await _generateUniqueBlocksForAllVendors(config, totalBlocksNeeded);
-        
-        if (selectedBlocks.isEmpty) {
-          print('❌ No se pudieron generar bloques únicos para distribución mínima');
-          return {
-            'success': false,
-            'error': 'No se pudieron generar bloques únicos para la distribución mínima',
-          };
-        }
-        
-        // Asignar 1 bloque por vendedor
-        final results = <Map<String, dynamic>>[];
-        final allAssignedCards = <int>{};
-        
-        for (int i = 0; i < vendorIds.length; i++) {
-          final vendorId = vendorIds[i];
-          final vendorBlock = selectedBlocks[i];
-          final vendorCards = config.generateCardNumbers([vendorBlock]);
-          
-          print('👤 Asignando 1 bloque al vendedor $vendorId: bloque $vendorBlock');
-          
-          final result = await _assignCardsToVendor(vendorId, vendorCards, config);
-          results.add(result);
-          
-          if (result['success']) {
-            print('✅ Vendedor $vendorId asignado exitosamente');
-            allAssignedCards.addAll(vendorCards);
-          } else {
-            print('❌ Error asignando vendedor $vendorId: ${result['error']}');
-          }
-        }
-        
-        // Verificar resultados
-        final failedAssignments = results.where((r) => !r['success']).toList();
-        if (failedAssignments.isNotEmpty) {
-          print('❌ Algunas asignaciones fallaron: ${failedAssignments.length} de ${results.length}');
-          return {
-            'success': false,
-            'error': 'Algunas asignaciones fallaron: ${failedAssignments.map((r) => r['error']).join(', ')}',
-          };
-        }
-        
-        print('🎉 DISTRIBUCIÓN MÍNIMA COMPLETADA EXITOSAMENTE');
-        return {
-          'success': true,
-          'data': {
-            'totalVendors': vendorIds.length,
-            'totalCardsAssigned': allAssignedCards.length,
-            'blocksPerVendor': 1, // Distribución mínima
-            'totalBlocksUsed': selectedBlocks.length,
-            'results': results,
-            'alreadyAssignedBlocksExcluded': alreadyAssignedBlocks.length,
-            'distribution': {
-              'blocksPerVendor': 1,
-              'extraBlocks': 0,
-              'vendorsWithExtra': 0,
-              'note': 'Distribución mínima: 1 bloque por vendedor',
-            },
-          },
-          'assignedCards': allAssignedCards.toList(),
-          'config': config,
-        };
-      }
-      
-      // Calcular bloques necesarios para todos los vendedores
-      final totalBlocksNeeded = vendorIds.length * optimalBlocksPerVendor;
-      print('🎯 Bloques necesarios total: $totalBlocksNeeded (${vendorIds.length} vendedores × $optimalBlocksPerVendor bloques por vendedor)');
-      
-      if (totalBlocksNeeded > availableBlocksForAssignment) {
-        final errorMsg = 'No hay suficientes bloques disponibles para asignar a todos los vendedores. Se necesitan $totalBlocksNeeded bloques pero solo hay $availableBlocksForAssignment disponibles (${config.availableBlocks} total - ${alreadyAssignedBlocks.length} ya asignados).';
+      // Verificar que hay al menos 1 bloque por vendedor
+      if (vendorIds.length > availableBlocksForAssignment) {
+        final errorMsg = 'No hay suficientes bloques para asignar al menos 1 bloque por vendedor. Hay ${vendorIds.length} vendedores pero solo ${availableBlocksForAssignment} bloques disponibles.';
         print('❌ $errorMsg');
         return {
           'success': false,
           'error': errorMsg,
         };
       }
+      
+      // Usar TODOS los bloques disponibles
+      final totalBlocksToAssign = availableBlocksForAssignment;
+      print('🎯 Total de bloques a asignar: $totalBlocksToAssign (TODOS los bloques disponibles)');
 
-      // Generar bloques únicos para toda la asignación
+      // Generar bloques únicos para toda la asignación (TODOS los bloques disponibles)
       print('🎲 Generando bloques únicos para todos los vendedores...');
-      final selectedBlocks = await _generateUniqueBlocksForAllVendors(config, totalBlocksNeeded);
+      final selectedBlocks = await _generateUniqueBlocksForAllVendors(config, totalBlocksToAssign);
       
       if (selectedBlocks.isEmpty) {
         print('❌ No se pudieron generar bloques únicos');
@@ -254,12 +233,14 @@ class BlockAssignmentService {
       final results = <Map<String, dynamic>>[];
       final allAssignedCards = <int>{};
 
-      // Calcular bloques por vendedor de manera equitativa
-      final blocksPerVendor = (totalBlocksNeeded / vendorIds.length).ceil();
-      final remainingBlocks = totalBlocksNeeded % vendorIds.length;
+      // Calcular bloques por vendedor de manera equitativa (usando TODOS los bloques disponibles)
+      final blocksPerVendor = totalBlocksToAssign ~/ vendorIds.length;
+      final remainingBlocks = totalBlocksToAssign % vendorIds.length;
       
-      print('📊 Distribución: $blocksPerVendor bloques por vendedor, $remainingBlocks bloques extra para distribuir');
+      print('📊 Distribución: $blocksPerVendor bloques base por vendedor, $remainingBlocks bloques extra para distribuir');
 
+      int totalBlocksDistributedSoFar = 0;
+      
       for (int i = 0; i < vendorIds.length; i++) {
         final vendorId = vendorIds[i];
         
@@ -269,22 +250,31 @@ class BlockAssignmentService {
           vendorBlockCount++; // Dar bloques extra a los primeros vendedores
         }
         
-        // Calcular índices de inicio y fin para este vendedor
-        int startBlockIndex = 0;
-        for (int j = 0; j < i; j++) {
-          if (j < remainingBlocks) {
-            startBlockIndex += (blocksPerVendor + 1);
-          } else {
-            startBlockIndex += blocksPerVendor;
+        // Si es el último vendedor y quedan bloques sin asignar, asignarle todos los bloques restantes
+        if (i == vendorIds.length - 1) {
+          final remainingBlocksToAssign = selectedBlocks.length - totalBlocksDistributedSoFar;
+          if (remainingBlocksToAssign > vendorBlockCount) {
+            print('📊 Último vendedor: asignando bloques restantes ($remainingBlocksToAssign bloques en lugar de $vendorBlockCount)');
+            vendorBlockCount = remainingBlocksToAssign;
           }
         }
+        
+        // Calcular índices de inicio y fin para este vendedor
+        final startBlockIndex = totalBlocksDistributedSoFar;
         final endBlockIndex = startBlockIndex + vendorBlockCount - 1;
         
-        print('👤 Procesando vendedor $vendorId (índice $i): ${vendorBlockCount} bloques (${startBlockIndex + 1} a ${endBlockIndex + 1})');
+        // Asegurar que no excedamos el número de bloques disponibles
+        final actualEndIndex = endBlockIndex < selectedBlocks.length ? endBlockIndex : selectedBlocks.length - 1;
+        final actualBlockCount = actualEndIndex - startBlockIndex + 1;
+        
+        print('👤 Procesando vendedor $vendorId (índice $i): $actualBlockCount bloques (índices $startBlockIndex a $actualEndIndex)');
         
         // Obtener bloques para este vendedor
-        final vendorBlocks = selectedBlocks.sublist(startBlockIndex, endBlockIndex + 1);
+        final vendorBlocks = selectedBlocks.sublist(startBlockIndex, actualEndIndex + 1);
         print('📦 Bloques para vendedor $vendorId: ${vendorBlocks.length} bloques (${vendorBlocks})');
+        
+        // Actualizar contador de bloques distribuidos
+        totalBlocksDistributedSoFar += actualBlockCount;
         
         // Generar cartillas para estos bloques
         final vendorCards = config.generateCardNumbers(vendorBlocks);
@@ -324,22 +314,47 @@ class BlockAssignmentService {
         };
       }
 
+      // Verificar que se asignaron TODOS los bloques disponibles
+      final totalBlocksAssigned = allAssignedCards.length ~/ config.blockSize;
+      final expectedBlocks = selectedBlocks.length;
+      if (totalBlocksAssigned != expectedBlocks) {
+        print('⚠️ ADVERTENCIA: Se esperaban $expectedBlocks bloques pero se asignaron $totalBlocksAssigned bloques');
+        print('⚠️ Diferencia: ${expectedBlocks - totalBlocksAssigned} bloques');
+      }
+
+      // Verificar que no quedaron bloques sin asignar
+      final totalBlocksDistributed = results.fold<int>(0, (sum, r) {
+        final cards = (r['assignedCards'] as List<dynamic>?) ?? [];
+        return sum + (cards.length ~/ config.blockSize);
+      });
+      
+      if (totalBlocksDistributed < selectedBlocks.length) {
+        final unassignedBlocks = selectedBlocks.length - totalBlocksDistributed;
+        print('⚠️ ADVERTENCIA: Quedaron $unassignedBlocks bloques sin asignar de ${selectedBlocks.length} totales');
+        print('⚠️ Esto puede deberse a que hay pocos vendedores para distribuir todos los bloques');
+      }
+
       print('🎉 ASIGNACIÓN AUTOMÁTICA COMPLETADA EXITOSAMENTE');
       print('📊 Resumen: ${vendorIds.length} vendedores, ${allAssignedCards.length} cartillas asignadas');
+      print('📊 Total de bloques disponibles: ${selectedBlocks.length}');
+      print('📊 Total de bloques asignados: $totalBlocksDistributed');
+      print('📊 Bloques por vendedor base: $blocksPerVendor, bloques extra: $remainingBlocks');
       
       return {
         'success': true,
         'data': {
           'totalVendors': vendorIds.length,
           'totalCardsAssigned': allAssignedCards.length,
-          'blocksPerVendor': optimalBlocksPerVendor, // Usar el valor calculado automáticamente
-          'totalBlocksUsed': selectedBlocks.length,
+          'blocksPerVendor': blocksPerVendor, // Bloques base por vendedor
+          'totalBlocksUsed': selectedBlocks.length, // TODOS los bloques disponibles
           'results': results,
           'alreadyAssignedBlocksExcluded': alreadyAssignedBlocks.length,
           'distribution': {
-            'blocksPerVendor': optimalBlocksPerVendor,
+            'blocksPerVendor': blocksPerVendor,
             'extraBlocks': remainingBlocks,
             'vendorsWithExtra': remainingBlocks,
+            'totalBlocksAssigned': selectedBlocks.length,
+            'note': 'Se asignaron TODOS los bloques disponibles de manera equitativa',
           },
         },
         'assignedCards': allAssignedCards.toList(),
@@ -540,38 +555,107 @@ class BlockAssignmentService {
       print('📡 Enviando solicitud para vendedor $vendorId: ${cardNumbers.length} cartillas');
       print('🔢 Cartillas: ${cardNumbers.take(10).toList()}...');
       
-      final response = await http.post(
-        Uri.parse('$apiBase/cards/bulk-assign'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'vendorId': vendorId,
-          'cardNumbers': cardNumbers,
-          'assignmentType': 'blocks',
-          'config': config.toJson(),
-        }),
-      );
+      // Dividir cartillas en lotes de máximo 100 (límite de la API)
+      const maxCardsPerBatch = 100;
+      final batches = <List<int>>[];
+      for (int i = 0; i < cardNumbers.length; i += maxCardsPerBatch) {
+        final end = (i + maxCardsPerBatch < cardNumbers.length) 
+            ? i + maxCardsPerBatch 
+            : cardNumbers.length;
+        batches.add(cardNumbers.sublist(i, end));
+      }
 
-      print('📡 Respuesta de la API para vendedor $vendorId: ${response.statusCode}');
+      print('📦 Dividiendo en ${batches.length} lotes de máximo $maxCardsPerBatch cartillas cada uno');
 
-      if (response.statusCode == 200) {
-        final result = jsonDecode(response.body);
-        print('✅ Vendedor $vendorId asignado exitosamente por la API');
-        return {
-          'success': true,
-          'vendorId': vendorId,
-          'assignedCards': cardNumbers,
-          'data': result,
-        };
-      } else {
-        print('❌ Error en la API para vendedor $vendorId: ${response.statusCode} - ${response.body}');
+      // Asignar cada lote por separado
+      final allAssignedCards = <int>[];
+      final batchErrors = <String>[];
+
+      for (int batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        final batch = batches[batchIndex];
+        print('📡 Enviando lote ${batchIndex + 1}/${batches.length} para vendedor $vendorId: ${batch.length} cartillas...');
+        
+        final response = await http.post(
+          Uri.parse('$apiBase/cards/bulk-assign'),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'vendorId': vendorId,
+            'cardNumbers': batch,
+            'assignmentType': 'blocks',
+            'config': config.toJson(),
+          }),
+        );
+
+        print('📡 Respuesta del lote ${batchIndex + 1} para vendedor $vendorId: ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final result = jsonDecode(response.body) as Map<String, dynamic>;
+          
+          // La API devuelve assignedCards como lista de objetos, necesitamos extraer cardNo
+          final assignedCardsList = result['assignedCards'] as List<dynamic>?;
+          
+          if (assignedCardsList != null && assignedCardsList.isNotEmpty) {
+            // Extraer cardNo de cada objeto
+            final cardNumbers = assignedCardsList.map((card) {
+              if (card is Map) {
+                return card['cardNo'] as int?;
+              } else if (card is int) {
+                return card;
+              }
+              return null;
+            }).whereType<int>().toList();
+            
+            allAssignedCards.addAll(cardNumbers);
+            print('✅ Lote ${batchIndex + 1} asignado exitosamente para vendedor $vendorId: ${cardNumbers.length} cartillas');
+          } else {
+            // Si no hay assignedCards, usar el summary.assigned o los números originales
+            final summary = result['summary'] as Map<String, dynamic>?;
+            if (summary != null && summary['assigned'] != null) {
+              final assigned = summary['assigned'] as List<dynamic>?;
+              if (assigned != null) {
+                final cardNumbers = assigned.map((e) => e as int).toList();
+                allAssignedCards.addAll(cardNumbers);
+                print('✅ Lote ${batchIndex + 1} asignado exitosamente para vendedor $vendorId (usando summary): ${cardNumbers.length} cartillas');
+              } else {
+                // Fallback: usar los números originales del batch
+                allAssignedCards.addAll(batch);
+                print('✅ Lote ${batchIndex + 1} asignado exitosamente para vendedor $vendorId (usando batch original): ${batch.length} cartillas');
+              }
+            } else {
+              // Fallback: usar los números originales del batch
+              allAssignedCards.addAll(batch);
+              print('✅ Lote ${batchIndex + 1} asignado exitosamente para vendedor $vendorId (usando batch original): ${batch.length} cartillas');
+            }
+          }
+        } else {
+          final errorMsg = 'Error en el lote ${batchIndex + 1}: ${response.statusCode} - ${response.body}';
+          batchErrors.add(errorMsg);
+          print('❌ $errorMsg');
+        }
+      }
+
+      if (batchErrors.isNotEmpty) {
+        print('❌ Algunos lotes fallaron para vendedor $vendorId: ${batchErrors.join(', ')}');
         return {
           'success': false,
           'vendorId': vendorId,
-          'error': 'Error en la API: ${response.statusCode} - ${response.body}',
+          'error': 'Algunas asignaciones fallaron: ${batchErrors.join(', ')}',
+          'assignedCards': allAssignedCards,
         };
       }
+
+      print('✅ Vendedor $vendorId asignado exitosamente por la API (${allAssignedCards.length} cartillas en ${batches.length} lotes)');
+      return {
+        'success': true,
+        'vendorId': vendorId,
+        'assignedCards': allAssignedCards,
+        'data': {
+          'assignedCards': allAssignedCards,
+          'totalBatches': batches.length,
+        },
+      };
     } catch (e) {
       print('💥 Error de conexión para vendedor $vendorId: $e');
       return {
@@ -653,6 +737,67 @@ class BlockAssignmentService {
     } catch (e) {
       // En caso de error, usar el método alternativo
       return await getAlreadyAssignedBlocks();
+    }
+  }
+
+  /// Obtener el total de cartillas disponibles en la base de datos
+  Future<int> getTotalCardsAvailable() async {
+    try {
+      print('🔍 Obteniendo total de cartillas disponibles...');
+      
+      // Usar el nuevo endpoint /total que es más eficiente
+      final response = await http.get(
+        Uri.parse('$apiBase/cards/total'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body) as Map<String, dynamic>;
+        final totalCards = result['totalCards'] as int? ?? 0;
+        final maxCardNo = result['maxCardNo'] as int? ?? 0;
+        final totalDocuments = result['totalDocuments'] as int? ?? 0;
+        
+        print('📊 Total de cartillas: $totalCards');
+        print('📊 Número máximo de cartilla: $maxCardNo');
+        print('📊 Total de documentos: $totalDocuments');
+        
+        // El total de cartillas es el máximo número de cartilla encontrado
+        final actualTotal = totalCards > 0 ? totalCards : (maxCardNo > 0 ? maxCardNo : totalDocuments);
+        
+        print('✅ Total de cartillas disponibles: $actualTotal');
+        return actualTotal;
+      } else {
+        print('⚠️ No se pudo obtener el total de cartillas (status: ${response.statusCode}), intentando método alternativo...');
+        
+        // Método alternativo: obtener todas las cartillas
+        final altResponse = await http.get(
+          Uri.parse('$apiBase/cards?limit=50000'),
+          headers: {'Content-Type': 'application/json'},
+        );
+        
+        if (altResponse.statusCode == 200) {
+          final result = jsonDecode(altResponse.body);
+          final allCards = result is List ? result : (result['cards'] as List<dynamic>? ?? []);
+          
+          int maxCardNo = 0;
+          for (final card in allCards) {
+            final cardNo = card['cardNo'] as int?;
+            if (cardNo != null && cardNo > maxCardNo) {
+              maxCardNo = cardNo;
+            }
+          }
+          
+          final totalCards = maxCardNo > 0 ? maxCardNo : allCards.length;
+          print('✅ Total de cartillas disponibles (método alternativo): $totalCards');
+          return totalCards;
+        }
+        
+        print('⚠️ No se pudo obtener el total de cartillas, usando valor por defecto');
+        return 1000; // Valor por defecto
+      }
+    } catch (e) {
+      print('💥 Error obteniendo total de cartillas: $e');
+      return 1000; // Valor por defecto en caso de error
     }
   }
 

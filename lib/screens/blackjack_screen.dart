@@ -41,36 +41,398 @@ class _BlackjackScreenState extends State<BlackjackScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mesa de Blackjack'),
-        backgroundColor: Colors.green.shade800,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.green.shade700,
-                Colors.green.shade900,
-              ],
+      backgroundColor: const Color(0xFF166336), // Verde casino
+      body: Stack(
+        children: [
+          // Fondo madera circular exterior
+          Center(
+            child: Container(
+              width: 770,
+              height: 770,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  colors: [
+                    const Color(0xFF8C6239), // Madera
+                    const Color(0xFFB68952),
+                    const Color(0xFF81592C),
+                    const Color(0xFF8C6239),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.6),
+                    blurRadius: 30,
+                    spreadRadius: 4,
+                    offset: const Offset(0, 15),
+                  ),
+                ],
+                border: Border.all(
+                  color: Colors.brown.shade900,
+                  width: 10,
+                ),
+              ),
+              child: Center(
+                child: Container(
+                  width: 670,
+                  height: 670,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      center: Alignment.center,
+                      radius: 0.97,
+                      colors: [
+                        const Color(0xFF197642),
+                        const Color(0xFF197642),
+                        const Color(0xFF166336),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.green.shade100,
-              Colors.green.shade200,
-            ],
+          // Mesa
+          Center(
+            child: SizedBox(
+              width: 670,
+              height: 670,
+              child: Stack(
+                children: [
+                  // TÍTULO
+                  Positioned(
+                    top: 42,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Text(
+                        "MESA DE BLACKJACK",
+                        style: TextStyle(
+                          fontSize: 48,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // CRUPIER Box
+                  Positioned(
+                    top: 110,
+                    left: 170,
+                    right: 170,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.45),
+                            blurRadius: 14,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Avatar central simple
+                          Container(
+                            width: 54,
+                            height: 54,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF444444),
+                            ),
+                            child: const Icon(Icons.person_outline, color: Colors.white, size: 34),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'CRUPIER',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 20,
+                              letterSpacing: 1.1,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              'Puntuación: $dealerScore',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Cartas CRUPIER
+                  Positioned(
+                    top: 225,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: CardHandWidget(
+                        cards: dealerCards,
+                        isFaceUp: showDealerCards || gameEnded,
+                        cardWidth: 70,
+                        cardHeight: 100,
+                        cardSpacing: 16,
+                      ),
+                    ),
+                  ),
+                  // JUGADOR 1 (IZQ INFERIOR)
+                  Positioned(
+                    left: 65,
+                    bottom: 120,
+                    child: Column(
+                      children: [
+                        // Avatar
+                        BlackjackAvatarWidget(
+                          name: 'JUGADOR 1',
+                          score: player1Score,
+                          isActive: isPlayer1Turn,
+                          size: 90,
+                        ),
+                        const SizedBox(height: 8),
+                        CardHandWidget(
+                          cards: player1Cards,
+                          isFaceUp: true,
+                          cardWidth: 64,
+                          cardHeight: 92,
+                          cardSpacing: 12,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF24362B),
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: Text(
+                                'Fichas: $player1Chips',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 9),
+                            if (player1Bet > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF247899),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: Text(
+                                  'Apuesta: $player1Bet',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // BOT (DER INFERIOR)
+                  Positioned(
+                    right: 65,
+                    bottom: 120,
+                    child: Column(
+                      children: [
+                        // Avatar
+                        BlackjackAvatarWidget(
+                          name: 'BOT',
+                          score: player2Score,
+                          isActive: isPlayer2Turn,
+                          size: 90,
+                        ),
+                        const SizedBox(height: 8),
+                        CardHandWidget(
+                          cards: player2Cards,
+                          isFaceUp: true,
+                          cardWidth: 64,
+                          cardHeight: 92,
+                          cardSpacing: 12,
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF7952B6),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            'AUTOMATICO',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // MENSAJE CENTRAL
+                  if (gameEnded || (!gameStarted && player1Bet > 0))
+                    Positioned(
+                      left: 80,
+                      right: 80,
+                      top: 370,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF184C2E),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            gameStatus,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  // CONTROLES DE APUESTA + COMENZAR (solo antes de iniciar)
+                  if (!gameStarted && !gameEnded)
+                    Positioned(
+                      bottom: 100,
+                      left: 60,
+                      right: 60,
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _ChipButton(label: '50', onPressed: () => _placeBet(50)),
+                              _ChipButton(label: '100', onPressed: () => _placeBet(100)),
+                              _ChipButton(label: '200', onPressed: () => _placeBet(200)),
+                              _ChipButton(label: '500', onPressed: () => _placeBet(500)),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: 280,
+                            child: ElevatedButton.icon(
+                              onPressed: player1Bet > 0 ? _startGame : null,
+                              icon: const Icon(Icons.play_arrow),
+                              label: const Text('COMENZAR JUEGO'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1E7448),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // CONTROLES DURANTE EL TURNO DEL JUGADOR 1
+                  if (isPlayer1Turn && !player1Finished)
+                    Positioned(
+                      bottom: 95,
+                      left: 80,
+                      right: 80,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          SizedBox(
+                            width: 220,
+                            child: ElevatedButton.icon(
+                              onPressed: _player1Hit,
+                              icon: const Icon(Icons.add_circle_outline),
+                              label: const Text('PEDIR CARTA'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1E7448),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 220,
+                            child: ElevatedButton.icon(
+                              onPressed: _player1Stand,
+                              icon: const Icon(Icons.stop_circle_outlined),
+                              label: const Text('PLANTARSE'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFCF7A1E),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // BOTÓN NUEVA PARTIDA INFERIOR CENTRAL (condicional)
+                  if (gameEnded || (!gameStarted && player1Bet == 0))
+                    Positioned(
+                      bottom: 35,
+                      left: 180,
+                      right: 180,
+                      child: ElevatedButton(
+                        onPressed: _newGame,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E7448),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+                          padding: const EdgeInsets.symmetric(vertical: 22),
+                          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          elevation: 5,
+                        ),
+                        child: const Text('NUEVA PARTIDA'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
-        ),
-        child: _buildBlackjackTable(),
+        ],
       ),
     );
   }
@@ -836,6 +1198,27 @@ class _BlackjackScreenState extends State<BlackjackScreen> {
     }
     
     return score;
+  }
+}
+
+class _ChipButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+  const _ChipButton({required this.label, required this.onPressed});
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF3C89C8),
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        textStyle: const TextStyle(fontWeight: FontWeight.bold),
+        elevation: 4,
+      ),
+      child: Text(label),
+    );
   }
 }
 
