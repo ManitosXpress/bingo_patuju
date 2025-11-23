@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:screenshot/screenshot.dart';
+import '../utils/cartilla_image_renderer.dart';
 import 'dart:typed_data';
 import 'dart:html' as html;
 import '../providers/app_provider.dart';
@@ -767,36 +767,11 @@ class _CartillaListItem extends StatelessWidget {
                         child: ElevatedButton.icon(
                           onPressed: () async {
                             try {
-                              // Crear un ScreenshotController para capturar la cartilla visible
-                              final screenshotController = ScreenshotController();
-                              
-                              // Crear un widget temporal con la cartilla para capturar
-                              final cartillaWidget = MaterialApp(
-                                home: Scaffold(
-                                  backgroundColor: Colors.white,
-                  body: Center(
-                    child: Container(
-                      width: 550, // Ancho reducido para mejor ajuste
-                      height: 800, // Alto ajustado para mejor ajuste
-                      child: Center(
-                        child: CartillaWidget(
-                                          numbers: firebaseCartilla.numbers,
-                                          cardNumber: firebaseCartilla.cardNo?.toString() ?? firebaseCartilla.displayNumber,
-                                          date: DateTime.now().toString().split(' ')[0],
-                                          price: "Bs. 20",
-                                          compact: false,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                              
-                              // Capturar la cartilla directamente
-                              final imageBytes = await screenshotController.captureFromWidget(
-                                cartillaWidget,
-                                context: context,
-                                delay: const Duration(milliseconds: 500), // Aumentar delay para asegurar renderizado completo
+                              final imageBytes = await renderCartillaImage(
+                                numbers: firebaseCartilla.numbers,
+                                cardNumber: firebaseCartilla.cardNo?.toString() ?? firebaseCartilla.displayNumber,
+                                date: DateTime.now().toString().split(' ')[0],
+                                price: "Bs. 20",
                               );
                               
                               if (imageBytes != null) {

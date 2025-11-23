@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'dart:html' as html;
-import 'package:screenshot/screenshot.dart';
+import '../utils/cartilla_image_renderer.dart';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:provider/provider.dart';
 import '../config/backend_config.dart';
 import '../widgets/cartilla_widget.dart';
@@ -298,44 +297,11 @@ class _CrmScreenState extends State<CrmScreen> {
   // Captura la cartilla y retorna los bytes de la imagen
   Future<Uint8List?> _captureCartillaImage(Map<String, dynamic> card) async {
     try {
-      // Crear un ScreenshotController para capturar la cartilla
-      final screenshotController = ScreenshotController();
-      
-      // Tamaño exacto según la imagen de referencia (720×1020)
-      // Proporción optimizada para impresión
-      const double containerWidth = 720;
-      const double containerHeight = 1020;
-      
-      // Crear un widget aislado sin MaterialApp para que capture solo el área definida
-      final cartillaWidget = Directionality(
-        textDirection: ui.TextDirection.ltr,
-        child: MediaQuery(
-          data: const MediaQueryData(
-            size: Size(containerWidth, containerHeight),
-            devicePixelRatio: 1.0,
-          ),
-          child: SizedBox(
-            width: containerWidth,
-            height: containerHeight,
-            child: DecoratedBox(
-              decoration: const BoxDecoration(color: Colors.white),
-              child: CartillaWidget(
-                numbers: _convertNumbersToIntList(card['numbers'] ?? []),
-                cardNumber: card['cardNo']?.toString() ?? card['id'],
-                date: DateTime.now().toString().split(' ')[0],
-                price: "Bs. 20",
-                compact: false,
-                forPrint: true,
-              ),
-            ),
-          ),
-        ),
-      );
-      
-      final imageBytes = await screenshotController.captureFromWidget(
-        cartillaWidget,
-        delay: const Duration(milliseconds: 500),
-        pixelRatio: 1.0, // Resolución exacta: 720×1080 píxeles
+      final imageBytes = await renderCartillaImage(
+        numbers: _convertNumbersToIntList(card['numbers'] ?? []),
+        cardNumber: card['cardNo']?.toString() ?? card['id'],
+        date: DateTime.now().toString().split(' ')[0],
+        price: "Bs. 20",
       );
 
       return imageBytes;
@@ -3545,61 +3511,17 @@ class _CrmScreenState extends State<CrmScreen> {
       int successCount = 0;
       int errorCount = 0;
       
-      // Crear un ScreenshotController para capturar las cartillas con resolución optimizada
-      final screenshotController = ScreenshotController();
-      
       for (int i = 0; i < cards.length; i++) {
         final card = cards[i];
         final cardNumber = card['cardNo']?.toString() ?? card['id'];
         
         try {
-          // Tamaño fijo para la imagen final (720x1020 píxeles)
-          const double imageWidth = 720;
-          const double imageHeight = 1020;
-          
-          // Tamaño del contenedor con padding para centrar la cartilla
-          const double containerWidth = imageWidth;
-          const double containerHeight = imageHeight;
-          
-          // Crear un widget aislado con MediaQuery envolviendo MaterialApp
-          // para proporcionar el MediaQuery necesario para ScaffoldMessenger
-          final cartillaWidget = MediaQuery(
-            data: MediaQueryData(
-              size: Size(containerWidth, containerHeight),
-              devicePixelRatio: 2.0,
-            ),
-            child: MaterialApp(
-              debugShowCheckedModeBanner: false, // Ocultar banner DEBUG
-              home: Scaffold(
-                backgroundColor: Colors.white,
-                body: SizedBox(
-                  width: containerWidth,
-                  height: containerHeight,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 85, vertical: 20),
-                      // Padding horizontal: (720 - 550) / 2 = 85px para centrar la cartilla de 550px
-                      child: CartillaWidget(
-                        numbers: _convertNumbersToIntList(card['numbers'] ?? []),
-                        cardNumber: cardNumber,
-                        date: DateTime.now().toString().split(' ')[0],
-                        price: "Bs. 20",
-                        compact: false,
-                        forPrint: true, // Usar modo impresión para evitar márgenes innecesarios
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-          
-          // Capturar la cartilla sin usar el context de la pantalla actual
-          // para evitar capturar elementos de la UI
-          final imageBytes = await screenshotController.captureFromWidget(
-            cartillaWidget,
-            delay: const Duration(milliseconds: 300),
-            pixelRatio: 2.0, // Resolución alta: 1440x2040 píxeles
+          final imageBytes = await renderCartillaImage(
+            numbers: _convertNumbersToIntList(card['numbers'] ?? []),
+            cardNumber: cardNumber,
+            date: DateTime.now().toString().split(' ')[0],
+            price: "Bs. 20",
+            pixelRatio: 1.0,
           );
           
           if (imageBytes.isNotEmpty) {

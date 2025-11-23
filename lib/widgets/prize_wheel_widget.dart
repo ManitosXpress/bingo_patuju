@@ -461,11 +461,9 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  Expanded(child: _buildInfoCard('Cartillas Totales', widget.cartillaNumbers.length.toString(), Colors.blue)),
+                  Expanded(flex: 2, child: _buildInfoCard('Cartillas Cargadas', null, Colors.blue)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildInfoCard('Cartillas en juego', _availableCartillas.length.toString(), Colors.green)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildInfoCard('Ganadores', _winners.length.toString(), Colors.purple)),
+                  Expanded(flex: 1, child: _buildInfoCard('Ganadores', _winners.length.toString(), Colors.purple)),
                 ],
               ),
             ),
@@ -629,27 +627,29 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
                             ),
                             const SizedBox(height: 4),
                             Expanded(
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _winners.length,
-                                itemBuilder: (context, index) {
-                                  return Container(
-                                    margin: const EdgeInsets.only(right: 8),
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.withOpacity(0.8),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      'Cartilla ${_winners[index]}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                              child: SingleChildScrollView(
+                                child: Wrap(
+                                  spacing: 8.0, // Espacio horizontal entre los elementos
+                                  runSpacing: 4.0, // Espacio vertical entre las líneas
+                                  children: _winners.map((winner) {
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 4), // Margen inferior para cada elemento
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.withOpacity(0.8),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                    ),
-                                  );
-                                },
+                                      child: Text(
+                                        'Cartilla $winner',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
                               ),
                             ),
                           ],
@@ -706,7 +706,7 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
     );
   }
 
-  Widget _buildInfoCard(String title, String value, Color color) {
+  Widget _buildInfoCard(String title, String? value, Color color) {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -715,25 +715,29 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
         border: Border.all(color: color.withOpacity(0.5)),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             title,
             style: TextStyle(
-              fontSize: 10,
-              color: Colors.white70,
+              fontSize: value != null ? 10 : 18,
+              fontWeight: value != null ? FontWeight.normal : FontWeight.bold,
+              color: value != null ? Colors.white70 : Colors.white,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          if (value != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
+          ],
         ],
       ),
     );
