@@ -7,6 +7,8 @@ interface CardDoc {
   numbers?: number[][]; // 5x5 (returned by API)
   numbersFlat?: number[]; // stored in Firestore
   gridSize?: number; // default 5
+  eventId: string; // FK to event - REQUERIDO
+  date?: string; // Fecha del evento (ISO 8601)
   assignedTo?: string; // vendorId
   sold: boolean;
   createdAt: number;
@@ -15,6 +17,7 @@ interface CardDoc {
 
 const createCardSchema = z.object({
   numbers: z.array(z.array(z.number())),
+  eventId: z.string().min(1, 'eventId es requerido'),
   cardNo: z.number().int().positive().optional(),
 });
 
@@ -41,13 +44,13 @@ function expandGrid(flat: number[], size = 5): number[][] {
 // Función para generar números aleatorios de Bingo según las reglas BINGO
 function generateRandomBingoNumbers(): number[][] {
   const grid: number[][] = [];
-  
+
   // Generar números para cada columna según las reglas del BINGO
   for (let col = 0; col < 5; col++) {
     const columnNumbers: number[] = [];
     const startNum = col * 15 + 1;
     const endNum = (col + 1) * 15;
-    
+
     // Generar 5 números únicos para esta columna
     while (columnNumbers.length < 5) {
       const randomNum = Math.floor(Math.random() * (endNum - startNum + 1)) + startNum;
@@ -55,7 +58,7 @@ function generateRandomBingoNumbers(): number[][] {
         columnNumbers.push(randomNum);
       }
     }
-    
+
     // Colocar los números en la columna
     for (let row = 0; row < 5; row++) {
       if (!grid[row]) {
@@ -64,10 +67,10 @@ function generateRandomBingoNumbers(): number[][] {
       grid[row][col] = columnNumbers[row];
     }
   }
-  
+
   // El centro es libre (número 0)
   grid[2][2] = 0;
-  
+
   return grid;
 }
 
@@ -80,6 +83,7 @@ router.post('/', async (req: any, res: any) => {
     const dataToSave = {
       numbersFlat: flat,
       gridSize: parsed.numbers.length,
+      eventId: parsed.eventId,
       assignedTo: null,
       sold: false,
       createdAt: Date.now(),
@@ -99,11 +103,11 @@ router.post('/', async (req: any, res: any) => {
     const data = snap.data() as any;
     const size = (data.gridSize as number) ?? 5;
     const numbers = expandGrid((data.numbersFlat as number[]) ?? [], size);
-    return res.status(201).json({ 
-      id: ref.id, 
-      numbers, 
-      assignedTo: data.assignedTo, 
-      sold: data.sold, 
+    return res.status(201).json({
+      id: ref.id,
+      numbers,
+      assignedTo: data.assignedTo,
+      sold: data.sold,
       createdAt: data.createdAt,
       cardNo: data.cardNo ?? null,
     });
@@ -113,30 +117,41 @@ router.post('/', async (req: any, res: any) => {
 });
 
 router.get('/', async (_req: any, res: any) => {
-  const { assignedTo, sold, limit } = _req.query as { assignedTo?: string; sold?: string; limit?: string };
-  let q = db.collection('cards') as any;
+  const { assignedTo, sold, limit, date } = _req.query as { assignedTo?: string; sold?: string; limit?: string; date?: string };
+
+  // date es REQUERIDO ahora
+  if (!date) {
+    return res.status(400).json({
+      error: 'El parámetro "date" es requerido (formato: YYYY-MM-DD)'
+    });
+  }
+
+  // Nueva ruta: events/{date}/cards
+  let q = db.collection('events').doc(date).collection('cards') as any;
+
   if (assignedTo) q = q.where('assignedTo', '==', assignedTo);
   if (sold === 'true') q = q.where('sold', '==', true);
   if (sold === 'false') q = q.where('sold', '==', false);
-  
-  // Usar el límite del query string o un valor alto por defecto
-  const limitValue = limit ? parseInt(limit) : 2000;
+
+  // Usar el límite del query string o un valor muy alto por defecto para obtener todas las cartillas
+  // Si no se especifica límite, usar 50000 para obtener todas las cartillas disponibles
+  const limitValue = limit ? parseInt(limit) : 50000;
   const snaps = await q.limit(limitValue).get();
-  
+
   const out = snaps.docs.map((d: any) => {
     const data = d.data();
     const size = (data.gridSize as number) ?? 5;
     const numbers = data.numbers ? (data.numbers as number[][]) : expandGrid((data.numbersFlat as number[]) ?? [], size);
-    return { 
-      id: d.id, 
-      numbers, 
-      assignedTo: data.assignedTo ?? null, 
-      sold: data.sold ?? false, 
+    return {
+      id: d.id,
+      numbers,
+      assignedTo: data.assignedTo ?? null,
+      sold: data.sold ?? false,
       createdAt: data.createdAt,
-      cardNo: data.cardNo ?? null, // Agregar el número de cartilla
+      cardNo: data.cardNo ?? null,
     } as CardDoc;
   });
-  
+
   // Ordenar por cardNo de menor a mayor
   out.sort((a: CardDoc, b: CardDoc) => {
     // Si ambos tienen cardNo, ordenar por ese valor
@@ -149,7 +164,7 @@ router.get('/', async (_req: any, res: any) => {
     // Si ninguno tiene cardNo, mantener el orden original
     return 0;
   });
-  
+
   return res.json(out);
 });
 
@@ -157,18 +172,24 @@ router.post('/:id/assign', async (req: any, res: any) => {
   try {
     const parsed = assignSchema.parse(req.body);
     const id = req.params.id;
-    const cardRef = db.collection('cards').doc(id);
+    const { date } = req.query as { date?: string };
+
+    if (!date) {
+      return res.status(400).json({ error: 'El parámetro "date" es requerido' });
+    }
+
+    const cardRef = db.collection('events').doc(date).collection('cards').doc(id);
     const card = await cardRef.get();
     if (!card.exists) return res.status(404).json({ error: 'Card not found' });
     await cardRef.update({ assignedTo: parsed.vendorId });
     const data = (await cardRef.get()).data() as any;
     const size = (data.gridSize as number) ?? 5;
     const numbers = data.numbers ? (data.numbers as number[][]) : expandGrid((data.numbersFlat as number[]) ?? [], size);
-    return res.json({ 
-      id, 
-      numbers, 
-      assignedTo: data.assignedTo, 
-      sold: data.sold, 
+    return res.json({
+      id,
+      numbers,
+      assignedTo: data.assignedTo,
+      sold: data.sold,
       createdAt: data.createdAt,
       cardNo: data.cardNo ?? null,
     });
@@ -180,21 +201,26 @@ router.post('/:id/assign', async (req: any, res: any) => {
 // Endpoint para asignar múltiples cartillas por rango o números específicos
 router.post('/bulk-assign', async (req: any, res: any) => {
   try {
-    const { vendorId, cardNumbers, startRange, endRange, step = 10 } = req.body as {
+    const { vendorId, cardNumbers, startRange, endRange, step = 10, date } = req.body as {
       vendorId: string;
       cardNumbers?: number[];
       startRange?: number;
       endRange?: number;
       step?: number;
+      date: string;
     };
 
     if (!vendorId) {
       return res.status(400).json({ error: 'vendorId es requerido' });
     }
 
+    if (!date) {
+      return res.status(400).json({ error: 'date es requerido' });
+    }
+
     if (!cardNumbers && (!startRange || !endRange)) {
-      return res.status(400).json({ 
-        error: 'Debe especificar cardNumbers o startRange y endRange' 
+      return res.status(400).json({
+        error: 'Debe especificar cardNumbers o startRange y endRange'
       });
     }
 
@@ -206,11 +232,11 @@ router.post('/bulk-assign', async (req: any, res: any) => {
     } else if (startRange && endRange) {
       // Generar rango de números
       if (startRange > endRange) {
-        return res.status(400).json({ 
-          error: 'startRange debe ser menor o igual a endRange' 
+        return res.status(400).json({
+          error: 'startRange debe ser menor o igual a endRange'
         });
       }
-      
+
       for (let i = startRange; i <= endRange; i += step) {
         targetCardNumbers.push(i);
       }
@@ -220,23 +246,25 @@ router.post('/bulk-assign', async (req: any, res: any) => {
       return res.status(400).json({ error: 'No se generaron números de cartilla válidos' });
     }
 
-    if (targetCardNumbers.length > 100) {
-      return res.status(400).json({ 
-        error: 'No se pueden asignar más de 100 cartillas a la vez' 
+    // Aumentar el límite para asignaciones por bloques (puede haber más de 100 cartillas)
+    // Firebase tiene un límite de 500 operaciones por batch, así que limitamos a 500
+    if (targetCardNumbers.length > 500) {
+      return res.status(400).json({
+        error: 'No se pueden asignar más de 500 cartillas a la vez (límite de Firebase batch)'
       });
     }
 
     console.log(`🃏 Asignando ${targetCardNumbers.length} cartilla${targetCardNumbers.length > 1 ? 's' : ''} a vendor ${vendorId}`);
     console.log(`📋 Números solicitados: ${targetCardNumbers.join(', ')}`);
 
-    // Buscar las cartillas por cardNo
+    // Buscar las cartillas por cardNo en events/{date}/cards
     const batch = db.batch();
     const assignedCards = [];
     const notFoundCards = [];
 
     for (const cardNo of targetCardNumbers) {
-      // Buscar cartilla por cardNo
-      const cardsSnapshot = await db.collection('cards')
+      // Buscar cartilla por cardNo en la fecha específica
+      const cardsSnapshot = await db.collection('events').doc(date).collection('cards')
         .where('cardNo', '==', cardNo)
         .where('sold', '==', false)
         .limit(1)
@@ -245,16 +273,16 @@ router.post('/bulk-assign', async (req: any, res: any) => {
       if (!cardsSnapshot.empty) {
         const cardDoc = cardsSnapshot.docs[0];
         const cardData = cardDoc.data();
-        
+
         // Verificar que no esté ya asignada
         if (!cardData.assignedTo) {
           batch.update(cardDoc.ref, { assignedTo: vendorId });
-          
+
           const size = (cardData.gridSize as number) ?? 5;
-          const numbers = cardData.numbers ? 
-            (cardData.numbers as number[][]) : 
+          const numbers = cardData.numbers ?
+            (cardData.numbers as number[][]) :
             expandGrid((cardData.numbersFlat as number[]) ?? [], size);
-          
+
           assignedCards.push({
             id: cardDoc.id,
             cardNo: cardData.cardNo,
@@ -276,7 +304,7 @@ router.post('/bulk-assign', async (req: any, res: any) => {
       console.log(`✅ Se asignaron ${assignedCards.length} cartilla${assignedCards.length > 1 ? 's' : ''} exitosamente`);
       console.log(`✅ Cartillas asignadas: ${assignedCards.map(c => c.cardNo).join(', ')}`);
     }
-    
+
     if (notFoundCards.length > 0) {
       console.log(`❌ Cartillas no encontradas: ${notFoundCards.map(c => c.cardNo).join(', ')}`);
     }
@@ -308,14 +336,21 @@ router.post('/bulk-assign', async (req: any, res: any) => {
 // Endpoint para generar cartillas automáticamente
 router.post('/generate', async (req: any, res: any) => {
   try {
-    const { count = 1 } = req.body as { count?: number };
-    
-    if (count < 0 || count > 1000) {
-      return res.status(400).json({ 
-        error: 'La cantidad debe estar entre 0 y 1000' 
+    const { count = 1, date } = req.body as { count?: number; date?: string };
+
+    // date es REQUERIDO ahora
+    if (!date) {
+      return res.status(400).json({
+        error: 'El parámetro "date" es requerido (formato: YYYY-MM-DD)'
       });
     }
-    
+
+    if (count < 0 || count > 10000) {
+      return res.status(400).json({
+        error: 'La cantidad debe estar entre 0 y 10000'
+      });
+    }
+
     if (count === 0) {
       return res.status(201).json({
         message: 'No se generaron cartillas (cantidad 0)',
@@ -323,18 +358,20 @@ router.post('/generate', async (req: any, res: any) => {
         cards: []
       });
     }
-    
-    console.log(`🃏 Generando ${count} cartilla${count > 1 ? 's' : ''} de Bingo...`);
-    
-    // Optimizar: Obtener el siguiente número de cartilla usando una consulta ordenada
-    // Esto es más eficiente que cargar todas las cartillas
+
+    console.log(`🃏 Generando ${count} cartilla${count > 1 ? 's' : ''} para ${date}...`);
+
+    // Nueva ruta: events/{date}/cards
+    const cardsCollectionRef = db.collection('events').doc(date).collection('cards');
+
+    // Obtener el siguiente número de cartilla en esta fecha
     let nextCardNo = 1;
     try {
-      const lastCardQuery = await db.collection('cards')
+      const lastCardQuery = await cardsCollectionRef
         .orderBy('cardNo', 'desc')
         .limit(1)
         .get();
-      
+
       if (!lastCardQuery.empty) {
         const lastCard = lastCardQuery.docs[0].data();
         if (lastCard.cardNo && typeof lastCard.cardNo === 'number') {
@@ -342,10 +379,9 @@ router.post('/generate', async (req: any, res: any) => {
         }
       }
     } catch (e) {
-      // Si falla la consulta ordenada, usar método alternativo
       console.warn('No se pudo usar índice ordenado, usando método alternativo');
-      const existingCards = await db.collection('cards').get();
-      
+      const existingCards = await cardsCollectionRef.get();
+
       if (!existingCards.empty) {
         const cardNumbers: number[] = [];
         existingCards.docs.forEach(doc => {
@@ -354,33 +390,33 @@ router.post('/generate', async (req: any, res: any) => {
             cardNumbers.push(data.cardNo);
           }
         });
-        
+
         if (cardNumbers.length > 0) {
           nextCardNo = Math.max(...cardNumbers) + 1;
         }
       }
     }
-    
+
     // Firebase limita a 500 operaciones por batch
     const BATCH_SIZE = 500;
     const generatedCards: any[] = [];
     const totalBatches = Math.ceil(count / BATCH_SIZE);
-    
+
     // Procesar en múltiples batches
     for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
       const batchStart = batchIndex * BATCH_SIZE;
       const batchEnd = Math.min(batchStart + BATCH_SIZE, count);
       const batchCount = batchEnd - batchStart;
-      
+
       const batch = db.batch();
       const batchCards: any[] = [];
-      
+
       // Generar todas las cartillas del batch en memoria primero
       for (let i = 0; i < batchCount; i++) {
         const numbers = generateRandomBingoNumbers();
         const flat = flattenGrid(numbers);
         const cardNo = nextCardNo + batchStart + i;
-        
+
         const dataToSave = {
           numbersFlat: flat,
           gridSize: 5,
@@ -389,10 +425,11 @@ router.post('/generate', async (req: any, res: any) => {
           createdAt: Date.now(),
           cardNo: cardNo,
         };
-        
-        const cardRef = db.collection('cards').doc();
+
+        // Escribir en events/{date}/cards
+        const cardRef = cardsCollectionRef.doc();
         batch.set(cardRef, dataToSave);
-        
+
         batchCards.push({
           id: cardRef.id,
           numbers,
@@ -402,22 +439,22 @@ router.post('/generate', async (req: any, res: any) => {
           cardNo: dataToSave.cardNo,
         });
       }
-      
+
       // Commit del batch
       await batch.commit();
       generatedCards.push(...batchCards);
-      
+
       console.log(`✅ Batch ${batchIndex + 1}/${totalBatches} completado (${batchCount} cartillas)`);
     }
-    
+
     console.log(`✅ Se generaron ${count} cartilla${count > 1 ? 's' : ''} exitosamente`);
-    
+
     return res.status(201).json({
       message: `Se generaron ${count} cartilla${count > 1 ? 's' : ''} exitosamente`,
       count,
       cards: generatedCards
     });
-    
+
   } catch (e: any) {
     console.error('Error generando cartillas:', e);
     return res.status(500).json({ error: 'Internal server error' });
@@ -428,25 +465,25 @@ router.post('/generate', async (req: any, res: any) => {
 router.delete('/clear', async (_req: any, res: any) => {
   try {
     console.log('⚠️ ADVERTENCIA: Eliminando TODAS las cartillas de la base de datos...');
-    
+
     // Obtener todas las cartillas
     const allCards = await db.collection('cards').get();
     const batch = db.batch();
-    
+
     // Agregar todas las cartillas al batch de eliminación
     allCards.docs.forEach((doc) => {
       batch.delete(doc.ref);
     });
-    
+
     // Ejecutar el batch
     await batch.commit();
-    
+
     const deletedCount = allCards.docs.length;
     console.log(`✅ Se eliminaron ${deletedCount} cartillas de la base de datos`);
-    
-    return res.status(200).json({ 
+
+    return res.status(200).json({
       message: `Se eliminaron ${deletedCount} cartillas correctamente`,
-      deletedCount 
+      deletedCount
     });
   } catch (e: any) {
     console.error('Error eliminando todas las cartillas:', e);
@@ -458,13 +495,19 @@ router.delete('/clear', async (_req: any, res: any) => {
 router.delete('/:id', async (req: any, res: any) => {
   try {
     const id = req.params.id;
-    const cardRef = db.collection('cards').doc(id);
+    const { date } = req.query as { date?: string };
+
+    if (!date) {
+      return res.status(400).json({ error: 'El parámetro "date" es requerido' });
+    }
+
+    const cardRef = db.collection('events').doc(date).collection('cards').doc(id);
     const card = await cardRef.get();
-    
+
     if (!card.exists) {
       return res.status(404).json({ error: 'Card not found' });
     }
-    
+
     await cardRef.delete();
     return res.status(200).json({ message: 'Card deleted successfully', id });
   } catch (e: any) {
@@ -479,22 +522,22 @@ router.post('/:id/unassign', async (req: any, res: any) => {
     const id = req.params.id;
     const cardRef = db.collection('cards').doc(id);
     const card = await cardRef.get();
-    
+
     if (!card.exists) {
       return res.status(404).json({ error: 'Card not found' });
     }
-    
+
     await cardRef.update({ assignedTo: null });
     const data = (await cardRef.get()).data() as any;
     const size = (data.gridSize as number) ?? 5;
     const numbers = data.numbers ? (data.numbers as number[][]) : expandGrid((data.numbersFlat as number[]) ?? [], size);
-    
-    return res.json({ 
-      id, 
-      numbers, 
-      assignedTo: data.assignedTo, 
-      sold: data.sold, 
-      createdAt: data.createdAt 
+
+    return res.json({
+      id,
+      numbers,
+      assignedTo: data.assignedTo,
+      sold: data.sold,
+      createdAt: data.createdAt
     });
   } catch (e: any) {
     console.error('Error unassigning card:', e);
@@ -508,22 +551,22 @@ router.post('/:id/sold', async (req: any, res: any) => {
     const id = req.params.id;
     const cardRef = db.collection('cards').doc(id);
     const card = await cardRef.get();
-    
+
     if (!card.exists) {
       return res.status(404).json({ error: 'Card not found' });
     }
-    
+
     await cardRef.update({ sold: true });
     const data = (await cardRef.get()).data() as any;
     const size = (data.gridSize as number) ?? 5;
     const numbers = data.numbers ? (data.numbers as number[][]) : expandGrid((data.numbersFlat as number[]) ?? [], size);
-    
-    return res.json({ 
-      id, 
-      numbers, 
-      assignedTo: data.assignedTo, 
-      sold: data.sold, 
-      createdAt: data.createdAt 
+
+    return res.json({
+      id,
+      numbers,
+      assignedTo: data.assignedTo,
+      sold: data.sold,
+      createdAt: data.createdAt
     });
   } catch (e: any) {
     console.error('Error marking card as sold:', e);
@@ -534,25 +577,25 @@ router.post('/:id/sold', async (req: any, res: any) => {
 // Función para validar si una cartilla cumple con las reglas del BINGO
 function validateBingoCard(numbers: number[][]): boolean {
   if (!numbers || numbers.length !== 5) return false;
-  
+
   for (let col = 0; col < 5; col++) {
     const startNum = col * 15 + 1;
     const endNum = (col + 1) * 15;
-    
+
     for (let row = 0; row < 5; row++) {
       // El centro es libre (número 0)
       if (row === 2 && col === 2) {
         if (numbers[row][col] !== 0) return false;
         continue;
       }
-      
+
       const num = numbers[row][col];
       if (num < startNum || num > endNum) {
         return false;
       }
     }
   }
-  
+
   return true;
 }
 
@@ -560,44 +603,44 @@ function validateBingoCard(numbers: number[][]): boolean {
 router.post('/validate-and-fix', async (_req: any, res: any) => {
   try {
     console.log('🔍 Validando y corrigiendo cartillas existentes...');
-    
+
     const existingCards = await db.collection('cards').get();
     let correctedCount = 0;
     let validCount = 0;
-    
+
     const batch = db.batch();
-    
+
     for (const doc of existingCards.docs) {
       const data = doc.data();
       const currentNumbers = data.numbers ? (data.numbers as number[][]) : expandGrid((data.numbersFlat as number[]) ?? [], 5);
-      
+
       // Validar si la cartilla cumple con las reglas del BINGO
       const isValid = validateBingoCard(currentNumbers);
-      
+
       if (!isValid) {
         // Generar nueva cartilla válida
         const newNumbers = generateRandomBingoNumbers();
         const newFlat = flattenGrid(newNumbers);
-        
+
         batch.update(doc.ref, {
           numbersFlat: newFlat,
           updatedAt: Date.now(),
           wasCorrected: true,
         });
-        
+
         correctedCount++;
       } else {
         validCount++;
       }
     }
-    
+
     if (correctedCount > 0) {
       await batch.commit();
       console.log(`✅ Se corrigieron ${correctedCount} cartillas, ${validCount} ya eran válidas`);
     } else {
       console.log(`✅ Todas las cartillas ya son válidas (${validCount} cartillas)`);
     }
-    
+
     return res.status(200).json({
       message: 'Validación y corrección completada',
       corrected: correctedCount,
@@ -606,6 +649,50 @@ router.post('/validate-and-fix', async (_req: any, res: any) => {
     });
   } catch (e: any) {
     console.error('❌ Error validando cartillas:', e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Endpoint para obtener el total de cartillas y el número máximo de cartilla
+router.get('/total', async (_req: any, res: any) => {
+  try {
+    console.log('🔍 Obteniendo total de cartillas...');
+
+    // Obtener la cartilla con el número más alto usando orderBy
+    const maxCardQuery = await db.collection('cards')
+      .orderBy('cardNo', 'desc')
+      .limit(1)
+      .get();
+
+    let maxCardNo = 0;
+    let totalCards = 0;
+
+    if (!maxCardQuery.empty) {
+      const maxCard = maxCardQuery.docs[0].data();
+      maxCardNo = maxCard.cardNo || 0;
+    }
+
+    // También contar el total de documentos (puede ser diferente si hay cartillas sin número)
+    const allCardsSnapshot = await db.collection('cards')
+      .limit(50000)
+      .get();
+
+    totalCards = allCardsSnapshot.size;
+
+    // El total real es el máximo entre el número máximo de cartilla y el total de documentos
+    const actualTotal = Math.max(maxCardNo, totalCards);
+
+    console.log(`📊 Total de cartillas: ${actualTotal}`);
+    console.log(`📊 Número máximo de cartilla: ${maxCardNo}`);
+    console.log(`📊 Total de documentos: ${totalCards}`);
+
+    return res.json({
+      totalCards: actualTotal,
+      maxCardNo: maxCardNo,
+      totalDocuments: totalCards,
+    });
+  } catch (e: any) {
+    console.error('❌ Error obteniendo total de cartillas:', e);
     return res.status(500).json({ error: e.message });
   }
 });

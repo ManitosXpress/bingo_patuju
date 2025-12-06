@@ -3,13 +3,32 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../models/bingo_game.dart';
 
-class CartillasFiltersPanel extends StatelessWidget {
+class CartillasFiltersPanel extends StatefulWidget {
   final BingoGame bingoGame;
 
   const CartillasFiltersPanel({
     super.key,
     required this.bingoGame,
   });
+
+  @override
+  State<CartillasFiltersPanel> createState() => _CartillasFiltersPanelState();
+}
+
+class _CartillasFiltersPanelState extends State<CartillasFiltersPanel> {
+  late TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,18 +56,8 @@ class CartillasFiltersPanel extends StatelessWidget {
             
             const SizedBox(height: 16),
             
-            // Tercera fila: botones de acción
-            _buildActionButtons(),
-            
-            const SizedBox(height: 12),
-            
-            // Cuarta fila: botones de asignación
-            _buildAssignmentButtons(),
-            
-            const SizedBox(height: 12),
-            
-            // Quinta fila: botones de utilidad
-            _buildUtilityButtons(),
+            // Tercera fila: Panel de control unificado
+            _buildUnifiedControls(),
             
             const SizedBox(height: 12),
             
@@ -104,14 +113,21 @@ class CartillasFiltersPanel extends StatelessWidget {
   Widget _buildSearchAndVendorRow() {
     return Consumer<AppProvider>(
       builder: (context, appProvider, child) {
-        final textController = TextEditingController(text: appProvider.searchQuery);
+        // Sincronizar el controlador con el provider si el texto cambió externamente
+        if (_searchController.text != appProvider.searchQuery) {
+          _searchController.value = _searchController.value.copyWith(
+            text: appProvider.searchQuery,
+            selection: TextSelection.collapsed(offset: appProvider.searchQuery.length),
+            composing: TextRange.empty,
+          );
+        }
         
         return Row(
           children: [
             Expanded(
               flex: 2,
               child: TextField(
-                controller: textController,
+                controller: _searchController,
                 decoration: const InputDecoration(
                   labelText: 'Buscar por número de cartilla',
                   border: OutlineInputBorder(),
@@ -155,29 +171,235 @@ class CartillasFiltersPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButtons() {
-    return Consumer<AppProvider>(
-      builder: (context, appProvider, child) {
-        return const SizedBox.shrink(); // Botones eliminados
-      },
-    );
-  }
-
-  Widget _buildAssignmentButtons() {
+  Widget _buildUnifiedControls() {
     return Consumer<AppProvider>(
       builder: (context, appProvider, child) {
         return Column(
           children: [
-            // Primera fila: Asignar y Desasignar
+            // Fila 1: Acciones Generales y Utilidades
             Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: appProvider.selectedCount > 0 && appProvider.selectedVendorId != null
-                    ? () {
-                        // Asignar cartillas seleccionadas
+              children: [
+                // Nueva Cartilla
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                     onPressed: () async {
+                      final textController = TextEditingController(text: '1');
+                      DateTime selectedDate = DateTime.now();
+                      
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => StatefulBuilder(
+                          builder: (context, setState) => AlertDialog(
+                            title: const Text('Generar Cartillas'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('¿Cuántas cartillas quieres generar? (0-10000):'),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: textController,
+                                  decoration: const InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    hintText: 'Ej: 10',
+                                    prefixIcon: Icon(Icons.numbers),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (value) => (context as Element).markNeedsBuild(),
+                                ),
+                                const SizedBox(height: 24),
+                                const Text('Fecha del evento:'),
+                                const SizedBox(height: 8),
+                                InkWell(
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: selectedDate,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2030),
+                                    );
+                                    if (picked != null) {
+                                      setState(() {
+                                        selectedDate = picked;
+                                      });
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.calendar_today, size: 20),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          '${selectedDate.day.toString().padLeft(2, '0')}/${selectedDate.month.toString().padLeft(2, '0')}/${selectedDate.year}',
+                                          style: const TextStyle(fontSize: 16),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancelar'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  final count = int.tryParse(textController.text);
+                                  if (count != null && count >= 0 && count <= 10000) {
+                                    Navigator.pop(context, true);
+                                  }
+                                },
+                                child: const Text('Generar'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                      
+                      if (confirmed == true) {
+                        final count = int.tryParse(textController.text) ?? 1;
+                        final dateStr = '${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}';
+                        
+                        // Actualizar la fecha seleccionada en el AppProvider
+                        appProvider.setSelectedDate(dateStr);
+                        
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('🃏 Generando $count cartilla${count > 1 ? 's' : ''} para $dateStr...'), duration: const Duration(seconds: 2)),
+                          );
+                        }
+                        final success = await appProvider.generateFirebaseCartillas(count);
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('✅ Se generaron $count cartilla${count > 1 ? 's' : ''} exitosamente'), backgroundColor: Colors.green),
+                          );
+                        } else if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('❌ Error al generar las cartillas'), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Nueva'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Utilidades (Iconos)
+                Tooltip(
+                  message: 'Seleccionar Todas',
+                  child: IconButton.outlined(
+                    onPressed: () {
+                      final cartillaIds = appProvider.firebaseCartillas.map((c) => c.id).toList();
+                      appProvider.selectAllCartillas(cartillaIds);
+                    },
+                    icon: const Icon(Icons.select_all),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: 'Limpiar Filtros',
+                  child: IconButton.outlined(
+                    onPressed: () => appProvider.resetFilters(),
+                    icon: const Icon(Icons.clear_all),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: 'Filtros por Defecto',
+                  child: IconButton.outlined(
+                    onPressed: () => appProvider.applyDefaultFilters(),
+                    icon: const Icon(Icons.settings_backup_restore),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Eliminar Todas (Peligroso)
+                Tooltip(
+                  message: 'ELIMINAR TODAS',
+                  child: IconButton.filled(
+                    onPressed: () async {
+                      final textController = TextEditingController();
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('⚠️ ADVERTENCIA CRÍTICA'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('Escribe "ELIMINAR" para borrar TODAS las cartillas permanentemente.'),
+                              const SizedBox(height: 16),
+                              TextField(
+                                controller: textController,
+                                decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'ELIMINAR'),
+                                onChanged: (value) => (context as Element).markNeedsBuild(),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+                            ElevatedButton(
+                              onPressed: textController.text == 'ELIMINAR' ? () => Navigator.pop(context, true) : null,
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade800, foregroundColor: Colors.white),
+                              child: const Text('Confirmar'),
+                            ),
+                          ],
+                        ),
+                      );
+                      
+                      if (confirmed == true) {
+                        final finalConfirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Confirmación Final'),
+                            content: const Text('¿Estás 100% seguro? No hay vuelta atrás.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade800, foregroundColor: Colors.white),
+                                child: const Text('SÍ, ELIMINAR'),
+                              ),
+                            ],
+                          ),
+                        );
+                        
+                        if (finalConfirmed == true) {
+                          final success = await appProvider.clearAllFirebaseCartillas();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(success ? '✅ Todas las cartillas eliminadas' : '❌ Error al eliminar'), backgroundColor: success ? Colors.green : Colors.red),
+                            );
+                          }
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.delete_forever),
+                    style: IconButton.styleFrom(backgroundColor: Colors.red.shade900, foregroundColor: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Fila 2: Acciones de Selección
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: appProvider.selectedCount > 0 && appProvider.selectedVendorId != null
+                        ? () {
                             for (String cartillaId in appProvider.selectedCartillaIds) {
-                              // Buscar la cartilla por ID
                               final firebaseCartilla = appProvider.firebaseCartillas.firstWhere(
                                 (fc) => fc.id == cartillaId,
                                 orElse: () => appProvider.allFirebaseCartillas.firstWhere(
@@ -186,26 +408,21 @@ class CartillasFiltersPanel extends StatelessWidget {
                                 ),
                               );
                               appProvider.assignFirebaseCartilla(firebaseCartilla.id, appProvider.selectedVendorId!);
-                        }
-                        appProvider.clearSelection();
-                      }
-                    : null,
-                icon: const Icon(Icons.person_add),
-                label: const Text('Asignar Seleccionadas'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
+                            }
+                            appProvider.clearSelection();
+                          }
+                        : null,
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('Asignar'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: appProvider.selectedCount > 0
-                    ? () {
-                        // Desasignar cartillas seleccionadas
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: appProvider.selectedCount > 0
+                        ? () {
                             for (String cartillaId in appProvider.selectedCartillaIds) {
-                              // Buscar la cartilla por ID
                               final firebaseCartilla = appProvider.firebaseCartillas.firstWhere(
                                 (fc) => fc.id == cartillaId,
                                 orElse: () => appProvider.allFirebaseCartillas.firstWhere(
@@ -214,47 +431,30 @@ class CartillasFiltersPanel extends StatelessWidget {
                                 ),
                               );
                               appProvider.unassignFirebaseCartilla(firebaseCartilla.id);
-                        }
-                        appProvider.clearSelection();
-                      }
-                    : null,
-                icon: const Icon(Icons.person_remove),
-                label: const Text('Desasignar Seleccionadas'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
+                            }
+                            appProvider.clearSelection();
+                          }
+                        : null,
+                    icon: const Icon(Icons.person_remove),
+                    label: const Text('Desasignar'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                  ),
                 ),
-              ),
-            ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Segunda fila: Eliminar y Nueva Cartilla
-            Row(
-              children: [
+                const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: appProvider.selectedCount > 0
                         ? () async {
-                            // Mostrar confirmación antes de eliminar
                             final confirmed = await showDialog<bool>(
                               context: context,
                               builder: (context) => AlertDialog(
                                 title: const Text('Confirmar Eliminación'),
-                                content: Text(
-                                  '¿Estás seguro de que quieres eliminar ${appProvider.selectedCount} cartilla${appProvider.selectedCount > 1 ? 's' : ''} seleccionada${appProvider.selectedCount > 1 ? 's' : ''}?\n\nEsta acción no se puede deshacer.',
-                                ),
+                                content: Text('¿Eliminar ${appProvider.selectedCount} cartillas seleccionadas?'),
                                 actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context, false),
-                                    child: const Text('Cancelar'),
-                                  ),
+                                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
                                   ElevatedButton(
                                     onPressed: () => Navigator.pop(context, true),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                      foregroundColor: Colors.white,
-                                    ),
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                                     child: const Text('Eliminar'),
                                   ),
                                 ],
@@ -262,9 +462,7 @@ class CartillasFiltersPanel extends StatelessWidget {
                             );
                             
                             if (confirmed == true) {
-                              // Eliminar cartillas seleccionadas
                               for (String cartillaId in appProvider.selectedCartillaIds) {
-                                // Buscar la cartilla por ID
                                 final firebaseCartilla = appProvider.firebaseCartillas.firstWhere(
                                   (fc) => fc.id == cartillaId,
                                   orElse: () => appProvider.allFirebaseCartillas.firstWhere(
@@ -275,286 +473,18 @@ class CartillasFiltersPanel extends StatelessWidget {
                                 await appProvider.deleteFirebaseCartilla(firebaseCartilla.id);
                               }
                               appProvider.clearSelection();
-                              
-                              // Recargar automáticamente si es necesario
                               await appProvider.autoReloadIfNeeded();
-                              
-                              // Mostrar mensaje de confirmación
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('${appProvider.selectedCount} cartilla${appProvider.selectedCount > 1 ? 's' : ''} eliminada${appProvider.selectedCount > 1 ? 's' : ''} correctamente'),
-                                    backgroundColor: Colors.green,
-                                  ),
+                                  const SnackBar(content: Text('Cartillas eliminadas correctamente'), backgroundColor: Colors.green),
                                 );
                               }
                             }
                           }
                         : null,
-                    icon: const Icon(Icons.delete_forever),
-                    label: const Text('Eliminar Seleccionadas'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  // Mostrar diálogo para especificar cantidad
-                  final textController = TextEditingController(text: '1');
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Generar Cartillas'),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '¿Cuántas cartillas quieres generar?\n\n'
-                            'Ingresa un número entre 0 y 1000:',
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: textController,
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-                              hintText: 'Ej: 10',
-                              prefixIcon: Icon(Icons.numbers),
-                            ),
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) {
-                              (context as Element).markNeedsBuild();
-                            },
-                          ),
-                        ],
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancelar'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            final count = int.tryParse(textController.text);
-                            if (count != null && count >= 0 && count <= 1000) {
-                              Navigator.pop(context, true);
-                            }
-                          },
-                          child: const Text('Generar'),
-                        ),
-                      ],
-                    ),
-                  );
-                  
-                  if (confirmed == true) {
-                    final count = int.tryParse(textController.text) ?? 1;
-                    
-                    // Mostrar indicador de carga
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('🃏 Generando $count cartilla${count > 1 ? 's' : ''}...'),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                    
-                    // Generar las cartillas
-                    final success = await appProvider.generateFirebaseCartillas(count);
-                    
-                    if (success && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('✅ Se generaron $count cartilla${count > 1 ? 's' : ''} exitosamente'),
-                          backgroundColor: Colors.green,
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                    } else if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('❌ Error al generar las cartillas'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                },
-                icon: const Icon(Icons.add),
-                label: const Text('Nueva Cartilla'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-              ],
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildUtilityButtons() {
-    return Consumer<AppProvider>(
-      builder: (context, appProvider, child) {
-        return Column(
-          children: [
-            // Primera fila: botones de utilidad
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      appProvider.resetFilters();
-                    },
-                    icon: const Icon(Icons.clear_all),
-                    label: const Text('Limpiar Filtros'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      appProvider.applyDefaultFilters();
-                    },
-                    icon: const Icon(Icons.settings_backup_restore),
-                    label: const Text('Filtros por Defecto'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      // Obtener todos los IDs de las cartillas Firebase
-                      final cartillaIds = appProvider.firebaseCartillas.map((c) => c.id).toList();
-                      appProvider.selectAllCartillas(cartillaIds);
-                    },
-                    icon: const Icon(Icons.select_all),
-                    label: const Text('Seleccionar Todas'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Segunda fila: botón de eliminar todas (peligroso)
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      // Mostrar diálogo para escribir "ELIMINAR"
-                      final textController = TextEditingController();
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('⚠️ ADVERTENCIA CRÍTICA'),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '¿Estás SEGURO de que quieres eliminar TODAS las cartillas de la base de datos?\n\n'
-                                'Esta acción:\n'
-                                '• Eliminará TODAS las cartillas permanentemente\n'
-                                '• No se puede deshacer\n'
-                                '• Limpiará toda la base de datos\n\n'
-                                'Escribe "ELIMINAR" para confirmar:',
-                              ),
-                              const SizedBox(height: 16),
-                              TextField(
-                                controller: textController,
-                                decoration: const InputDecoration(
-                                  border: OutlineInputBorder(),
-                                  hintText: 'Escribe ELIMINAR aquí',
-                                ),
-                                onChanged: (value) {
-                                  // Habilitar/deshabilitar botón según el texto
-                                  (context as Element).markNeedsBuild();
-                                },
-                              ),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancelar'),
-                            ),
-                            ElevatedButton(
-                              onPressed: textController.text == 'ELIMINAR' 
-                                  ? () => Navigator.pop(context, true)
-                                  : null,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red.shade800,
-                                foregroundColor: Colors.white,
-                              ),
-                              child: const Text('Confirmar'),
-                            ),
-                          ],
-                          contentPadding: const EdgeInsets.all(20),
-                        ),
-                      );
-                      
-                      if (confirmed == true) {
-                        // Mostrar diálogo de confirmación final
-                        final finalConfirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Confirmación Final'),
-                            content: const Text(
-                              '¿Estás 100% seguro? Esta acción eliminará TODAS las cartillas sin posibilidad de recuperación.',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context, false),
-                                child: const Text('Cancelar'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(context, true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red.shade800,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('SÍ, ELIMINAR TODO'),
-                              ),
-                            ],
-                          ),
-                        );
-                        
-                        if (finalConfirmed == true) {
-                          // Eliminar todas las cartillas
-                          final success = await appProvider.clearAllFirebaseCartillas();
-                          
-                          if (success && context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('✅ Todas las cartillas han sido eliminadas'),
-                                backgroundColor: Colors.green,
-                                duration: Duration(seconds: 5),
-                              ),
-                            );
-                          } else if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('❌ Error al eliminar todas las cartillas'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      }
-                    },
-                    icon: const Icon(Icons.delete_forever, color: Colors.white),
-                    label: const Text('ELIMINAR TODAS', style: TextStyle(color: Colors.white)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade800,
-                      foregroundColor: Colors.white,
-                    ),
+                    icon: const Icon(Icons.delete),
+                    label: const Text('Eliminar'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, foregroundColor: Colors.white),
                   ),
                 ),
               ],

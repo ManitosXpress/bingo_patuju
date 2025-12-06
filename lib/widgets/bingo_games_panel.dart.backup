@@ -5,14 +5,9 @@ import 'bingo_patterns_dialog.dart';
 import '../models/bingo_game.dart';
 import '../providers/app_provider.dart';
 import '../services/rounds_persistence_service.dart';
-import 'game_selector_dialog.dart';
-import 'edit_game_dialog.dart';
-import 'edit_round_dialog.dart';
-import 'round_editor.dart';
-import '../utils/bingo_pattern_names.dart';
+import 'create_game_modal.dart';
 import '../services/bingo_games_service.dart';
 import '../models/firebase_bingo_game.dart';
-import 'create_game_modal.dart';
 
 class BingoGamesPanel extends StatefulWidget {
   final VoidCallback? onGameStateChanged;
@@ -79,6 +74,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   void dispose() {
     super.dispose();
   }
+
 
 
   // Método para cargar juegos predefinidos
@@ -213,6 +209,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   }
 
 
+
   void _showPatternsDialog(BuildContext context) {
     // Crear un BingoGame temporal para mostrar en el diálogo
     final tempBingoGame = BingoGame();
@@ -238,7 +235,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return GameSelectorDialog(
+        return _GameSelectorDialog(
           currentGame: _selectedGame,
           onGameSelected: (game) async {
             setState(() {
@@ -252,38 +249,8 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
             await _updateCurrentRoundIndex(0);
             Navigator.of(context).pop();
           },
-        );
-      },
-    );
-  }
-
-  void _showCreateGameDialog(BuildContext context) {
-    showDialog(
-      context: context,
       builder: (BuildContext context) {
-        return CreateGameModal(
-          onGameCreated: (newGame) async {
-            setState(() {
-              _selectedGame = newGame;
-            });
-            
-            // Guardar las rondas del nuevo juego
-            await RoundsPersistenceService.saveGameRounds(newGame);
-            
-            // Usar el método que actualiza la variable estática
-            await _updateCurrentRoundIndex(0);
-            Navigator.of(context).pop();
-          },
-        );
-      },
-    );
-  }
-
-  void _showEditGameDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return EditGameDialog(
+        return _EditGameDialog(
           game: _selectedGame!,
           onGameUpdated: (updatedGame) async {
             setState(() {
@@ -847,6 +814,8 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       },
     );
   }
+
+
 
 
   Widget _buildGameInfo() {
@@ -1774,7 +1743,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return EditRoundDialog(
+        return _EditRoundDialog(
           round: round,
           onRoundUpdated: (updatedRound) {
             setState(() {
@@ -1836,4 +1805,1020 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
 
 }
 
+// Diálogo para seleccionar un juego existente
+class _GameSelectorDialog extends StatelessWidget {
+  final BingoGameConfig? currentGame;
+  final Function(BingoGameConfig) onGameSelected;
 
+  const _GameSelectorDialog({
+    required this.currentGame,
+    required this.onGameSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.8,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.swap_horiz, color: Colors.blue.shade600, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Seleccionar Juego',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade700,
+                  ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getPatternName(BingoPattern pattern) {
+    switch (pattern) {
+      case BingoPattern.diagonalPrincipal:
+        return 'Diagonal Principal';
+      case BingoPattern.diagonalSecundaria:
+        return 'Diagonal Secundaria';
+      case BingoPattern.lineaHorizontal:
+        return 'Línea Horizontal';
+      case BingoPattern.lineaVertical:
+        return 'Línea Vertical';
+      case BingoPattern.marcoCompleto:
+        return 'Marco Completo';
+      case BingoPattern.marcoPequeno:
+        return 'Marco Pequeño';
+      case BingoPattern.spoutnik:
+        return 'Spoutnik';
+      case BingoPattern.corazon:
+        return 'Corazón';
+      case BingoPattern.cartonLleno:
+        return 'Cartón Lleno';
+      case BingoPattern.consuelo:
+        return 'Consuelo';
+      case BingoPattern.x:
+        return 'X';
+      // Patrones adicionales
+      case BingoPattern.figuraAvion:
+        return 'Figura Avión';
+      case BingoPattern.caidaNieve:
+        return 'Caída de Nieve';
+      case BingoPattern.arbolFlecha:
+        return 'Árbol o Flecha';
+      case BingoPattern.letraI:
+        return 'LETRA I';
+      case BingoPattern.letraN:
+        return 'LETRA N';
+      case BingoPattern.autopista:
+        return 'Autopista';
+      // Nuevas figuras legendarias
+      case BingoPattern.relojArena:
+        return 'Reloj de Arena';
+      case BingoPattern.dobleLineaV:
+        return 'Doble Línea V';
+      case BingoPattern.figuraSuegra:
+        return 'Figura la Suegra';
+      case BingoPattern.figuraComodin:
+        return 'Figura Infinito';
+      case BingoPattern.letraFE:
+        return 'Letra FE';
+      case BingoPattern.figuraCLoca:
+        return 'Figura C Loca';
+      case BingoPattern.figuraBandera:
+        return 'Figura Bandera';
+      case BingoPattern.figuraTripleLinea:
+        return 'Figura Triple Línea';
+      case BingoPattern.diagonalDerecha:
+        return 'Diagonal Derecha';
+    }
+  }
+}
+
+// Diálogo para crear un nuevo juego
+class _CreateGameDialog extends StatefulWidget {
+  final Function(BingoGameConfig) onGameCreated;
+
+  const _CreateGameDialog({required this.onGameCreated});
+
+  @override
+  State<_CreateGameDialog> createState() => _CreateGameDialogState();
+}
+
+class _CreateGameDialogState extends State<_CreateGameDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  String _selectedDay = 'Lunes';
+  final List<BingoGameRound> _rounds = [];
+  
+  final List<String> _availableDays = [
+    'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Agregar una ronda por defecto
+    _addRound();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _addRound() {
+    setState(() {
+      _rounds.add(BingoGameRound(
+        id: 'ronda_${_rounds.length + 1}',
+        name: 'Ronda ${_rounds.length + 1}',
+        patterns: [BingoPattern.cartonLleno],
+      ));
+    });
+  }
+
+  void _removeRound(int index) {
+    if (_rounds.length > 1) {
+      setState(() {
+        _rounds.removeAt(index);
+      });
+    }
+  }
+
+  void _updateRound(int index, BingoGameRound round) {
+    setState(() {
+      _rounds[index] = round;
+    });
+  }
+
+  void _createGame() {
+    if (_formKey.currentState!.validate() && _rounds.isNotEmpty) {
+      final newGame = BingoGameConfig(
+        id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+        name: _nameController.text.trim(),
+        date: _selectedDay,
+        rounds: List.from(_rounds),
+      );
+      
+      // Agregar el nuevo juego a la lista de presets
+      BingoGamePresets.defaultGames.add(newGame);
+      
+      widget.onGameCreated(newGame);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.8,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.add_circle_outline, color: Colors.green.shade600, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Crear Nuevo Juego',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green.shade700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Nombre del juego
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre del Juego',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Por favor ingresa un nombre';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Día de la semana
+                      DropdownButtonFormField<String>(
+                        value: _selectedDay,
+                        decoration: const InputDecoration(
+                          labelText: 'Día de la Semana',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _availableDays.map((day) {
+                          return DropdownMenuItem(
+                            value: day,
+                            child: Text(day),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectedDay = value;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Título de las rondas
+                      Row(
+                        children: [
+                          Text(
+                            'Rondas del Juego',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          ElevatedButton.icon(
+                            onPressed: _addRound,
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Agregar Ronda'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade600,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Lista de rondas
+                      ...(_rounds.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final round = entry.value;
+                        return _RoundEditor(
+                          round: round,
+                          onUpdate: (updatedRound) => _updateRound(index, updatedRound),
+                          onRemove: () => _removeRound(index),
+                          canRemove: _rounds.length > 1,
+                        );
+                      }).toList()),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Botones de acción
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _createGame,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green.shade600,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Crear Juego'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Editor de ronda individual
+class _RoundEditor extends StatefulWidget {
+  final BingoGameRound round;
+  final Function(BingoGameRound) onUpdate;
+  final VoidCallback onRemove;
+  final bool canRemove;
+
+  const _RoundEditor({
+    required this.round,
+    required this.onUpdate,
+    required this.onRemove,
+    required this.canRemove,
+  });
+
+  @override
+  State<_RoundEditor> createState() => _RoundEditorState();
+}
+
+class _RoundEditorState extends State<_RoundEditor> {
+  late TextEditingController _nameController;
+  late List<BingoPattern> _selectedPatterns;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.round.name);
+    _selectedPatterns = List.from(widget.round.patterns);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _updateRound() {
+    final updatedRound = widget.round.copyWith(
+      name: _nameController.text.trim(),
+      patterns: _selectedPatterns,
+    );
+    widget.onUpdate(updatedRound);
+  }
+
+  /// Obtener patrones ordenados alfabéticamente por su nombre de visualización
+  List<BingoPattern> _getSortedPatterns() {
+    final patterns = List<BingoPattern>.from(BingoPattern.values);
+    patterns.sort((a, b) {
+      final nameA = _getPatternDisplayName(a).toLowerCase();
+      final nameB = _getPatternDisplayName(b).toLowerCase();
+      return nameA.compareTo(nameB);
+    });
+    return patterns;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre de la Ronda',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (_) => _updateRound(),
+                  ),
+                ),
+                if (widget.canRemove) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: widget.onRemove,
+                    icon: Icon(Icons.delete, color: Colors.red.shade600),
+                    tooltip: 'Eliminar Ronda',
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            Text(
+              'Patrones:',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _getSortedPatterns().map((pattern) {
+                final isSelected = _selectedPatterns.contains(pattern);
+                return FilterChip(
+                  label: Text(_getPatternDisplayName(pattern)),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedPatterns.add(pattern);
+                      } else {
+                        _selectedPatterns.remove(pattern);
+                      }
+                    });
+                    _updateRound();
+                  },
+                  backgroundColor: Colors.grey.shade100,
+                  selectedColor: Colors.blue.shade100,
+                  checkmarkColor: Colors.blue.shade600,
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getPatternDisplayName(BingoPattern pattern) {
+    switch (pattern) {
+      case BingoPattern.diagonalPrincipal:
+        return 'Diagonal Principal';
+      case BingoPattern.diagonalSecundaria:
+        return 'Diagonal Secundaria';
+      case BingoPattern.lineaHorizontal:
+        return 'Línea Horizontal';
+      case BingoPattern.lineaVertical:
+        return 'Línea Vertical';
+      case BingoPattern.marcoCompleto:
+        return 'Marco Completo';
+      case BingoPattern.marcoPequeno:
+        return 'Marco Pequeño';
+      case BingoPattern.spoutnik:
+        return 'Spoutnik';
+      case BingoPattern.corazon:
+        return 'Corazón';
+      case BingoPattern.cartonLleno:
+        return 'Cartón Lleno';
+      case BingoPattern.consuelo:
+        return 'Consuelo';
+      case BingoPattern.x:
+        return 'X';
+      // Patrones adicionales
+      case BingoPattern.figuraAvion:
+        return 'Figura Avión';
+      case BingoPattern.caidaNieve:
+        return 'Caída de Nieve';
+      case BingoPattern.arbolFlecha:
+        return 'Árbol o Flecha';
+      case BingoPattern.letraI:
+        return 'LETRA I';
+      case BingoPattern.letraN:
+        return 'LETRA N';
+      case BingoPattern.autopista:
+        return 'Autopista';
+      // Nuevas figuras legendarias
+      case BingoPattern.relojArena:
+        return 'Reloj de Arena';
+      case BingoPattern.dobleLineaV:
+        return 'Doble Línea V';
+      case BingoPattern.figuraSuegra:
+        return 'Figura la Suegra';
+      case BingoPattern.figuraComodin:
+        return 'Figura Infinito';
+      case BingoPattern.letraFE:
+        return 'Letra FE';
+      case BingoPattern.figuraCLoca:
+        return 'Figura C Loca';
+      case BingoPattern.figuraBandera:
+        return 'Figura Bandera';
+      case BingoPattern.figuraTripleLinea:
+        return 'Figura Triple Línea';
+      case BingoPattern.diagonalDerecha:
+        return 'Diagonal Derecha';
+    }
+  }
+}
+
+// Diálogo para editar un juego existente
+class _EditGameDialog extends StatefulWidget {
+  final BingoGameConfig game;
+  final Function(BingoGameConfig) onGameUpdated;
+
+  const _EditGameDialog({
+    required this.game,
+    required this.onGameUpdated,
+  });
+
+  @override
+  State<_EditGameDialog> createState() => _EditGameDialogState();
+}
+
+class _EditGameDialogState extends State<_EditGameDialog> {
+  late BingoGameConfig _editedGame;
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  late String _selectedDay;
+  late List<BingoGameRound> _rounds;
+  
+  final List<String> _availableDays = [
+    'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Crear una copia del juego para editar
+    _editedGame = widget.game.copyWith();
+    _nameController.text = _editedGame.name;
+    _selectedDay = _editedGame.date;
+    _rounds = List.from(_editedGame.rounds);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _addRound() {
+    setState(() {
+      _rounds.add(BingoGameRound(
+        id: 'ronda_${_rounds.length + 1}_${DateTime.now().millisecondsSinceEpoch}',
+        name: 'Ronda ${_rounds.length + 1}',
+        patterns: [BingoPattern.cartonLleno],
+      ));
+    });
+  }
+
+  void _removeRound(int index) {
+    if (_rounds.length > 1) {
+      setState(() {
+        _rounds.removeAt(index);
+      });
+    }
+  }
+
+  void _updateRound(int index, BingoGameRound round) {
+    setState(() {
+      _rounds[index] = round;
+    });
+  }
+
+  void _saveChanges() {
+    if (_formKey.currentState!.validate() && _rounds.isNotEmpty) {
+      final updatedGame = _editedGame.copyWith(
+        name: _nameController.text.trim(),
+        date: _selectedDay,
+        rounds: List.from(_rounds),
+      );
+      
+      // Actualizar el juego en la lista de presets
+      final gameIndex = BingoGamePresets.defaultGames.indexWhere((g) => g.id == widget.game.id);
+      if (gameIndex != -1) {
+        BingoGamePresets.defaultGames[gameIndex] = updatedGame;
+      }
+      
+      widget.onGameUpdated(updatedGame);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.8,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.edit, color: Colors.blue.shade600, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Editar Juego: ${widget.game.name}',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Nombre del juego
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre del Juego',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Por favor ingresa un nombre';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Día de la semana
+                      DropdownButtonFormField<String>(
+                        value: _selectedDay,
+                        decoration: const InputDecoration(
+                          labelText: 'Día de la Semana',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _availableDays.map((day) {
+                          return DropdownMenuItem(
+                            value: day,
+                            child: Text(day),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectedDay = value;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Título de las rondas
+                      Row(
+                        children: [
+                          Text(
+                            'Rondas del Juego (${_rounds.length})',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          ElevatedButton.icon(
+                            onPressed: _addRound,
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Agregar Ronda'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade600,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Lista de rondas
+                      ...(_rounds.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final round = entry.value;
+                        return _RoundEditor(
+                          round: round,
+                          onUpdate: (updatedRound) => _updateRound(index, updatedRound),
+                          onRemove: () => _removeRound(index),
+                          canRemove: _rounds.length > 1,
+                        );
+                      }).toList()),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Botones de acción
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _saveChanges,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade600,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Guardar Cambios'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+} 
+
+// Diálogo para editar una ronda individual
+class _EditRoundDialog extends StatefulWidget {
+  final BingoGameRound round;
+  final Function(BingoGameRound) onRoundUpdated;
+
+  const _EditRoundDialog({
+    required this.round,
+    required this.onRoundUpdated,
+  });
+
+  @override
+  State<_EditRoundDialog> createState() => _EditRoundDialogState();
+}
+
+class _EditRoundDialogState extends State<_EditRoundDialog> {
+  late TextEditingController _nameController;
+  late TextEditingController _descriptionController;
+  late List<BingoPattern> _selectedPatterns;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.round.name);
+    _descriptionController = TextEditingController(text: widget.round.description ?? '');
+    _selectedPatterns = List.from(widget.round.patterns);
+  }
+
+  /// Obtener patrones ordenados alfabéticamente por su nombre de visualización
+  List<BingoPattern> _getSortedPatterns() {
+    final patterns = List<BingoPattern>.from(BingoPattern.values);
+    patterns.sort((a, b) {
+      final nameA = _getPatternDisplayName(a).toLowerCase();
+      final nameB = _getPatternDisplayName(b).toLowerCase();
+      return nameA.compareTo(nameB);
+    });
+    return patterns;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _saveChanges() {
+    if (_nameController.text.trim().isNotEmpty && _selectedPatterns.isNotEmpty) {
+      final updatedRound = widget.round.copyWith(
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+        patterns: List.from(_selectedPatterns),
+      );
+      
+      widget.onRoundUpdated(updatedRound);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.8,
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.edit, color: Colors.orange.shade600, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Editar Ronda: ${widget.round.name}',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange.shade700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Nombre de la ronda
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre de la Ronda',
+                        border: OutlineInputBorder(),
+                        hintText: 'Ej: Juego 1, Consuelo, etc.',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Descripción de la ronda
+                    TextFormField(
+                      controller: _descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Descripción (Opcional)',
+                        border: OutlineInputBorder(),
+                        hintText: 'Descripción detallada de la ronda',
+                      ),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Patrones de la ronda
+                    Text(
+                      'Patrones de la Ronda:',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    Text(
+                      'Selecciona las figuras que se deben completar para ganar esta ronda:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Grid de patrones seleccionables (ordenados alfabéticamente)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _getSortedPatterns().map((pattern) {
+                        final isSelected = _selectedPatterns.contains(pattern);
+                        return FilterChip(
+                          label: Text(_getPatternDisplayName(pattern)),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedPatterns.add(pattern);
+                              } else {
+                                _selectedPatterns.remove(pattern);
+                              }
+                            });
+                          },
+                          backgroundColor: Colors.grey.shade100,
+                          selectedColor: Colors.orange.shade100,
+                          checkmarkColor: Colors.orange.shade600,
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.orange.shade700 : Colors.grey.shade700,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Vista previa de la ronda
+                    if (_selectedPatterns.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Vista Previa:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange.shade700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Nombre: ${_nameController.text.trim().isEmpty ? "Sin nombre" : _nameController.text.trim()}',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            Text(
+                              'Patrones: ${_selectedPatterns.map((p) => _getPatternDisplayName(p)).join(', ')}',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            if (_descriptionController.text.trim().isNotEmpty)
+                              Text(
+                                'Descripción: ${_descriptionController.text.trim()}',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Botones de acción
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  onPressed: _selectedPatterns.isNotEmpty && _nameController.text.trim().isNotEmpty
+                      ? _saveChanges
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange.shade600,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Guardar Cambios'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getPatternDisplayName(BingoPattern pattern) {
+    switch (pattern) {
+      case BingoPattern.diagonalPrincipal:
+        return 'Diagonal Principal';
+      case BingoPattern.diagonalSecundaria:
+        return 'Diagonal Secundaria';
+      case BingoPattern.lineaHorizontal:
+        return 'Línea Horizontal';
+      case BingoPattern.lineaVertical:
+        return 'Línea Vertical';
+      case BingoPattern.marcoCompleto:
+        return 'Marco Completo';
+      case BingoPattern.marcoPequeno:
+        return 'Marco Pequeño';
+      case BingoPattern.spoutnik:
+        return 'Spoutnik';
+      case BingoPattern.corazon:
+        return 'Corazón';
+      case BingoPattern.cartonLleno:
+        return 'Cartón Lleno';
+      case BingoPattern.consuelo:
+        return 'Consuelo';
+      case BingoPattern.x:
+        return 'X';
+      // Patrones adicionales
+      case BingoPattern.figuraAvion:
+        return 'Figura Avión';
+      case BingoPattern.caidaNieve:
+        return 'Caída de Nieve';
+      case BingoPattern.arbolFlecha:
+        return 'Árbol o Flecha';
+      case BingoPattern.letraI:
+        return 'LETRA I';
+      case BingoPattern.letraN:
+        return 'LETRA N';
+      case BingoPattern.autopista:
+        return 'Autopista';
+      // Nuevas figuras legendarias
+      case BingoPattern.relojArena:
+        return 'Reloj de Arena';
+      case BingoPattern.dobleLineaV:
+        return 'Doble Línea V';
+      case BingoPattern.figuraSuegra:
+        return 'Figura la Suegra';
+      case BingoPattern.figuraComodin:
+        return 'Figura Infinito';
+      case BingoPattern.letraFE:
+        return 'Letra FE';
+      case BingoPattern.figuraCLoca:
+        return 'Figura C Loca';
+      case BingoPattern.figuraBandera:
+        return 'Figura Bandera';
+      case BingoPattern.figuraTripleLinea:
+        return 'Figura Triple Línea';
+      case BingoPattern.diagonalDerecha:
+        return 'Diagonal Derecha';
+    }
+  }
+} 

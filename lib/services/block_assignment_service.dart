@@ -793,11 +793,11 @@ class BlockAssignmentService {
         }
         
         print('⚠️ No se pudo obtener el total de cartillas, usando valor por defecto');
-        return 1000; // Valor por defecto
+        return 10000; // Valor por defecto aumentado
       }
     } catch (e) {
       print('💥 Error obteniendo total de cartillas: $e');
-      return 1000; // Valor por defecto en caso de error
+      return 10000; // Valor por defecto en caso de error aumentado
     }
   }
 

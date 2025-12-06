@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import 'package:provider/provider.dart';
 import '../config/backend_config.dart';
 import '../widgets/cartilla_widget.dart';
+import '../widgets/date_selector_widget.dart';
 import '../block_assignment.dart';
 import '../providers/app_provider.dart';
 
@@ -20,8 +21,6 @@ class CrmScreen extends StatefulWidget {
 
 class _CrmScreenState extends State<CrmScreen> {
   final DateFormat _df = DateFormat('yyyy-MM-dd');
-  DateTime? _from;
-  DateTime? _to;
   String? _leaderId;
   List<Map<String, dynamic>> _leaders = [];
   List<Map<String, dynamic>> _vendorsAll = [];
@@ -31,9 +30,11 @@ class _CrmScreenState extends State<CrmScreen> {
   String get _apiBase => BackendConfig.apiBase;
 
   Future<void> _showVendorDetail(Map<String, dynamic> vendor) async {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final selectedDate = appProvider.selectedDate;
     final sellerId = vendor['vendorId'] ?? vendor['id'] ?? vendor['vendorId'];
     final salesUri = Uri.parse('$_apiBase/sales?sellerId=$sellerId');
-    final cardsUri = Uri.parse('$_apiBase/cards?assignedTo=$sellerId&sold=false');
+    final cardsUri = Uri.parse('$_apiBase/cards?assignedTo=$sellerId&sold=false&date=$selectedDate');
     final salesResp = await http.get(salesUri);
     final cardsResp = await http.get(cardsUri);
     final sales = salesResp.statusCode < 300 ? List<Map<String, dynamic>>.from(json.decode(salesResp.body)) : <Map<String, dynamic>>[];
@@ -110,8 +111,10 @@ class _CrmScreenState extends State<CrmScreen> {
   }
 
   Future<void> _registerSaleDialog(String sellerId) async {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final selectedDate = appProvider.selectedDate;
     // Cargar cartillas asignadas sin vender para este usuario
-    final r = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$sellerId&sold=false'));
+    final r = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$sellerId&sold=false&date=$selectedDate'));
     List<Map<String, dynamic>> cards = [];
     if (r.statusCode < 300) {
       cards = List<Map<String, dynamic>>.from(json.decode(r.body));
@@ -488,7 +491,9 @@ class _CrmScreenState extends State<CrmScreen> {
   }
 
   Future<void> _sellAllAssigned(String sellerId) async {
-    final r = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$sellerId&sold=false'));
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final selectedDate = appProvider.selectedDate;
+    final r = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$sellerId&sold=false&date=$selectedDate'));
     if (r.statusCode >= 300) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar cartillas: ${r.body}')));
@@ -855,11 +860,13 @@ class _CrmScreenState extends State<CrmScreen> {
   }
 
   Future<Map<String, dynamic>> _load({bool withLeaders = false, int? refreshKey}) async {
-    final qp = <String>[];
-    if (_from != null) qp.add('from=${DateTime(_from!.year, _from!.month, _from!.day).millisecondsSinceEpoch}');
-    if (_to != null) qp.add('to=${DateTime(_to!.year, _to!.month, _to!.day, 23, 59, 59).millisecondsSinceEpoch}');
+    // Usar selectedDate del AppProvider para filtrar por fecha del evento
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final selectedDate = appProvider.selectedDate;
+    
+    final qp = <String>['date=$selectedDate'];
     if (_leaderId != null && _leaderId!.isNotEmpty) qp.add('leaderId=$_leaderId');
-    final qs = qp.isEmpty ? '' : '?${qp.join('&')}';
+    final qs = '?${qp.join('&')}';
 
     if (withLeaders) {
       final leadersResp = await http.get(Uri.parse('$_apiBase/vendors'));
@@ -880,7 +887,8 @@ class _CrmScreenState extends State<CrmScreen> {
       for (final vendor in vendors) {
         final vendorId = vendor['vendorId'] ?? vendor['id'];
         try {
-          final assignedResp = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$vendorId'));
+          // Incluir date en la petición - es requerido por el backend
+          final assignedResp = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$vendorId&date=$selectedDate'));
           if (assignedResp.statusCode < 300) {
             final assignedCards = List<Map<String, dynamic>>.from(json.decode(assignedResp.body));
             vendor['assignedCount'] = assignedCards.length;
@@ -892,9 +900,10 @@ class _CrmScreenState extends State<CrmScreen> {
         }
       }
       
-      // Obtener el total de cartillas del sistema
+      // Obtener el total de cartillas del sistema para la fecha seleccionada
       try {
-        final totalCardsResp = await http.get(Uri.parse('$_apiBase/cards'));
+        // Incluir date en la petición - es requerido por el backend
+        final totalCardsResp = await http.get(Uri.parse('$_apiBase/cards?date=$selectedDate'));
         if (totalCardsResp.statusCode < 300) {
           final allCards = List<Map<String, dynamic>>.from(json.decode(totalCardsResp.body));
           data['totalCards'] = allCards.length;
@@ -908,18 +917,6 @@ class _CrmScreenState extends State<CrmScreen> {
       return data;
     }
     throw Exception('Error ${resp.statusCode}: ${resp.body}');
-  }
-
-  Future<void> _pickDate({required bool isFrom}) async {
-    final now = DateTime.now();
-    final initial = isFrom ? (_from ?? now) : (_to ?? now);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(now.year - 3),
-      lastDate: DateTime(now.year + 1),
-    );
-    if (picked != null) setState(() => isFrom ? _from = picked : _to = picked);
   }
 
 
@@ -1547,12 +1544,15 @@ class _CrmScreenState extends State<CrmScreen> {
   
   // Método para mostrar diálogo de cartillas asignadas
   Future<void> _showAssignedCardsDialog(String vendorId) async {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final selectedDate = appProvider.selectedDate;
     // Mostrar diálogo inmediatamente con widget optimizado
     await showDialog(
       context: context,
       builder: (context) => _AssignedCardsDialog(
         vendorId: vendorId,
         apiBase: _apiBase,
+        eventDate: selectedDate,
         onDownloadAll: (cards) => _downloadAllAssignedCards(cards, vendorId),
         onDeleteAll: (cards) => _deleteAllAssignedCards(cards, vendorId),
         onOpenCartilla: (card) => _openCartilla(card),
@@ -1678,7 +1678,9 @@ class _CrmScreenState extends State<CrmScreen> {
     }
     
     // Cargar cartillas inicialmente
-    final initialResp = await http.get(Uri.parse('$_apiBase/cards?sold=false'));
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final eventDate = appProvider.selectedDate;
+    final initialResp = await http.get(Uri.parse('$_apiBase/cards?sold=false&date=$eventDate'));
     if (initialResp.statusCode < 300) {
       cards = List<Map<String, dynamic>>.from(json.decode(initialResp.body));
       // Ordenar cartillas por número
@@ -1707,7 +1709,7 @@ class _CrmScreenState extends State<CrmScreen> {
       return StatefulBuilder(builder: (context, setSt) {
         Future<void> loadCards() async {
           setSt(() => isLoadingCards = true);
-          final r = await http.get(Uri.parse('$_apiBase/cards?sold=false'));
+          final r = await http.get(Uri.parse('$_apiBase/cards?sold=false&date=$eventDate'));
           if (r.statusCode < 300) {
             cards = List<Map<String, dynamic>>.from(json.decode(r.body));
             // Ordenar cartillas por número
@@ -2393,121 +2395,257 @@ class _CrmScreenState extends State<CrmScreen> {
 
           return Column(
             children: [
-              // Filtros
+              // Dashboard Header Profesional
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                                         // Resumen de cartillas
-                     Container(
-                       padding: const EdgeInsets.all(16),
-                       decoration: BoxDecoration(
-                         color: Colors.grey.shade50,
-                         borderRadius: BorderRadius.circular(12),
-                         border: Border.all(color: Colors.grey.shade300),
-                       ),
-                       child: Column(
-                         children: [
-                           Row(
-                             mainAxisAlignment: MainAxisAlignment.spaceAround,
-                             children: [
-                               _summaryStat('Total Cartillas', snap.data!['totalCards'] ?? 0),
-                               _summaryStat('Total Vendidas', _getTotalSold(vendors)),
-                               _summaryStat('Total Asignadas', _getTotalAssigned(vendors)),
-                             ],
-                           ),
-                           const SizedBox(height: 16),
-                           Row(
-                             mainAxisAlignment: MainAxisAlignment.spaceAround,
-                             children: [
-                               _summaryStat('Sin Asignar', _getTotalUnassigned(vendors, snap.data!['totalCards'] ?? 0)),
-                               _summaryStat('Disponibles', _getTotalAvailable(vendors)),
-                             ],
-                           ),
-                         ],
-                       ),
-                     ),
-                    const SizedBox(height: 16),
-                    // Filtros existentes
+                    // Selector de Fecha Global
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.indigo.shade700, Colors.indigo.shade500],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.indigo.withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.event, color: Colors.white, size: 28),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Fecha del Evento',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Consumer<AppProvider>(
+                                    builder: (context, appProvider, child) {
+                                      final date = DateTime.parse(appProvider.selectedDate);
+                                      return Text(
+                                        DateFormat('dd/MM/yyyy').format(date),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const DateSelectorWidget(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // KPI Cards con diseño moderno
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildKpiCard(
+                            title: 'Total Cartillas',
+                            value: '${snap.data!['totalCards'] ?? 0}',
+                            icon: Icons.grid_view_rounded,
+                            color: Colors.blue,
+                            gradientEnd: Colors.cyan,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildKpiCard(
+                            title: 'Vendidas',
+                            value: '${_getTotalSold(vendors)}',
+                            icon: Icons.monetization_on_rounded,
+                            color: Colors.green,
+                            gradientEnd: Colors.teal,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildKpiCard(
+                            title: 'Asignadas',
+                            value: '${_getTotalAssigned(vendors)}',
+                            icon: Icons.assignment_ind_rounded,
+                            color: Colors.orange,
+                            gradientEnd: Colors.deepOrange,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildKpiCard(
+                            title: 'Disponibles',
+                            value: '${_getTotalAvailable(vendors)}',
+                            icon: Icons.inventory_2_rounded,
+                            color: Colors.purple,
+                            gradientEnd: Colors.deepPurple,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Acciones organizadas
                     Wrap(
-                      spacing: 12,
+                      spacing: 8,
+                      runSpacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.date_range),
-                          label: Text(_from == null ? 'Desde' : _df.format(_from!)),
-                          onPressed: () async { await _pickDate(isFrom: true); setState(() {}); },
-                        ),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.date_range_outlined),
-                          label: Text(_to == null ? 'Hasta' : _df.format(_to!)),
-                          onPressed: () async { await _pickDate(isFrom: false); setState(() {}); },
-                        ),
-                        DropdownButton<String>(
-                          value: _leaderId,
-                          hint: const Text('Filtrar por líder'),
-                          items: _leaders
-                              .map((l) => DropdownMenuItem<String>(
-                                    value: (l['id'] as String),
-                                    child: Text(l['name'] as String),
-                                  ))
-                              .toList(),
-                          onChanged: (v) => setState(() => _leaderId = v),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => setState(() {}),
-                          child: const Text('Aplicar'),
-                        ),
-                        const SizedBox(width: 12),
-                        // Acciones rápidas
-                        ElevatedButton.icon(
-                          onPressed: () => _createVendor(isLeader: true),
-                          icon: const Icon(Icons.star),
-                          label: const Text('Nuevo Líder'),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: () => _createVendor(isLeader: false),
-                          icon: const Icon(Icons.person_add),
-                          label: const Text('Nuevo Vendedor'),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: () => _createVendor(isLeader: false, isSubseller: true),
-                          icon: const Icon(Icons.people_alt),
-                          label: const Text('Nuevo Subvendedor'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.purple,
-                            foregroundColor: Colors.white,
+                        // Filtro por líder (profesional con scroll)
+                        PopupMenuButton<String?>(
+                          tooltip: 'Filtrar por líder',
+                          onSelected: (v) => setState(() => _leaderId = v),
+                          offset: const Offset(0, 40),
+                          constraints: const BoxConstraints(
+                            maxHeight: 300,
+                            minWidth: 200,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          itemBuilder: (context) => [
+                            // Opción para ver todos
+                            PopupMenuItem<String?>(
+                              value: null,
+                              child: Row(
+                                children: [
+                                  Icon(Icons.clear_all, color: Colors.grey.shade600, size: 20),
+                                  const SizedBox(width: 12),
+                                  Text('Todos los líderes', style: TextStyle(color: Colors.grey.shade700)),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuDivider(),
+                            // Lista de líderes
+                            ..._leaders.map((l) => PopupMenuItem<String>(
+                              value: l['id'] as String,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [Colors.orange.shade400, Colors.deepOrange.shade400],
+                                      ),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      (l['name'] as String).substring(0, 1).toUpperCase(),
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      l['name'] as String,
+                                      style: TextStyle(
+                                        fontWeight: _leaderId == l['id'] ? FontWeight.bold : FontWeight.normal,
+                                        color: _leaderId == l['id'] ? Colors.indigo : Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                  if (_leaderId == l['id'])
+                                    const Icon(Icons.check, color: Colors.indigo, size: 18),
+                                ],
+                              ),
+                            )),
+                          ],
+                          child: Container(
+                            height: 36,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: _leaderId != null 
+                                    ? [Colors.indigo.shade50, Colors.indigo.shade100]
+                                    : [Colors.grey.shade50, Colors.grey.shade100],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _leaderId != null ? Colors.indigo.shade300 : Colors.grey.shade400,
+                                width: _leaderId != null ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.filter_list,
+                                  size: 18,
+                                  color: _leaderId != null ? Colors.indigo : Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _leaderId != null
+                                      ? _leaders.firstWhere(
+                                          (l) => l['id'] == _leaderId,
+                                          orElse: () => {'name': 'Líder'},
+                                        )['name'] as String
+                                      : 'Filtrar Líder',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: _leaderId != null ? FontWeight.w600 : FontWeight.normal,
+                                    color: _leaderId != null ? Colors.indigo : Colors.grey.shade700,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 20,
+                                  color: _leaderId != null ? Colors.indigo : Colors.grey.shade600,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        OutlinedButton.icon(
-                          onPressed: _assignCard,
-                          icon: const Icon(Icons.assignment_ind),
-                          label: const Text('Asignar Cartillas (Rango/Números)'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _showInventoryDialog,
-                          icon: const Icon(Icons.inventory_2_outlined),
-                          label: const Text('Inventario'),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: _exportToExcel,
-                          icon: const Icon(Icons.table_chart, color: Colors.white),
-                          label: const Text('Exportar a Excel'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        ElevatedButton.icon(
-                          onPressed: _clearCommissions,
-                          icon: const Icon(Icons.delete_forever, color: Colors.white),
-                          label: const Text('ELIMINAR DATOS'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                          ),
+                        // Botones compactos con iconos y tooltips
+                        _compactIconButton(Icons.refresh, 'Actualizar', () => setState(() {}), Colors.indigo),
+                        _compactIconButton(Icons.star, 'Nuevo Líder', () => _createVendor(isLeader: true), Colors.amber.shade700),
+                        _compactIconButton(Icons.person_add, 'Nuevo Vendedor', () => _createVendor(isLeader: false), Colors.blue),
+                        _compactIconButton(Icons.people_alt, 'Nuevo Subvendedor', () => _createVendor(isLeader: false, isSubseller: true), Colors.purple),
+                        _compactIconButton(Icons.assignment_ind, 'Asignar Cartillas', _assignCard, Colors.teal),
+                        _compactIconButton(Icons.inventory_2, 'Inventario', _showInventoryDialog, Colors.blueGrey),
+                        _compactIconButton(Icons.table_chart, 'Exportar Excel', _exportToExcel, Colors.green),
+                        // Eliminar datos (con fecha visible)
+                        Consumer<AppProvider>(
+                          builder: (context, appProvider, child) {
+                            return Tooltip(
+                              message: 'Eliminar datos del ${appProvider.selectedDate}',
+                              child: ElevatedButton.icon(
+                                onPressed: _clearCommissions,
+                                icon: const Icon(Icons.delete_forever, size: 16),
+                                label: Text(appProvider.selectedDate, style: const TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  minimumSize: const Size(0, 36),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -2786,8 +2924,90 @@ class _CrmScreenState extends State<CrmScreen> {
     );
   }
 
+  // Botón compacto con solo icono y tooltip
+  Widget _compactIconButton(IconData icon, String tooltip, VoidCallback onPressed, Color color) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: color,
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            child: Icon(icon, color: Colors.white, size: 18),
+          ),
+        ),
+      ),
+    );
+  }
+
   // Métodos helper para la nueva interfaz moderna
   
+  /// Widget para KPI Cards con diseño moderno de dashboard
+  Widget _buildKpiCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required Color gradientEnd,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withOpacity(0.15), gradientEnd.withOpacity(0.08)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: color,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              color: color.withOpacity(0.8),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _modernStat(String label, String value, {String? assignedValue, String? vendorId, Color? color}) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -4331,6 +4551,7 @@ class _CrmScreenState extends State<CrmScreen> {
 class _AssignedCardsDialog extends StatefulWidget {
   final String vendorId;
   final String apiBase;
+  final String eventDate;
   final Function(List<Map<String, dynamic>>) onDownloadAll;
   final Function(List<Map<String, dynamic>>) onDeleteAll;
   final Function(Map<String, dynamic>) onOpenCartilla;
@@ -4339,6 +4560,7 @@ class _AssignedCardsDialog extends StatefulWidget {
   const _AssignedCardsDialog({
     required this.vendorId,
     required this.apiBase,
+    required this.eventDate,
     required this.onDownloadAll,
     required this.onDeleteAll,
     required this.onOpenCartilla,
@@ -4362,23 +4584,38 @@ class _AssignedCardsDialogState extends State<_AssignedCardsDialog> {
 
   Future<void> _loadCards() async {
     try {
-      final response = await http.get(Uri.parse('${widget.apiBase}/cards?assignedTo=${widget.vendorId}'));
+      // Fetch both unsold and sold cards to ensure we show everything
+      final unsoldFuture = http.get(Uri.parse('${widget.apiBase}/cards?assignedTo=${widget.vendorId}&sold=false&date=${widget.eventDate}'));
+      final soldFuture = http.get(Uri.parse('${widget.apiBase}/cards?assignedTo=${widget.vendorId}&sold=true&date=${widget.eventDate}'));
+      
+      final responses = await Future.wait([unsoldFuture, soldFuture]);
+      final unsoldResp = responses[0];
+      final soldResp = responses[1];
       
       if (!mounted) return;
       
-      if (response.statusCode >= 300) {
+      if (unsoldResp.statusCode >= 300 || soldResp.statusCode >= 300) {
         setState(() {
-          _errorMessage = 'Error al cargar cartillas: ${response.body}';
+          _errorMessage = 'Error al cargar cartillas: ${unsoldResp.statusCode >= 300 ? unsoldResp.body : soldResp.body}';
           _isLoading = false;
         });
         return;
       }
       
-      final cards = List<Map<String, dynamic>>.from(json.decode(response.body));
+      final unsoldCards = List<Map<String, dynamic>>.from(json.decode(unsoldResp.body));
+      final soldCards = List<Map<String, dynamic>>.from(json.decode(soldResp.body));
+      
+      // Merge and sort by card number
+      final allCards = [...unsoldCards, ...soldCards];
+      allCards.sort((a, b) {
+        final aNum = int.tryParse(a['cardNo']?.toString() ?? '0') ?? 0;
+        final bNum = int.tryParse(b['cardNo']?.toString() ?? '0') ?? 0;
+        return aNum.compareTo(bNum);
+      });
       
       if (mounted) {
         setState(() {
-          _cards = cards;
+          _cards = allCards;
           _isLoading = false;
         });
       }
@@ -4468,10 +4705,15 @@ class _AssignedCardsDialogState extends State<_AssignedCardsDialog> {
   }
 
   Widget _buildContent() {
+    final soldCount = _cards!.where((c) {
+      final soldVal = c['sold'];
+      return soldVal == true || soldVal == 'true' || soldVal == 1;
+    }).length;
+
     return Column(
       children: [
         Text(
-          'Total: ${_cards!.length} cartillas asignadas',
+          'Total: ${_cards!.length} cartillas asignadas ($soldCount vendidas)',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
@@ -4589,38 +4831,48 @@ class _CardItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Check for various truthy values just in case
+    final soldVal = card['sold'];
+    final isSold = soldVal == true || soldVal == 'true' || soldVal == 1;
+    
+    final bgColor = isSold ? Colors.blue.shade100 : Colors.green.shade100;
+    final borderColor = isSold ? Colors.blue.shade300 : Colors.green.shade300;
+    final textColor = isSold ? Colors.blue.shade800 : Colors.green.shade800;
+    final subTextColor = isSold ? Colors.blue.shade600 : Colors.green.shade600;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.green.shade100,
+        color: bgColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.shade300, width: 1),
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Stack(
         children: [
-          // Botón de eliminación
-          Positioned(
-            top: 2,
-            right: 2,
-            child: Tooltip(
-              message: 'Desasignar cartilla $cardNumber',
-              child: GestureDetector(
-                onTap: onDelete,
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.close,
-                    size: 14,
-                    color: Colors.white,
+          // Botón de eliminación (solo si NO está vendida)
+          if (!isSold)
+            Positioned(
+              top: 2,
+              right: 2,
+              child: Tooltip(
+                message: 'Desasignar cartilla $cardNumber',
+                child: GestureDetector(
+                  onTap: onDelete,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.close,
+                      size: 14,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
           // Contenido principal
           GestureDetector(
             onTap: onTap,
@@ -4633,15 +4885,15 @@ class _CardItemWidget extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: Colors.green.shade800,
+                      color: textColor,
                     ),
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Cartilla',
+                    isSold ? 'VENDIDA' : 'Cartilla',
                     style: TextStyle(
                       fontSize: 10,
-                      color: Colors.green.shade600,
+                      color: subTextColor,
                     ),
                   ),
                 ],

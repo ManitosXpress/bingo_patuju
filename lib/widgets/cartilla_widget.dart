@@ -147,9 +147,9 @@ class CartillaWidget extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min, // No expandir más del necesario
                 children: [
                   _buildHeader(isForPrint: true),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 0.1),
                   _buildBingoGrid(isForPrint: true),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 0.1),
                 ],
               ),
             ),
@@ -219,7 +219,8 @@ class CartillaWidget extends StatelessWidget {
     final double cardBoxWidth = (isForPrint ? 82 : 70) * headerScale;
     final double cardBoxHeight = (isForPrint ? 68 : 60) * headerScale;
     final double centerWidth = 165 * headerScale;
-    final double rightWidth = 105 * headerScale;
+    // Usar un ancho común para los lados para asegurar que el logo quede centrado
+    final double sideWidth = 110 * headerScale; 
     final double spacing = 18 * headerScale;
     final double labelFont = 11.5 * headerScale;
     final double numberFont = 21.5 * headerScale;
@@ -230,8 +231,8 @@ class CartillaWidget extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isForPrint ? 8 : 10,
-        vertical: isForPrint ? 6 : 10,
-      ), // Padding ajustado para permitir header más alto
+        vertical: isForPrint ? 0 : 10, // Padding vertical eliminado para impresión
+      ), 
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.zero, // Sin bordes redondeados para impresión
@@ -240,49 +241,54 @@ class CartillaWidget extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center, // Cambiar a center para agrupar elementos
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Left side - Card number box (centrado)
-          Container(
-            width: cardBoxWidth,
-            height: cardBoxHeight,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.black, width: 3),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  "CARTILLA",
-                  style: TextStyle(
-                    fontSize: labelFont,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
+          // Left side - Card number box (centrado en su contenedor)
+          SizedBox(
+            width: sideWidth,
+            child: Center(
+              child: Container(
+                width: cardBoxWidth,
+                height: cardBoxHeight,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black, width: 3),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(height: 1), // Espaciado reducido
-                Text(
-                  cardNumber ?? "#",
-                  style: TextStyle(
-                    fontSize: numberFont,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "CARTILLA",
+                      style: TextStyle(
+                        fontSize: labelFont,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 1), // Espaciado reducido
+                    Text(
+                      cardNumber ?? "#",
+                      style: TextStyle(
+                        fontSize: numberFont,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           
           SizedBox(width: spacing),
           
-          // Center - Logo and title (más grande) - Reducir ancho para acercar elementos
+          // Center - Logo and title (más grande)
           Container(
             width: centerWidth,
             child: Column(
               children: [
-                // Logo con imagen bingo_imperial.png (reducido)
+                // Logo con imagen logo.png
                 Center(
                   child: Image.asset(
-                    'assets/images/bingo_imperial.png',
+                    'assets/images/logo.png',
                     height: logoSize,
                     width: logoSize,
                   ),
@@ -293,9 +299,9 @@ class CartillaWidget extends StatelessWidget {
           
           SizedBox(width: spacing),
           
-          // Right side - Date and Price labels (centrado)
-          Container(
-            width: rightWidth,
+          // Right side - Date and Price labels (centrado en su contenedor)
+          SizedBox(
+            width: sideWidth,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center, // Centrar texto
               children: [
@@ -405,7 +411,7 @@ class CartillaWidget extends StatelessWidget {
     final cellMargin = isForPrint ? 1.5 : 2.0; // Márgenes reducidos
     
     return Container(
-      padding: EdgeInsets.all(isForPrint ? 10 : 10), // Padding reducido para formato carta
+      padding: EdgeInsets.all(isForPrint ? 0 : 10), // Padding reducido a 0 para formato carta
       margin: EdgeInsets.all(isForPrint ? 0 : 4), // Sin margen para aprovechar espacio
       child: Stack(
         children: [
@@ -606,12 +612,11 @@ class CartillaWidget extends StatelessWidget {
     // Center cell (free space) - Mostrar "FREE"
     if (row == 2 && col == 2) {
       return Center(
-        child: Text(
-          "FREE",
-          style: TextStyle(
-            fontSize: isForPrint ? 32 : 24, // Fuente ajustada para formato carta
-            fontWeight: FontWeight.bold,
-            color: Color(0xFFFF8C00),
+        child: Padding(
+          padding: EdgeInsets.all(isForPrint ? 8.0 : 6.0),
+          child: Image.asset(
+            'assets/images/free.png',
+            fit: BoxFit.contain,
           ),
         ),
       );
@@ -637,13 +642,12 @@ class CartillaWidget extends StatelessWidget {
   Widget _buildCompactCellContent(int row, int col) {
     // Center cell (free space) - Mostrar "FREE"
     if (row == 2 && col == 2) {
-      return const Center(
-        child: Text(
-          "FREE",
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFFFF8C00),
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(4.0),
+          child: Image.asset(
+            'assets/images/free.png',
+            fit: BoxFit.contain,
           ),
         ),
       );
@@ -700,4 +704,4 @@ class CartillaWidget extends StatelessWidget {
       onTap: onTap,
     );
   }
-} 
+}

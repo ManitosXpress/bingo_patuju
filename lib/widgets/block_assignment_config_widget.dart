@@ -153,6 +153,46 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
                 ],
               ),
               const SizedBox(height: 12),
+              
+              // Campo para editar el total de cartillas
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      initialValue: _totalCards.toString(),
+                      decoration: const InputDecoration(
+                        labelText: 'Total de Cartillas Disponibles',
+                        helperText: 'Ajusta este valor si el detectado es incorrecto',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.confirmation_number),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        final newValue = int.tryParse(value);
+                        if (newValue != null && newValue > 0) {
+                          setState(() {
+                            _totalCards = newValue;
+                          });
+                          _updateBlockInfo();
+                        }
+                      },
+                    ),
+                  ),
+                  if (_isLoadingTotalCards) ...[
+                    const SizedBox(width: 16),
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ],
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
               const Text(
                 'El sistema configurará automáticamente:',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
@@ -160,7 +200,7 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
               const SizedBox(height: 8),
               Text(
                 '• Tamaño de bloque: 5 cartillas por bloque\n'
-                '• Total de cartillas: $_totalCards cartillas disponibles\n'
+                '• Total de cartillas: $_totalCards cartillas configuradas\n'
                 '• Total de bloques: ${(_totalCards / 5).ceil()} bloques (calculado dinámicamente)\n'
                 '• Cartilla inicial: Desde la cartilla 1\n'
                 '• Bloques a saltar: 0 (todos los bloques disponibles)\n'
@@ -171,23 +211,6 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
                 '• Ajuste inteligente: Se adapta a los bloques disponibles',
                 style: const TextStyle(fontSize: 14),
               ),
-              if (_isLoadingTotalCards) ...[
-                const SizedBox(height: 8),
-                const Row(
-                  children: [
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    SizedBox(width: 8),
-                    Text(
-                      'Cargando total de cartillas...',
-                      style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
         ),

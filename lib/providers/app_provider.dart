@@ -22,6 +22,9 @@ class AppProvider extends ChangeNotifier {
   bool _hasMoreData = true;
   bool _isLoadingMore = false;
   
+  // Fecha seleccionada para cargar cartillas (formato YYYY-MM-DD)
+  String _selectedDate = DateTime.now().toIso8601String().split('T')[0];
+  
   AppProvider() {
     // Escuchar cambios en UIStateProvider para propagar notificaciones
     _uiState.addListener(() {
@@ -60,6 +63,20 @@ class AppProvider extends ChangeNotifier {
   int get pageSize => _pageSize;
   bool get hasMoreData => _hasMoreData;
   bool get isLoadingMore => _isLoadingMore;
+  
+  // Getter para fecha seleccionada
+  String get selectedDate => _selectedDate;
+  
+  // Setter para cambiar fecha seleccionada
+  void setSelectedDate(String date) {
+    if (_selectedDate != date) {
+      _selectedDate = date;
+      debugLog('Fecha cambiada a: $date');
+      // Recargar cartillas para la nueva fecha
+      loadFirebaseCartillas();
+      notifyListeners();
+    }
+  }
   
   // Nuevos getters para paginación local
   int get totalPages => (_allFirebaseCartillas.length / _pageSize).ceil();
@@ -172,6 +189,7 @@ class AppProvider extends ChangeNotifier {
       
       // Cargar todas las cartillas de Firebase de una vez (máximo 2000)
       final cartillasData = await CartillaService.getCartillas(
+        date: _selectedDate,
         assignedTo: assignedTo,
         sold: sold,
         page: 0, // Siempre página 0 para cargar todo
@@ -341,7 +359,7 @@ class AppProvider extends ChangeNotifier {
   // Asignar cartilla a vendedor en Firebase
   Future<bool> assignFirebaseCartilla(String cartillaId, String vendorId) async {
     try {
-      final cartillaData = await CartillaService.assignCartilla(cartillaId, vendorId);
+      final cartillaData = await CartillaService.assignCartilla(cartillaId, vendorId, _selectedDate);
       
       // Actualizar en la lista local
       final index = _firebaseCartillas.indexWhere((c) => c.id == cartillaId);
@@ -457,7 +475,10 @@ class AppProvider extends ChangeNotifier {
   // Eliminar cartilla de Firebase
   Future<bool> deleteFirebaseCartilla(String cartillaId) async {
     try {
-      final success = await CartillaService.deleteCartilla(cartillaId);
+      debugLog('Intentando eliminar cartilla $cartillaId con fecha: $_selectedDate');
+      final success = await CartillaService.deleteCartilla(cartillaId, _selectedDate);
+      
+      debugLog('Resultado de eliminación: $success');
       
       if (success) {
         // Remover de la lista local
@@ -491,7 +512,7 @@ class AppProvider extends ChangeNotifier {
   // Generar cartillas en Firebase
   Future<bool> generateFirebaseCartillas(int count) async {
     try {
-      final result = await CartillaService.generateCartillas(count);
+      final result = await CartillaService.generateCartillas(count, date: _selectedDate);
       
       if (result != null) {
         // Recargar las cartillas después de generar

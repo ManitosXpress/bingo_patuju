@@ -156,7 +156,7 @@ router.delete('/:id', async (req: any, res: any) => {
     if (!salesQuery.empty) {
       return res.status(400).json({ 
         error: 'Cannot delete vendor with sales history. Sales records must be preserved.' 
-        });
+      });
     }
     
     // Eliminar el vendor

@@ -6,6 +6,7 @@ import '../config/backend_config.dart';
 class CartillaService {
   // Obtener todas las cartillas con paginación
   static Future<List<Map<String, dynamic>>> getCartillas({
+    required String date, // date es REQUERIDO ahora (formato YYYY-MM-DD)
     String? assignedTo,
     bool? sold,
     int page = 0,
@@ -13,6 +14,7 @@ class CartillaService {
   }) async {
     return _makeRequestWithRetry(() async {
       final queryParams = <String, String>{
+        'date': date, // Siempre incluir date
         'page': page.toString(),
         'limit': limit.toString(),
       };
@@ -21,7 +23,7 @@ class CartillaService {
       
       final uri = Uri.parse(BackendConfig.cardsUrl).replace(queryParameters: queryParams);
       
-      print('DEBUG: Solicitando cartillas: $uri');
+      print('DEBUG: Solicitando cartillas para $date: $uri');
       
       final response = await http.get(
         uri,
@@ -58,10 +60,13 @@ class CartillaService {
   }
   
   // Asignar cartilla a un vendedor
-  static Future<Map<String, dynamic>> assignCartilla(String cartillaId, String vendorId) async {
+  static Future<Map<String, dynamic>> assignCartilla(String cartillaId, String vendorId, String date) async {
     return _makeRequestWithRetry(() async {
+      final uri = Uri.parse('${BackendConfig.cardsUrl}/$cartillaId/assign').replace(
+        queryParameters: {'date': date}
+      );
       final response = await http.post(
-        Uri.parse('${BackendConfig.cardsUrl}/$cartillaId/assign'),
+        uri,
         headers: BackendConfig.defaultHeaders,
         body: json.encode({'vendorId': vendorId}),
       ).timeout(BackendConfig.connectionTimeout);
@@ -91,14 +96,22 @@ class CartillaService {
   }
   
   // Eliminar cartilla
-  static Future<bool> deleteCartilla(String id) async {
+  static Future<bool> deleteCartilla(String id, String date) async {
     try {
+      final uri = Uri.parse('${BackendConfig.apiBase}/cards/$id').replace(
+        queryParameters: {'date': date}
+      );
+      
+      print('DEBUG: Eliminando cartilla - URL: $uri');
+      
       final response = await _makeRequestWithRetry(
         () => http.delete(
-          Uri.parse('${BackendConfig.apiBase}/cards/$id'),
+          uri,
           headers: BackendConfig.defaultHeaders,
         ),
       );
+      
+      print('DEBUG: Respuesta de eliminación - Status: ${response.statusCode}, Body: ${response.body}');
       
       return response.statusCode == 200;
     } catch (e) {
@@ -108,13 +121,18 @@ class CartillaService {
   }
 
   // Generar cartillas automáticamente
-  static Future<Map<String, dynamic>?> generateCartillas(int count) async {
+  static Future<Map<String, dynamic>?> generateCartillas(int count, {required String date}) async {
     try {
+      final Map<String, dynamic> body = {
+        'count': count,
+        'date': date  // date es REQUERIDO
+      };
+      
       final response = await _makeRequestWithRetry(
         () => http.post(
           Uri.parse('${BackendConfig.apiBase}/cards/generate'),
           headers: BackendConfig.defaultHeaders,
-          body: json.encode({'count': count}),
+          body: json.encode(body),
         ),
       );
 

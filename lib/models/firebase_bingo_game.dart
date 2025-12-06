@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// Modelo para guardar juegos de bingo en Firebase
 class FirebaseBingoGame {
   final String id;
+  final String eventId; // NUEVO - FK al evento
   final String name;
   final String date;
   final List<FirebaseBingoRound> rounds;
@@ -13,6 +14,7 @@ class FirebaseBingoGame {
 
   FirebaseBingoGame({
     required this.id,
+    required this.eventId,
     required this.name,
     required this.date,
     required this.rounds,
@@ -28,6 +30,7 @@ class FirebaseBingoGame {
     
     return FirebaseBingoGame(
       id: doc.id,
+      eventId: data['eventId'] ?? '',
       name: data['name'] ?? '',
       date: data['date'] ?? '',
       rounds: (data['rounds'] as List<dynamic>?)
@@ -56,6 +59,7 @@ class FirebaseBingoGame {
   /// Crear una copia con cambios
   FirebaseBingoGame copyWith({
     String? id,
+    String? eventId,
     String? name,
     String? date,
     List<FirebaseBingoRound>? rounds,
@@ -66,6 +70,7 @@ class FirebaseBingoGame {
   }) {
     return FirebaseBingoGame(
       id: id ?? this.id,
+      eventId: eventId ?? this.eventId,
       name: name ?? this.name,
       date: date ?? this.date,
       rounds: rounds ?? this.rounds,
@@ -80,6 +85,7 @@ class FirebaseBingoGame {
   factory FirebaseBingoGame.fromLocalGame(dynamic localGame) {
     return FirebaseBingoGame(
       id: localGame.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      eventId: localGame.eventId ?? localGame.date ?? 'Sin fecha',
       name: localGame.name ?? 'Nuevo Juego',
       date: localGame.date ?? 'Sin fecha',
       rounds: (localGame.rounds as List<dynamic>?)
@@ -96,6 +102,7 @@ class FirebaseBingoGame {
   factory FirebaseBingoGame.fromMap(Map<String, dynamic> map) {
     return FirebaseBingoGame(
       id: map['id'] ?? '',
+      eventId: map['eventId'] ?? map['date'] ?? '',
       name: map['name'] ?? '',
       date: map['date'] ?? '',
       rounds: (map['rounds'] as List<dynamic>?)

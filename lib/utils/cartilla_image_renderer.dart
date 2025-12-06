@@ -6,7 +6,7 @@ import 'package:flutter/rendering.dart';
 
 import '../widgets/cartilla_widget.dart';
 
-const Size kCartillaCanvasSize = Size(850, 1400);
+const Size kCartillaCanvasSize = Size(850, 1220);
 const EdgeInsets kCartillaCanvasPadding =
     EdgeInsets.symmetric(vertical: 60, horizontal: 20);
 

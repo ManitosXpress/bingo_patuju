@@ -3,6 +3,8 @@ import '../utils/debug_logger.dart';
 class FirebaseCartilla {
   final String id;
   final List<List<int>> numbers;
+  final String eventId;
+  final String? date; // Fecha del evento (ISO 8601 o formato legible)
   final String? assignedTo;
   final bool sold;
   final int createdAt;
@@ -11,6 +13,8 @@ class FirebaseCartilla {
   FirebaseCartilla({
     required this.id,
     required this.numbers,
+    required this.eventId,
+    this.date,
     this.assignedTo,
     required this.sold,
     required this.createdAt,
@@ -58,6 +62,8 @@ class FirebaseCartilla {
       final cartilla = FirebaseCartilla(
         id: id,
         numbers: numbers,
+        eventId: json['eventId'] as String? ?? '',
+        date: json['date'] as String?,
         assignedTo: json['assignedTo'] as String?,
         sold: json['sold'] as bool? ?? false,
         createdAt: json['createdAt'] as int? ?? 0,
@@ -79,6 +85,8 @@ class FirebaseCartilla {
     return {
       'id': id,
       'numbers': numbers,
+      'eventId': eventId,
+      if (date != null) 'date': date,
       'assignedTo': assignedTo,
       'sold': sold,
       'createdAt': createdAt,
