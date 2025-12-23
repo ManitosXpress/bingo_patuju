@@ -11,9 +11,10 @@ class BlockAssignmentService {
   Future<Map<String, dynamic>> assignCardsByBlocks(
     String vendorId,
     BlockAssignmentConfig config,
+    String date,
   ) async {
     try {
-      print('🚀 Iniciando asignación por bloques para vendedor: $vendorId');
+      print('🚀 Iniciando asignación por bloques para vendedor: $vendorId (Fecha: $date)');
       
       // Validar configuración
       final errors = config.validate();
@@ -89,6 +90,7 @@ class BlockAssignmentService {
             'cardNumbers': batch,
             'assignmentType': 'blocks',
             'config': config.toJson(),
+            'date': date,
           }),
         );
         
@@ -171,9 +173,10 @@ class BlockAssignmentService {
   Future<Map<String, dynamic>> assignBlocksToAllVendors(
     List<String> vendorIds,
     BlockAssignmentConfig config,
+    String date,
   ) async {
     try {
-      print('🚀 INICIANDO ASIGNACIÓN AUTOMÁTICA A TODOS LOS VENDEDORES');
+      print('🚀 INICIANDO ASIGNACIÓN AUTOMÁTICA A TODOS LOS VENDEDORES (Fecha: $date)');
       print('👥 Total de vendedores: ${vendorIds.length}');
       print('📊 Configuración: ${config.toJson()}');
       
@@ -228,57 +231,60 @@ class BlockAssignmentService {
       
       print('✅ Bloques generados: ${selectedBlocks.length} (${selectedBlocks.take(10).toList()}...)');
 
-      // Distribuir bloques entre vendedores de manera equitativa
-      print('📦 Distribuyendo bloques entre vendedores de manera equitativa...');
+      // Distribuir cartillas de manera equitativa entre vendedores
+      // Primero, generar todas las cartillas disponibles desde los bloques
+      print('📦 Generando todas las cartillas disponibles...');
+      final allAvailableCards = config.generateCardNumbers(selectedBlocks);
+      print('📊 Total de cartillas disponibles: ${allAvailableCards.length}');
+      
+      // Distribuir cartillas equitativamente entre vendedores
+      print('📦 Distribuyendo cartillas entre vendedores de manera equitativa...');
       final results = <Map<String, dynamic>>[];
       final allAssignedCards = <int>{};
 
-      // Calcular bloques por vendedor de manera equitativa (usando TODOS los bloques disponibles)
-      final blocksPerVendor = totalBlocksToAssign ~/ vendorIds.length;
-      final remainingBlocks = totalBlocksToAssign % vendorIds.length;
+      // Calcular cartillas por vendedor de manera equitativa
+      final cardsPerVendor = allAvailableCards.length ~/ vendorIds.length;
+      final remainingCards = allAvailableCards.length % vendorIds.length;
       
-      print('📊 Distribución: $blocksPerVendor bloques base por vendedor, $remainingBlocks bloques extra para distribuir');
+      print('📊 Distribución equitativa: $cardsPerVendor cartillas base por vendedor, $remainingCards cartillas extra para distribuir');
+      print('📊 Cartilla inicial: ${config.startCard}, Cartilla final: ${config.actualEndCard}');
 
-      int totalBlocksDistributedSoFar = 0;
+      int totalCardsDistributedSoFar = 0;
       
       for (int i = 0; i < vendorIds.length; i++) {
         final vendorId = vendorIds[i];
         
-        // Calcular cuántos bloques le tocan a este vendedor
-        int vendorBlockCount = blocksPerVendor;
-        if (i < remainingBlocks) {
-          vendorBlockCount++; // Dar bloques extra a los primeros vendedores
+        // Calcular cuántas cartillas le tocan a este vendedor
+        int vendorCardCount = cardsPerVendor;
+        if (i < remainingCards) {
+          vendorCardCount++; // Dar cartillas extra a los primeros vendedores
         }
         
-        // Si es el último vendedor y quedan bloques sin asignar, asignarle todos los bloques restantes
+        // Si es el último vendedor y quedan cartillas sin asignar, asignarle todas las cartillas restantes
         if (i == vendorIds.length - 1) {
-          final remainingBlocksToAssign = selectedBlocks.length - totalBlocksDistributedSoFar;
-          if (remainingBlocksToAssign > vendorBlockCount) {
-            print('📊 Último vendedor: asignando bloques restantes ($remainingBlocksToAssign bloques en lugar de $vendorBlockCount)');
-            vendorBlockCount = remainingBlocksToAssign;
+          final remainingCardsToAssign = allAvailableCards.length - totalCardsDistributedSoFar;
+          if (remainingCardsToAssign > vendorCardCount) {
+            print('📊 Último vendedor: asignando cartillas restantes ($remainingCardsToAssign cartillas en lugar de $vendorCardCount)');
+            vendorCardCount = remainingCardsToAssign;
           }
         }
         
         // Calcular índices de inicio y fin para este vendedor
-        final startBlockIndex = totalBlocksDistributedSoFar;
-        final endBlockIndex = startBlockIndex + vendorBlockCount - 1;
+        final startCardIndex = totalCardsDistributedSoFar;
+        final endCardIndex = startCardIndex + vendorCardCount - 1;
         
-        // Asegurar que no excedamos el número de bloques disponibles
-        final actualEndIndex = endBlockIndex < selectedBlocks.length ? endBlockIndex : selectedBlocks.length - 1;
-        final actualBlockCount = actualEndIndex - startBlockIndex + 1;
+        // Asegurar que no excedamos el número de cartillas disponibles
+        final actualEndIndex = endCardIndex < allAvailableCards.length ? endCardIndex : allAvailableCards.length - 1;
+        final actualCardCount = actualEndIndex - startCardIndex + 1;
         
-        print('👤 Procesando vendedor $vendorId (índice $i): $actualBlockCount bloques (índices $startBlockIndex a $actualEndIndex)');
+        print('👤 Procesando vendedor $vendorId (índice $i): $actualCardCount cartillas (índices $startCardIndex a $actualEndIndex)');
         
-        // Obtener bloques para este vendedor
-        final vendorBlocks = selectedBlocks.sublist(startBlockIndex, actualEndIndex + 1);
-        print('📦 Bloques para vendedor $vendorId: ${vendorBlocks.length} bloques (${vendorBlocks})');
+        // Obtener cartillas para este vendedor
+        final vendorCards = allAvailableCards.sublist(startCardIndex, actualEndIndex + 1);
+        print('🎴 Cartillas para vendedor $vendorId: ${vendorCards.length} cartillas (${vendorCards.take(10).toList()}...)');
         
-        // Actualizar contador de bloques distribuidos
-        totalBlocksDistributedSoFar += actualBlockCount;
-        
-        // Generar cartillas para estos bloques
-        final vendorCards = config.generateCardNumbers(vendorBlocks);
-        print('🎴 Cartillas generadas para vendedor $vendorId: ${vendorCards.length} cartillas');
+        // Actualizar contador de cartillas distribuidas
+        totalCardsDistributedSoFar += actualCardCount;
         
         // Verificar que no hay duplicados
         if (vendorCards.any((card) => allAssignedCards.contains(card))) {
@@ -291,7 +297,7 @@ class BlockAssignmentService {
 
         // Asignar cartillas al vendedor
         print('📡 Asignando cartillas al vendedor $vendorId...');
-        final result = await _assignCardsToVendor(vendorId, vendorCards, config);
+        final result = await _assignCardsToVendor(vendorId, vendorCards, config, date);
         results.add(result);
         
         if (result['success']) {
@@ -334,27 +340,36 @@ class BlockAssignmentService {
         print('⚠️ Esto puede deberse a que hay pocos vendedores para distribuir todos los bloques');
       }
 
+      // Calcular bloques equivalentes para el reporte
+      final blocksPerVendorEquivalent = cardsPerVendor ~/ config.blockSize;
+      final remainingBlocksEquivalent = remainingCards ~/ config.blockSize;
+      
       print('🎉 ASIGNACIÓN AUTOMÁTICA COMPLETADA EXITOSAMENTE');
       print('📊 Resumen: ${vendorIds.length} vendedores, ${allAssignedCards.length} cartillas asignadas');
       print('📊 Total de bloques disponibles: ${selectedBlocks.length}');
       print('📊 Total de bloques asignados: $totalBlocksDistributed');
-      print('📊 Bloques por vendedor base: $blocksPerVendor, bloques extra: $remainingBlocks');
+      print('📊 Cartillas por vendedor base: $cardsPerVendor, cartillas extra: $remainingCards');
+      print('📊 Bloques equivalentes por vendedor: ~$blocksPerVendorEquivalent, bloques extra: ~$remainingBlocksEquivalent');
       
       return {
         'success': true,
         'data': {
           'totalVendors': vendorIds.length,
           'totalCardsAssigned': allAssignedCards.length,
-          'blocksPerVendor': blocksPerVendor, // Bloques base por vendedor
+          'cardsPerVendor': cardsPerVendor, // Cartillas base por vendedor
+          'blocksPerVendor': blocksPerVendorEquivalent, // Bloques equivalentes base por vendedor
           'totalBlocksUsed': selectedBlocks.length, // TODOS los bloques disponibles
           'results': results,
           'alreadyAssignedBlocksExcluded': alreadyAssignedBlocks.length,
           'distribution': {
-            'blocksPerVendor': blocksPerVendor,
-            'extraBlocks': remainingBlocks,
-            'vendorsWithExtra': remainingBlocks,
+            'cardsPerVendor': cardsPerVendor,
+            'extraCards': remainingCards,
+            'vendorsWithExtra': remainingCards,
+            'blocksPerVendor': blocksPerVendorEquivalent,
+            'extraBlocks': remainingBlocksEquivalent,
             'totalBlocksAssigned': selectedBlocks.length,
-            'note': 'Se asignaron TODOS los bloques disponibles de manera equitativa',
+            'totalCardsAssigned': allAssignedCards.length,
+            'note': 'Se asignaron TODAS las cartillas disponibles de manera equitativa (distribución por cartillas, no por bloques)',
           },
         },
         'assignedCards': allAssignedCards.toList(),
@@ -460,6 +475,7 @@ class BlockAssignmentService {
   Future<Map<String, dynamic>> assignCardsByBlocksToMultipleVendors(
     List<String> vendorIds,
     BlockAssignmentConfig config,
+    String date,
   ) async {
     try {
       // Validar configuración
@@ -509,7 +525,7 @@ class BlockAssignmentService {
         }
 
         // Asignar cartillas al vendedor
-        final result = await _assignCardsToVendor(vendorId, vendorCards, config);
+        final result = await _assignCardsToVendor(vendorId, vendorCards, config, date);
         results.add(result);
         
         // Agregar cartillas asignadas al conjunto global
@@ -550,6 +566,7 @@ class BlockAssignmentService {
     String vendorId,
     List<int> cardNumbers,
     BlockAssignmentConfig config,
+    String date,
   ) async {
     try {
       print('📡 Enviando solicitud para vendedor $vendorId: ${cardNumbers.length} cartillas');
@@ -585,6 +602,7 @@ class BlockAssignmentService {
             'cardNumbers': batch,
             'assignmentType': 'blocks',
             'config': config.toJson(),
+            'date': date,
           }),
         );
 

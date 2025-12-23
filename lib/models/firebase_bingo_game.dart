@@ -46,6 +46,7 @@ class FirebaseBingoGame {
   /// Convertir a mapa para Firestore
   Map<String, dynamic> toFirestore() {
     return {
+      'eventId': eventId,
       'name': name,
       'date': date,
       'rounds': rounds.map((round) => round.toMap()).toList(),
@@ -118,6 +119,27 @@ class FirebaseBingoGame {
       isCompleted: map['isCompleted'] ?? false,
     );
   }
+
+  /// Crear desde BingoGameConfig (modelo local del UI)
+  factory FirebaseBingoGame.fromBingoGameConfig(
+    dynamic gameConfig, {
+    required int totalCartillas,
+  }) {
+    final now = DateTime.now();
+    return FirebaseBingoGame(
+      id: gameConfig.id,
+      eventId: gameConfig.date, // Usar date como eventId
+      name: gameConfig.name,
+      date: gameConfig.date,
+      rounds: (gameConfig.rounds as List<dynamic>)
+          .map((round) => FirebaseBingoRound.fromBingoGameRound(round))
+          .toList(),
+      totalCartillas: totalCartillas,
+      createdAt: now,
+      updatedAt: now,
+      isCompleted: false,
+    );
+  }
 }
 
 /// Modelo para guardar rondas de bingo en Firebase
@@ -173,6 +195,21 @@ class FirebaseBingoRound {
       isCompleted: localRound.isCompleted ?? false,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+    );
+  }
+
+  /// Crear desde BingoGameRound (modelo local del UI)
+  factory FirebaseBingoRound.fromBingoGameRound(dynamic gameRound) {
+    final now = DateTime.now();
+    return FirebaseBingoRound(
+      id: gameRound.id,
+      name: gameRound.name,
+      patterns: (gameRound.patterns as List<dynamic>)
+          .map((pattern) => pattern.toString().split('.').last)
+          .toList(),
+      isCompleted: gameRound.isCompleted ?? false,
+      createdAt: now,
+      updatedAt: now,
     );
   }
 

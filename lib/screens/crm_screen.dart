@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'dart:html' as html;
+import 'package:excel/excel.dart' as excel_pkg;
 import '../utils/cartilla_image_renderer.dart';
 import 'dart:typed_data';
 import 'package:provider/provider.dart';
@@ -113,12 +114,33 @@ class _CrmScreenState extends State<CrmScreen> {
   Future<void> _registerSaleDialog(String sellerId) async {
     final appProvider = Provider.of<AppProvider>(context, listen: false);
     final selectedDate = appProvider.selectedDate;
-    // Cargar cartillas asignadas sin vender para este usuario
-    final r = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$sellerId&sold=false&date=$selectedDate'));
+    // Cargar cartillas asignadas sin vender para este usuario (con paginación)
     List<Map<String, dynamic>> cards = [];
-    if (r.statusCode < 300) {
-      cards = List<Map<String, dynamic>>.from(json.decode(r.body));
+    String? lastDocId;
+    
+    Future<void> loadCardsPage() async {
+      final queryParams = <String>['assignedTo=$sellerId', 'sold=false', 'date=$selectedDate', 'limit=2000'];
+      if (lastDocId != null) {
+        queryParams.add('startAfter=$lastDocId');
+      }
+      
+      final r = await http.get(Uri.parse('$_apiBase/cards?${queryParams.join('&')}'));
+      if (r.statusCode < 300) {
+        final responseData = json.decode(r.body) as Map<String, dynamic>;
+        final pageCards = List<Map<String, dynamic>>.from(responseData['cards'] as List? ?? []);
+        final pagination = responseData['pagination'] as Map<String, dynamic>?;
+        
+        cards.addAll(pageCards);
+        lastDocId = pagination?['lastDocId'] as String?;
+        
+        // Si hay más páginas, cargar la siguiente
+        if (pagination?['hasMore'] == true && lastDocId != null) {
+          await loadCardsPage();
+        }
+      }
     }
+    
+    await loadCardsPage();
 
     String? selectedCardId = cards.isNotEmpty ? (cards.first['id'] as String) : null;
     final amountCtrl = TextEditingController(text: '20');
@@ -286,7 +308,12 @@ class _CrmScreenState extends State<CrmScreen> {
     final resp = await http.post(
       Uri.parse('$_apiBase/sales'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({ 'cardId': selectedCardId, 'sellerId': sellerId, 'amount': double.tryParse(amountCtrl.text) ?? 20 }),
+      body: json.encode({
+        'cardId': selectedCardId,
+        'sellerId': sellerId,
+        'amount': double.tryParse(amountCtrl.text) ?? 20,
+        'date': selectedDate,
+      }),
     );
     if (!mounted) return;
     if (resp.statusCode < 300) {
@@ -300,10 +327,27 @@ class _CrmScreenState extends State<CrmScreen> {
   // Captura la cartilla y retorna los bytes de la imagen
   Future<Uint8List?> _captureCartillaImage(Map<String, dynamic> card) async {
     try {
+      // Obtener la fecha del evento (del card si está disponible, o del provider)
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      String eventDateStr = card['date'] as String? ?? appProvider.selectedDate;
+      
+      // Formatear la fecha de YYYY-MM-DD a DD/MM/YYYY para la imagen
+      String formattedDate;
+      try {
+        final dateParts = eventDateStr.split('-');
+        if (dateParts.length == 3) {
+          formattedDate = '${dateParts[2]}/${dateParts[1]}/${dateParts[0]}';
+        } else {
+          formattedDate = eventDateStr;
+        }
+      } catch (e) {
+        formattedDate = eventDateStr;
+      }
+      
       final imageBytes = await renderCartillaImage(
         numbers: _convertNumbersToIntList(card['numbers'] ?? []),
         cardNumber: card['cardNo']?.toString() ?? card['id'],
-        date: DateTime.now().toString().split(' ')[0],
+        date: formattedDate,
         price: "Bs. 20",
       );
 
@@ -493,13 +537,38 @@ class _CrmScreenState extends State<CrmScreen> {
   Future<void> _sellAllAssigned(String sellerId) async {
     final appProvider = Provider.of<AppProvider>(context, listen: false);
     final selectedDate = appProvider.selectedDate;
-    final r = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$sellerId&sold=false&date=$selectedDate'));
-    if (r.statusCode >= 300) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar cartillas: ${r.body}')));
-      return;
+    
+    // Cargar cartillas con paginación
+    List<Map<String, dynamic>> cards = [];
+    String? lastDocId;
+    
+    Future<void> loadCardsPage() async {
+      final queryParams = <String>['assignedTo=$sellerId', 'sold=false', 'date=$selectedDate', 'limit=2000'];
+      if (lastDocId != null) {
+        queryParams.add('startAfter=$lastDocId');
+      }
+      
+      final r = await http.get(Uri.parse('$_apiBase/cards?${queryParams.join('&')}'));
+      if (r.statusCode >= 300) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al cargar cartillas: ${r.body}')));
+        return;
+      }
+      
+      final responseData = json.decode(r.body) as Map<String, dynamic>;
+      final pageCards = List<Map<String, dynamic>>.from(responseData['cards'] as List? ?? []);
+      final pagination = responseData['pagination'] as Map<String, dynamic>?;
+      
+      cards.addAll(pageCards);
+      lastDocId = pagination?['lastDocId'] as String?;
+      
+      // Si hay más páginas, cargar la siguiente
+      if (pagination?['hasMore'] == true && lastDocId != null) {
+        await loadCardsPage();
+      }
     }
-    final cards = List<Map<String, dynamic>>.from(json.decode(r.body));
+    
+    await loadCardsPage();
     if (cards.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay cartillas asignadas sin vender.')));
@@ -547,7 +616,12 @@ class _CrmScreenState extends State<CrmScreen> {
       final resp = await http.post(
         Uri.parse('$_apiBase/sales'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'cardId': c['id'], 'sellerId': sellerId, 'amount': 20}),
+        body: json.encode({
+          'cardId': c['id'],
+          'sellerId': sellerId,
+          'amount': 20,
+          'date': selectedDate,
+        }),
       );
       if (resp.statusCode < 300) {
         ok++;
@@ -882,31 +956,66 @@ class _CrmScreenState extends State<CrmScreen> {
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       final data = json.decode(resp.body) as Map<String, dynamic>;
       
-      // Obtener conteo de cartillas asignadas para cada vendedor
+      // Obtener conteo de cartillas asignadas para cada vendedor usando endpoint optimizado
       final vendors = List<Map<String, dynamic>>.from(data['vendors'] as List);
-      for (final vendor in vendors) {
-        final vendorId = vendor['vendorId'] ?? vendor['id'];
+      
+      // Extraer todos los vendorIds
+      final vendorIds = vendors
+          .map((v) => v['vendorId'] ?? v['id'])
+          .where((id) => id != null)
+          .cast<String>()
+          .toList();
+
+      // Obtener conteos en batch usando el nuevo endpoint optimizado
+      if (vendorIds.isNotEmpty) {
         try {
-          // Incluir date en la petición - es requerido por el backend
-          final assignedResp = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$vendorId&date=$selectedDate'));
-          if (assignedResp.statusCode < 300) {
-            final assignedCards = List<Map<String, dynamic>>.from(json.decode(assignedResp.body));
-            vendor['assignedCount'] = assignedCards.length;
+          final countsResp = await http.post(
+            Uri.parse('$_apiBase/cards/counts'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'vendorIds': vendorIds,
+              'date': selectedDate,
+            }),
+          );
+
+          if (countsResp.statusCode < 300) {
+            final countsData = json.decode(countsResp.body) as Map<String, dynamic>;
+            final counts = countsData['counts'] as Map<String, dynamic>?;
+
+            // Asignar conteos a cada vendor
+            for (final vendor in vendors) {
+              final vendorId = vendor['vendorId'] ?? vendor['id'];
+              if (vendorId != null && counts != null && counts.containsKey(vendorId)) {
+                final vendorCounts = counts[vendorId] as Map<String, dynamic>;
+                vendor['assignedCount'] = vendorCounts['assigned'] ?? 0;
+                // El soldCount ya viene del reports/vendors-summary, pero lo actualizamos si es necesario
+                if (vendorCounts['sold'] != null) {
+                  vendor['soldCount'] = vendorCounts['sold'];
+                }
+              } else {
+                vendor['assignedCount'] = 0;
+              }
+            }
           } else {
-            vendor['assignedCount'] = 0;
+            // Fallback: inicializar en 0 si falla
+            for (final vendor in vendors) {
+              vendor['assignedCount'] = 0;
+            }
           }
         } catch (e) {
-          vendor['assignedCount'] = 0;
+          // Fallback: inicializar en 0 si hay error
+          for (final vendor in vendors) {
+            vendor['assignedCount'] = 0;
+          }
         }
       }
       
-      // Obtener el total de cartillas del sistema para la fecha seleccionada
+      // Obtener el total de cartillas del sistema usando el endpoint optimizado
       try {
-        // Incluir date en la petición - es requerido por el backend
-        final totalCardsResp = await http.get(Uri.parse('$_apiBase/cards?date=$selectedDate'));
+        final totalCardsResp = await http.get(Uri.parse('$_apiBase/cards/total?date=$selectedDate'));
         if (totalCardsResp.statusCode < 300) {
-          final allCards = List<Map<String, dynamic>>.from(json.decode(totalCardsResp.body));
-          data['totalCards'] = allCards.length;
+          final totalData = json.decode(totalCardsResp.body) as Map<String, dynamic>;
+          data['totalCards'] = totalData['totalCards'] ?? 0;
         } else {
           data['totalCards'] = 0;
         }
@@ -1270,6 +1379,9 @@ class _CrmScreenState extends State<CrmScreen> {
   
   /// Mostrar modal de asignación por bloques
   Future<void> _showBlockAssignmentModal(BuildContext context, [String? vendorId]) async {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    final selectedDate = appProvider.selectedDate;
+
     final vendor = vendorId != null 
         ? _vendorsAll.firstWhere(
             (v) => v['id'] == vendorId,
@@ -1283,6 +1395,7 @@ class _CrmScreenState extends State<CrmScreen> {
         apiBase: _apiBase,
         vendorId: vendorId ?? '',
         vendorName: vendor['name'] ?? 'Vendedor',
+        date: selectedDate,
         allVendors: _vendorsAll, // Pasar la lista completa de vendedores
         onSuccess: () {
           setState(() {});
@@ -1304,8 +1417,13 @@ class _CrmScreenState extends State<CrmScreen> {
     int? step,
   }) async {
     try {
+      // Obtener la fecha seleccionada del AppProvider
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      final selectedDate = appProvider.selectedDate;
+      
       final body = <String, dynamic>{
         'vendorId': vendorId,
+        'date': selectedDate, // REQUERIDO por el backend
       };
       
       if (cardNumbers != null) {
@@ -1568,6 +1686,23 @@ class _CrmScreenState extends State<CrmScreen> {
       // Cerrar el diálogo de cartillas asignadas
       Navigator.pop(context);
       
+      // Obtener la fecha del evento (del card si está disponible, o del provider)
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      String eventDateStr = card['date'] as String? ?? appProvider.selectedDate;
+      
+      // Formatear la fecha de YYYY-MM-DD a DD/MM/YYYY
+      String formattedDate;
+      try {
+        final dateParts = eventDateStr.split('-');
+        if (dateParts.length == 3) {
+          formattedDate = '${dateParts[2]}/${dateParts[1]}/${dateParts[0]}';
+        } else {
+          formattedDate = eventDateStr;
+        }
+      } catch (e) {
+        formattedDate = eventDateStr;
+      }
+      
       // Mostrar la cartilla en un diálogo
       await showDialog(
         context: context,
@@ -1620,7 +1755,7 @@ class _CrmScreenState extends State<CrmScreen> {
                       child: CartillaWidget(
                         numbers: _convertNumbersToIntList(card['numbers'] ?? []),
                         cardNumber: card['cardNo']?.toString() ?? card['id'],
-                        date: DateTime.now().toString().split(' ')[0],
+                        date: formattedDate,
                         price: "Bs. 20",
                         compact: false,
                       ),
@@ -1677,28 +1812,34 @@ class _CrmScreenState extends State<CrmScreen> {
       return vendorIdToName[vendorId] ?? vendorId;
     }
     
-    // Cargar cartillas inicialmente
+    // Cargar cartillas inicialmente con paginación
     final appProvider = Provider.of<AppProvider>(context, listen: false);
     final eventDate = appProvider.selectedDate;
-    final initialResp = await http.get(Uri.parse('$_apiBase/cards?sold=false&date=$eventDate'));
-    if (initialResp.statusCode < 300) {
-      cards = List<Map<String, dynamic>>.from(json.decode(initialResp.body));
-      // Ordenar cartillas por número
-      cards.sort((a, b) {
-        // Intentar parsear como número
-        int getCardNumber(Map<String, dynamic> card) {
-          final cardNo = card['cardNo'];
-          if (cardNo == null) return 0;
-          if (cardNo is int) return cardNo;
-          if (cardNo is String) {
-            return int.tryParse(cardNo) ?? 0;
-          }
-          if (cardNo is num) return cardNo.toInt();
-          return 0;
+    String? lastDocId;
+    
+    Future<void> loadCardsPage() async {
+      final queryParams = <String>['sold=false', 'date=$eventDate', 'limit=2000'];
+      if (lastDocId != null) {
+        queryParams.add('startAfter=$lastDocId');
+      }
+      
+      final initialResp = await http.get(Uri.parse('$_apiBase/cards?${queryParams.join('&')}'));
+      if (initialResp.statusCode < 300) {
+        final responseData = json.decode(initialResp.body) as Map<String, dynamic>;
+        final pageCards = List<Map<String, dynamic>>.from(responseData['cards'] as List? ?? []);
+        final pagination = responseData['pagination'] as Map<String, dynamic>?;
+        
+        cards.addAll(pageCards);
+        lastDocId = pagination?['lastDocId'] as String?;
+        
+        // Si hay más páginas, cargar la siguiente
+        if (pagination?['hasMore'] == true && lastDocId != null) {
+          await loadCardsPage();
         }
-        return getCardNumber(a).compareTo(getCardNumber(b));
-      });
+      }
     }
+    
+    await loadCardsPage();
     
     String? vendorId;
     int displayedCount = 10; // Mostrar inicialmente 10 cartillas
@@ -1709,25 +1850,33 @@ class _CrmScreenState extends State<CrmScreen> {
       return StatefulBuilder(builder: (context, setSt) {
         Future<void> loadCards() async {
           setSt(() => isLoadingCards = true);
-          final r = await http.get(Uri.parse('$_apiBase/cards?sold=false&date=$eventDate'));
-          if (r.statusCode < 300) {
-            cards = List<Map<String, dynamic>>.from(json.decode(r.body));
-            // Ordenar cartillas por número
-            cards.sort((a, b) {
-              // Intentar parsear como número
-              int getCardNumber(Map<String, dynamic> card) {
-                final cardNo = card['cardNo'];
-                if (cardNo == null) return 0;
-                if (cardNo is int) return cardNo;
-                if (cardNo is String) {
-                  return int.tryParse(cardNo) ?? 0;
-                }
-                if (cardNo is num) return cardNo.toInt();
-                return 0;
+          cards.clear();
+          String? pageLastDocId;
+          
+          Future<void> loadPage() async {
+            final queryParams = <String>['sold=false', 'date=$eventDate', 'limit=2000'];
+            if (pageLastDocId != null) {
+              queryParams.add('startAfter=$pageLastDocId');
+            }
+            
+            final r = await http.get(Uri.parse('$_apiBase/cards?${queryParams.join('&')}'));
+            if (r.statusCode < 300) {
+              final responseData = json.decode(r.body) as Map<String, dynamic>;
+              final pageCards = List<Map<String, dynamic>>.from(responseData['cards'] as List? ?? []);
+              final pagination = responseData['pagination'] as Map<String, dynamic>?;
+              
+              cards.addAll(pageCards);
+              pageLastDocId = pagination?['lastDocId'] as String?;
+              
+              // Si hay más páginas, cargar la siguiente
+              if (pagination?['hasMore'] == true && pageLastDocId != null) {
+                await loadPage();
               }
-              return getCardNumber(a).compareTo(getCardNumber(b));
-            });
+            }
           }
+          
+          await loadPage();
+          
           setSt(() {
             isLoadingCards = false;
             displayedCount = 10; // Resetear a 10 al recargar
@@ -2496,7 +2645,7 @@ class _CrmScreenState extends State<CrmScreen> {
                         Expanded(
                           child: _buildKpiCard(
                             title: 'Disponibles',
-                            value: '${_getTotalAvailable(vendors)}',
+                            value: '${_getTotalUnassigned(vendors, snap.data!['totalCards'] ?? 0)}',
                             icon: Icons.inventory_2_rounded,
                             color: Colors.purple,
                             gradientEnd: Colors.deepPurple,
@@ -2956,20 +3105,20 @@ class _CrmScreenState extends State<CrmScreen> {
     required Color gradientEnd,
   }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [color.withOpacity(0.15), gradientEnd.withOpacity(0.08)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color.withOpacity(0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
             color: color.withOpacity(0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -2977,28 +3126,28 @@ class _CrmScreenState extends State<CrmScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
               color: color.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: color, size: 28),
+            child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 2),
           Text(
             value,
             style: TextStyle(
-              fontSize: 32,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: color,
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 1),
           Text(
             title,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 10,
               color: color.withOpacity(0.8),
               fontWeight: FontWeight.w600,
             ),
@@ -3728,6 +3877,23 @@ class _CrmScreenState extends State<CrmScreen> {
     );
 
     try {
+      // Obtener la fecha del evento del provider
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      final eventDateStr = appProvider.selectedDate;
+      
+      // Formatear la fecha de YYYY-MM-DD a DD/MM/YYYY para la imagen
+      String formattedDate;
+      try {
+        final dateParts = eventDateStr.split('-');
+        if (dateParts.length == 3) {
+          formattedDate = '${dateParts[2]}/${dateParts[1]}/${dateParts[0]}';
+        } else {
+          formattedDate = eventDateStr;
+        }
+      } catch (e) {
+        formattedDate = eventDateStr;
+      }
+      
       int successCount = 0;
       int errorCount = 0;
       
@@ -3735,11 +3901,25 @@ class _CrmScreenState extends State<CrmScreen> {
         final card = cards[i];
         final cardNumber = card['cardNo']?.toString() ?? card['id'];
         
+        // Usar la fecha del evento del card si está disponible, sino usar la del provider
+        String cardDate = card['date'] as String? ?? eventDateStr;
+        String cardFormattedDate;
+        try {
+          final dateParts = cardDate.split('-');
+          if (dateParts.length == 3) {
+            cardFormattedDate = '${dateParts[2]}/${dateParts[1]}/${dateParts[0]}';
+          } else {
+            cardFormattedDate = formattedDate;
+          }
+        } catch (e) {
+          cardFormattedDate = formattedDate;
+        }
+        
         try {
           final imageBytes = await renderCartillaImage(
             numbers: _convertNumbersToIntList(card['numbers'] ?? []),
             cardNumber: cardNumber,
-            date: DateTime.now().toString().split(' ')[0],
+            date: cardFormattedDate,
             price: "Bs. 20",
             pixelRatio: 1.0,
           );
@@ -4344,17 +4524,71 @@ class _CrmScreenState extends State<CrmScreen> {
   // Exportar a archivo Excel (.xlsx)
   Future<void> _exportToExcelFile(List<Map<String, dynamic>> vendors) async {
     try {
-      // Crear estructura de datos para Excel
+      // Crear un nuevo libro de Excel
+      final excel = excel_pkg.Excel.createExcel();
+      
+      // Obtener la hoja por defecto y renombrarla
+      final defaultSheet = excel.getDefaultSheet();
+      if (defaultSheet != null) {
+        excel.delete(defaultSheet);
+      }
+      
+      // Crear una nueva hoja llamada "CRM Bingo Patuju"
+      final sheet = excel['CRM Bingo Patuju'];
+      
+      // Preparar los datos
       final excelData = await _prepareExcelData(vendors);
       
-      // Crear CSV temporal (que se puede abrir en Excel)
-      final csvContent = _createCsvContent(excelData);
+      // Agregar los datos a la hoja
+      for (int rowIndex = 0; rowIndex < excelData.length; rowIndex++) {
+        final rowData = excelData[rowIndex];
+        
+        for (int colIndex = 0; colIndex < rowData.length; colIndex++) {
+          final cell = sheet.cell(
+            excel_pkg.CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex)
+          );
+          
+          // Intentar convertir a número si es posible, sino usar texto
+          final cellValue = rowData[colIndex];
+          final numValue = num.tryParse(cellValue);
+          
+          if (numValue != null) {
+            // Usar el constructor apropiado según el tipo de número
+            if (numValue is int || numValue == numValue.toInt()) {
+              cell.value = excel_pkg.IntCellValue(numValue.toInt());
+            } else {
+              cell.value = excel_pkg.DoubleCellValue(numValue.toDouble());
+            }
+          } else {
+            cell.value = excel_pkg.TextCellValue(cellValue);
+          }
+          
+          // Estilo para la primera fila (encabezados)
+          if (rowIndex == 0) {
+            cell.cellStyle = excel_pkg.CellStyle(
+              bold: true,
+              backgroundColorHex: excel_pkg.ExcelColor.fromHexString('#4CAF50'),
+              fontColorHex: excel_pkg.ExcelColor.white,
+            );
+          }
+        }
+      }
       
-      // Crear archivo con extensión .xlsx (aunque sea CSV)
-      final bytes = utf8.encode(csvContent);
-      final blob = html.Blob([bytes], 'text/csv');
+      // Codificar el archivo a bytes
+      final List<int>? excelBytes = excel.encode();
+      
+      if (excelBytes == null) {
+        throw Exception('No se pudo codificar el archivo Excel');
+      }
+      
+      // Crear Blob con el tipo MIME correcto para archivos Excel
+      final blob = html.Blob(
+        [Uint8List.fromList(excelBytes)],
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      
+      // Crear URL y descargar
       final url = html.Url.createObjectUrlFromBlob(blob);
-      
       final anchor = html.AnchorElement(href: url)
         ..setAttribute('download', 'CRM_Bingo_Patuju_${DateTime.now().millisecondsSinceEpoch}.xlsx')
         ..click();
@@ -4364,7 +4598,7 @@ class _CrmScreenState extends State<CrmScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Datos exportados a Excel exitosamente'),
+            content: Text('✅ Datos exportados a Excel exitosamente'),
             backgroundColor: Colors.green,
           ),
         );
@@ -4373,7 +4607,7 @@ class _CrmScreenState extends State<CrmScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al exportar a Excel: $e'),
+            content: Text('❌ Error al exportar a Excel: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -4384,24 +4618,66 @@ class _CrmScreenState extends State<CrmScreen> {
   // Exportar a Google Sheets
   Future<void> _exportToGoogleSheets(List<Map<String, dynamic>> vendors) async {
     try {
-      // Crear estructura de datos para Google Sheets
-      final sheetData = await _prepareExcelData(vendors);
+      // Google Sheets no permite importación directa desde URL sin autenticación
+      // La mejor alternativa es descargar un Excel que el usuario puede subir a Sheets
       
-      // Crear URL de Google Sheets con datos
-      final csvContent = _createCsvContent(sheetData);
-      final encodedData = Uri.encodeComponent(csvContent);
+      // Mostrar diálogo informativo
+      final shouldProceed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Exportar a Google Sheets'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Se descargará un archivo Excel (.xlsx) compatible con Google Sheets.',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 12),
+              Text('Para importarlo a Google Sheets:'),
+              SizedBox(height: 8),
+              Text('1. Ve a sheets.google.com'),
+              Text('2. Haz clic en "Archivo" → "Importar"'),
+              Text('3. Selecciona "Subir" y elige el archivo descargado'),
+              Text('4. Haz clic en "Importar datos"'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Cancelar'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(context, true),
+              icon: Icon(Icons.download),
+              label: Text('Descargar Excel'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
       
-      // URL para crear nuevo Google Sheet
-      final googleSheetsUrl = 'https://docs.google.com/spreadsheets/create?usp=data_import&dataformat=csv&data=$encodedData';
+      if (shouldProceed != true) return;
       
-      // Abrir en nueva pestaña
-      html.window.open(googleSheetsUrl, '_blank');
+      // Descargar el archivo Excel
+      await _exportToExcelFile(vendors);
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Google Sheets abierto en nueva pestaña'),
-            backgroundColor: Colors.green,
+            content: Text('📊 Archivo descargado. Súbelo a Google Sheets para continuar'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 5),
           ),
         );
       }
@@ -4409,7 +4685,7 @@ class _CrmScreenState extends State<CrmScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al exportar a Google Sheets: $e'),
+            content: Text('Error al exportar: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -4457,16 +4733,46 @@ class _CrmScreenState extends State<CrmScreen> {
       String assignedCardNumbers = '';
       try {
         final vendorId = vendor['vendorId'] ?? vendor['id'];
-        final assignedResp = await http.get(Uri.parse('$_apiBase/cards?assignedTo=$vendorId'));
+        final appProvider = Provider.of<AppProvider>(context, listen: false);
+        final selectedDate = appProvider.selectedDate;
+        
+        final assignedResp = await http.get(
+          Uri.parse('$_apiBase/cards?assignedTo=$vendorId&date=$selectedDate&sold=false')
+        );
+        
         if (assignedResp.statusCode < 300) {
-          final assignedCards = List<Map<String, dynamic>>.from(json.decode(assignedResp.body));
+          final responseBody = assignedResp.body;
+          
+          // El endpoint puede retornar un array directamente o un objeto con 'cards'
+          dynamic parsedData = json.decode(responseBody);
+          List<Map<String, dynamic>> assignedCards;
+          
+          if (parsedData is List) {
+            assignedCards = List<Map<String, dynamic>>.from(parsedData);
+          } else if (parsedData is Map && parsedData['cards'] != null) {
+            assignedCards = List<Map<String, dynamic>>.from(parsedData['cards']);
+          } else {
+            assignedCards = [];
+          }
+          
           if (assignedCards.isNotEmpty) {
-            final cardNumbers = assignedCards.map((card) => card['cardNo']?.toString() ?? '').where((num) => num.isNotEmpty).toList();
+            final cardNumbers = assignedCards
+              .map((card) => card['cardNo']?.toString() ?? '')
+              .where((cardNum) => cardNum.isNotEmpty)
+              .toList();
+            
+            // Ordenar números para mejor legibilidad
+            cardNumbers.sort((a, b) {
+              final aNum = int.tryParse(a) ?? 0;
+              final bNum = int.tryParse(b) ?? 0;
+              return aNum.compareTo(bNum);
+            });
+            
             assignedCardNumbers = cardNumbers.join(', ');
           }
         }
       } catch (e) {
-        assignedCardNumbers = 'Error al obtener';
+        assignedCardNumbers = 'Error: $e';
       }
       
       // Estado del vendedor
@@ -4584,26 +4890,55 @@ class _AssignedCardsDialogState extends State<_AssignedCardsDialog> {
 
   Future<void> _loadCards() async {
     try {
-      // Fetch both unsold and sold cards to ensure we show everything
-      final unsoldFuture = http.get(Uri.parse('${widget.apiBase}/cards?assignedTo=${widget.vendorId}&sold=false&date=${widget.eventDate}'));
-      final soldFuture = http.get(Uri.parse('${widget.apiBase}/cards?assignedTo=${widget.vendorId}&sold=true&date=${widget.eventDate}'));
+      List<Map<String, dynamic>> unsoldCards = [];
+      List<Map<String, dynamic>> soldCards = [];
       
-      final responses = await Future.wait([unsoldFuture, soldFuture]);
-      final unsoldResp = responses[0];
-      final soldResp = responses[1];
-      
-      if (!mounted) return;
-      
-      if (unsoldResp.statusCode >= 300 || soldResp.statusCode >= 300) {
-        setState(() {
-          _errorMessage = 'Error al cargar cartillas: ${unsoldResp.statusCode >= 300 ? unsoldResp.body : soldResp.body}';
-          _isLoading = false;
-        });
-        return;
+      // Función helper para cargar cartillas con paginación
+      Future<void> loadCardsPage(String sold, List<Map<String, dynamic>> targetList) async {
+        String? lastDocId;
+        
+        Future<void> loadPage() async {
+          final queryParams = <String>[
+            'assignedTo=${widget.vendorId}',
+            'sold=$sold',
+            'date=${widget.eventDate}',
+            'limit=2000'
+          ];
+          if (lastDocId != null) {
+            queryParams.add('startAfter=$lastDocId');
+          }
+          
+          final resp = await http.get(Uri.parse('${widget.apiBase}/cards?${queryParams.join('&')}'));
+          
+          if (!mounted) return;
+          
+          if (resp.statusCode >= 300) {
+            throw Exception('Error ${resp.statusCode}: ${resp.body}');
+          }
+          
+          final responseData = json.decode(resp.body) as Map<String, dynamic>;
+          final pageCards = List<Map<String, dynamic>>.from(responseData['cards'] as List? ?? []);
+          final pagination = responseData['pagination'] as Map<String, dynamic>?;
+          
+          targetList.addAll(pageCards);
+          lastDocId = pagination?['lastDocId'] as String?;
+          
+          // Si hay más páginas, cargar la siguiente
+          if (pagination?['hasMore'] == true && lastDocId != null) {
+            await loadPage();
+          }
+        }
+        
+        await loadPage();
       }
       
-      final unsoldCards = List<Map<String, dynamic>>.from(json.decode(unsoldResp.body));
-      final soldCards = List<Map<String, dynamic>>.from(json.decode(soldResp.body));
+      // Cargar cartillas no vendidas y vendidas en paralelo
+      await Future.wait([
+        loadCardsPage('false', unsoldCards),
+        loadCardsPage('true', soldCards),
+      ]);
+      
+      if (!mounted) return;
       
       // Merge and sort by card number
       final allCards = [...unsoldCards, ...soldCards];

@@ -25,10 +25,8 @@ class _CartillasListPanelState extends State<CartillasListPanel> {
   @override
   void initState() {
     super.initState();
-    // Cargar cartillas de Firebase al inicializar (solo las primeras 10)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppProvider>().refreshFirebaseCartillas();
-    });
+    // Ya no cargamos automáticamente todas las cartillas al abrir el diálogo.
+    // El usuario puede usar el buscador por número o disparar cargas manuales desde otros controles.
   }
 
   @override
@@ -36,7 +34,7 @@ class _CartillasListPanelState extends State<CartillasListPanel> {
     return Consumer<AppProvider>(
       builder: (context, appProvider, child) {
         final firebaseCartillas = appProvider.getFilteredFirebaseCartillas();
-        final isLoading = appProvider.isLoadingFirebase;
+        final isLoading = appProvider.isLoadingFirebase || appProvider.isSearchingFirebase;
         final error = appProvider.firebaseError;
         
         if (isLoading) {
@@ -91,15 +89,24 @@ class _CartillasListPanelState extends State<CartillasListPanel> {
   }
 
   Widget _buildLoadingState() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Cargando cartillas desde Firebase...'),
-        ],
-      ),
+    return Consumer<AppProvider>(
+      builder: (context, appProvider, child) {
+        final isSearching = appProvider.isSearchingFirebase;
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                isSearching
+                    ? 'Buscando cartilla por número...'
+                    : 'Cargando cartillas desde Firebase...',
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

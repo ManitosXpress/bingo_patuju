@@ -24,15 +24,24 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
   Map<String, dynamic>? _blockInfo;
   List<String> _validationErrors = [];
   int _totalCards = 1000; // Valor por defecto, se actualizará dinámicamente
+  int _startCard = 1; // Cartilla inicial (editable)
   bool _isLoadingTotalCards = true;
+  final TextEditingController _startCardController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     
     _assignToAllVendors = true; // Siempre habilitado para asignación por bloques
+    _startCardController.text = _startCard.toString();
     
     _loadTotalCards();
+  }
+
+  @override
+  void dispose() {
+    _startCardController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadTotalCards() async {
@@ -60,11 +69,6 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
     }
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
   void _updateBlockInfo() async {
     try {
       final config = _createConfigFromInputs();
@@ -85,13 +89,20 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
       // Configuración automática - calcular totalBlocks dinámicamente
       const blockSize = 5;
       const skipBlocks = 0;
-      const startCard = 1;
+      
+      // Usar el valor de la cartilla inicial del campo de entrada
+      final startCard = _startCard;
       
       // Calcular totalBlocks basándose en el total de cartillas disponibles
+      // Si el usuario pone 1000 cartillas, desde la cartilla inicial hasta la final
       // totalBlocks = totalCards / blockSize (redondeado hacia arriba)
       final totalBlocks = (_totalCards / blockSize).ceil();
       
-      print('📊 Calculando totalBlocks: $_totalCards cartillas / $blockSize = $totalBlocks bloques');
+      print('📊 Calculando configuración:');
+      print('📊 Cartillas disponibles: $_totalCards');
+      print('📊 Cartilla inicial: $startCard');
+      print('📊 Cartilla final: ${startCard + _totalCards - 1}');
+      print('📊 Total de bloques: $totalBlocks (${_totalCards / blockSize} cartillas / $blockSize por bloque)');
       
       // La cantidad se calculará automáticamente basada en los vendedores disponibles
       const quantityBlocks = 0; // Se calculará automáticamente
@@ -193,6 +204,36 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
               
               const SizedBox(height: 16),
               
+              // Campo para editar la cartilla inicial
+              TextFormField(
+                controller: _startCardController,
+                decoration: const InputDecoration(
+                  labelText: 'Cartilla Inicial',
+                  helperText: 'Número de cartilla desde donde comenzar la asignación (ej: 1, 100, 500)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.play_arrow),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                onChanged: (value) {
+                  final newValue = int.tryParse(value);
+                  if (newValue != null && newValue > 0) {
+                    setState(() {
+                      _startCard = newValue;
+                    });
+                    _updateBlockInfo();
+                  } else if (value.isEmpty) {
+                    // Permitir campo vacío temporalmente
+                    setState(() {
+                      _startCard = 1; // Valor por defecto si está vacío
+                    });
+                  }
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
               const Text(
                 'El sistema configurará automáticamente:',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
@@ -200,15 +241,16 @@ class _BlockAssignmentConfigWidgetState extends State<BlockAssignmentConfigWidge
               const SizedBox(height: 8),
               Text(
                 '• Tamaño de bloque: 5 cartillas por bloque\n'
-                '• Total de cartillas: $_totalCards cartillas configuradas\n'
+                '• Total de cartillas disponibles: $_totalCards cartillas\n'
+                '• Rango de cartillas: Desde la cartilla $_startCard hasta la cartilla ${_startCard + _totalCards - 1}\n'
                 '• Total de bloques: ${(_totalCards / 5).ceil()} bloques (calculado dinámicamente)\n'
-                '• Cartilla inicial: Desde la cartilla 1\n'
+                '• Cartilla inicial: Desde la cartilla $_startCard\n'
                 '• Bloques a saltar: 0 (todos los bloques disponibles)\n'
                 '• Selección aleatoria: Habilitada por defecto\n'
-                '• Distribución: Equitativa entre todos los vendedores\n'
+                '• Distribución: Equitativa de cartillas entre todos los vendedores\n'
                 '• Cantidad de bloques: Calculada automáticamente\n'
                 '• Bloques por vendedor: Optimizados automáticamente\n'
-                '• Ajuste inteligente: Se adapta a los bloques disponibles',
+                '• Ajuste inteligente: Se adapta a las cartillas disponibles',
                 style: const TextStyle(fontSize: 14),
               ),
             ],

@@ -28,7 +28,6 @@ enum BingoPattern {
   figuraCLoca,
   figuraBandera,
   figuraTripleLinea,
-  diagonalDerecha,
 }
 
 class BingoGameConfig {
@@ -199,8 +198,6 @@ class BingoGameRound {
         return 'Figura Bandera';
       case BingoPattern.figuraTripleLinea:
         return 'Figura Triple Línea';
-      case BingoPattern.diagonalDerecha:
-        return 'Diagonal Derecha';
     }
   }
 }
@@ -319,7 +316,6 @@ class BingoGamePresets {
             break;
           default:
             patterns.addAll([
-              BingoPattern.diagonalDerecha,
               BingoPattern.x,
             ]);
         }

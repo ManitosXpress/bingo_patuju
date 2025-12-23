@@ -30,7 +30,7 @@ String getBingoPatternDisplayName(BingoPattern pattern) {
     case BingoPattern.caidaNieve:
       return 'Caída de Nieve';
     case BingoPattern.arbolFlecha:
-      return 'Árbol o Flecha';
+      return 'Flecha';
     case BingoPattern.letraI:
       return 'LETRA I';
     case BingoPattern.letraN:
@@ -53,7 +53,5 @@ String getBingoPatternDisplayName(BingoPattern pattern) {
       return 'Figura Bandera';
     case BingoPattern.figuraTripleLinea:
       return 'Figura Triple Línea';
-    case BingoPattern.diagonalDerecha:
-      return 'Diagonal Derecha';
   }
 }

@@ -394,9 +394,6 @@ class BingoGame {
     if (_checkPatternOptimized(cartilla, calledSet, _figuraTripleLineaPattern())) {
       completedPatterns.add('Figura Triple Línea');
     }
-    if (_checkPatternOptimized(cartilla, calledSet, _diagonalDerechaPattern())) {
-      completedPatterns.add('Diagonal Derecha');
-    }
     
     return completedPatterns;
   }
@@ -482,7 +479,6 @@ class BingoGame {
     if (_checkPattern(cartilla, calledNumbers, _figuraCLocaPattern())) completedPatterns.add('Figura C Loca');
     if (_checkPattern(cartilla, calledNumbers, _figuraBanderaPattern())) completedPatterns.add('Figura Bandera');
     if (_checkPattern(cartilla, calledNumbers, _figuraTripleLineaPattern())) completedPatterns.add('Figura Triple Línea');
-    if (_checkPattern(cartilla, calledNumbers, _diagonalDerechaPattern())) completedPatterns.add('Diagonal Derecha');
     
     // Si no hay figuras completadas, devolver null
     if (completedPatterns.isEmpty) return null;
@@ -548,7 +544,6 @@ class BingoGame {
     bool figuraCLoca = false;
     bool figuraBandera = false;
     bool figuraTripleLinea = false;
-    bool diagonalDerecha = false;
     
     // Optimización: salir temprano si todas las figuras ya están completadas
     for (var cartilla in cartillas) {
@@ -643,7 +638,6 @@ class BingoGame {
       if (!figuraCLoca && _checkPatternOptimized(cartilla, calledSet, _figuraCLocaPattern())) figuraCLoca = true;
       if (!figuraBandera && _checkPatternOptimized(cartilla, calledSet, _figuraBanderaPattern())) figuraBandera = true;
       if (!figuraTripleLinea && _checkPatternOptimized(cartilla, calledSet, _figuraTripleLineaPattern())) figuraTripleLinea = true;
-      if (!diagonalDerecha && _checkPatternOptimized(cartilla, calledSet, _diagonalDerechaPattern())) diagonalDerecha = true;
     }
     
     // Retornar TODAS las figuras con su estado
@@ -673,7 +667,6 @@ class BingoGame {
       'Figura C Loca': figuraCLoca,
       'Figura Bandera': figuraBandera,
       'Figura Triple Línea': figuraTripleLinea,
-      'Diagonal Derecha': diagonalDerecha,
     };
   }
 
@@ -856,16 +849,6 @@ class BingoGame {
       [1,1,1,1,1],
       [0,0,0,0,0],
       [1,1,1,1,1],
-    ];
-  }
-  
-  List<List<int>> _diagonalDerechaPattern() {
-    return [
-      [1,0,0,0,0],
-      [0,1,0,0,0],
-      [0,0,1,0,0],
-      [0,0,0,1,0],
-      [0,0,0,0,1],
     ];
   }
   

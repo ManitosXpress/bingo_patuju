@@ -7,6 +7,7 @@ export const router = Router();
 router.get('/vendors-summary', async (req: any, res: any) => {
   const from = req.query.from ? Number(req.query.from) : undefined;
   const to = req.query.to ? Number(req.query.to) : undefined;
+  const date = req.query.date as string | undefined;
   const leaderFilter: string | undefined = req.query.leaderId as string | undefined;
   // Load vendors
   const vendorSnaps = await db.collection('vendors').get();
@@ -30,6 +31,7 @@ router.get('/vendors-summary', async (req: any, res: any) => {
 
   // Iterate sales
   let q = db.collection('sales') as any;
+  if (date) q = q.where('date', '==', date); // Filtrar por fecha de evento
   if (from) q = q.where('createdAt', '>=', from);
   if (to) q = q.where('createdAt', '<=', to);
   const salesSnaps = await q.get();
@@ -108,8 +110,6 @@ router.post('/clear-commissions', async (req: any, res: any) => {
       });
     }
 
-    console.log(`Iniciando ELIMINACIÓN COMPLETA de datos. Modo dry run: ${dryRun}`);
-
     // 1. Contar TODAS las ventas para eliminar
     const salesSnapshot = await db.collection('sales').get();
     const totalSales = salesSnapshot.size;
@@ -117,8 +117,6 @@ router.post('/clear-commissions', async (req: any, res: any) => {
     // 2. Contar TODOS los balances para eliminar
     const balancesSnapshot = await db.collection('balances').get();
     const totalBalances = balancesSnapshot.size;
-
-    console.log(`Encontrados ${totalSales} ventas y ${totalBalances} balances para ELIMINAR COMPLETAMENTE`);
 
     if (dryRun) {
       return res.json({
@@ -134,28 +132,34 @@ router.post('/clear-commissions', async (req: any, res: any) => {
     }
 
     // ⚠️ EJECUCIÓN REAL - ELIMINAR TODOS LOS DATOS
-    console.log('🚨 INICIANDO ELIMINACIÓN PERMANENTE DE TODOS LOS DATOS...');
-    
-    const batch = db.batch();
+    // Implementar chunking para evitar límite de 500 operaciones por batch
+    const BATCH_SIZE = 500;
     let salesDeleted = 0;
     let balancesDeleted = 0;
 
-    // Eliminar TODAS las ventas
-    salesSnapshot.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-      salesDeleted++;
-    });
+    // Eliminar ventas en chunks
+    const salesDocs = salesSnapshot.docs;
+    for (let i = 0; i < salesDocs.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      const chunk = salesDocs.slice(i, i + BATCH_SIZE);
+      chunk.forEach((doc) => {
+        batch.delete(doc.ref);
+        salesDeleted++;
+      });
+      await batch.commit();
+    }
 
-    // Eliminar TODOS los balances
-    balancesSnapshot.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-      balancesDeleted++;
-    });
-
-    // Ejecutar batch de eliminación
-    await batch.commit();
-
-    console.log('✅ ELIMINACIÓN COMPLETA DE DATOS COMPLETADA EXITOSAMENTE');
+    // Eliminar balances en chunks
+    const balancesDocs = balancesSnapshot.docs;
+    for (let i = 0; i < balancesDocs.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      const chunk = balancesDocs.slice(i, i + BATCH_SIZE);
+      chunk.forEach((doc) => {
+        batch.delete(doc.ref);
+        balancesDeleted++;
+      });
+      await batch.commit();
+    }
 
     return res.json({
       message: 'TODOS LOS DATOS ELIMINADOS EXITOSAMENTE',
@@ -169,7 +173,6 @@ router.post('/clear-commissions', async (req: any, res: any) => {
     });
 
   } catch (error: any) {
-    console.error('Error al eliminar datos:', error);
     return res.status(500).json({ 
       error: 'Error interno del servidor al eliminar datos',
       details: error.message 

@@ -149,9 +149,31 @@ class FirebaseCartilla {
     return rows.join('\n');
   }
 
-  // Obtener fecha formateada
+  // Obtener fecha formateada (usa la fecha del evento, no la fecha de creación)
   String get formattedDate {
+    // Si tenemos la fecha del evento, usarla
+    if (this.date != null && this.date!.isNotEmpty) {
+      try {
+        // Intentar parsear como ISO 8601 (YYYY-MM-DD)
+        final dateParts = this.date!.split('-');
+        if (dateParts.length == 3) {
+          final year = int.parse(dateParts[0]);
+          final month = int.parse(dateParts[1]);
+          final day = int.parse(dateParts[2]);
+          return '${day.toString().padLeft(2, '0')}/${month.toString().padLeft(2, '0')}/${year}';
+        }
+        // Si no es ISO, intentar parsear como DateTime
+        final parsedDate = DateTime.parse(this.date!);
+        return '${parsedDate.day.toString().padLeft(2, '0')}/${parsedDate.month.toString().padLeft(2, '0')}/${parsedDate.year}';
+      } catch (e) {
+        // Si falla el parseo, usar createdAt como fallback
+        debugLog('Error parseando fecha del evento: $e, usando createdAt como fallback');
+        final date = DateTime.fromMillisecondsSinceEpoch(createdAt);
+        return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+      }
+    }
+    // Fallback: usar createdAt si no hay fecha del evento
     final date = DateTime.fromMillisecondsSinceEpoch(createdAt);
-    return '${date.day}/${date.month}/${date.year}';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 } 

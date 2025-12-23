@@ -15,6 +15,9 @@ class AppProvider extends ChangeNotifier {
   List<FirebaseCartilla> _allFirebaseCartillas = []; // Todas las cartillas cargadas
   bool _isLoadingFirebase = false;
   String? _firebaseError;
+  bool _isSearchingFirebase = false;
+  bool _isSearchMode = false;
+  List<FirebaseCartilla> _searchResults = [];
   
   // Variables para paginación
   int _currentPage = 0;
@@ -39,10 +42,6 @@ class AppProvider extends ChangeNotifier {
     try {
       await loadVendors();
       debugLog('Vendedores cargados automáticamente: ${vendors.length}');
-      
-      // Cargar cartillas automáticamente al inicializar
-      await loadFirebaseCartillas();
-      debugLog('Cartillas cargadas automáticamente: ${_allFirebaseCartillas.length}');
     } catch (e) {
       debugLog('Error cargando datos automáticamente: $e');
     }
@@ -57,6 +56,8 @@ class AppProvider extends ChangeNotifier {
   List<FirebaseCartilla> get allFirebaseCartillas => _allFirebaseCartillas; // Todas las cartillas
   bool get isLoadingFirebase => _isLoadingFirebase;
   String? get firebaseError => _firebaseError;
+  bool get isSearchingFirebase => _isSearchingFirebase;
+  bool get isSearchMode => _isSearchMode;
   
   // Getters para paginación
   int get currentPage => _currentPage;
@@ -173,6 +174,8 @@ class AppProvider extends ChangeNotifier {
         _firebaseCartillas.clear();
         _allFirebaseCartillas.clear(); // Limpiar todas las cartillas cargadas
         _hasMoreData = true;
+        _isSearchMode = false;
+        _searchResults.clear();
       }
       
       if (!_hasMoreData) return;
@@ -187,13 +190,13 @@ class AppProvider extends ChangeNotifier {
       await loadVendors();
       debugLog('Vendedores cargados antes de cartillas: ${vendors.length}');
       
-      // Cargar todas las cartillas de Firebase de una vez (máximo 2000)
-      final cartillasData = await CartillaService.getCartillas(
+      // Cargar todas las cartillas de Firebase con paginación automática
+      // OPTIMIZADO: Usa límite de 50 por página para reducir lecturas de Firestore
+      final cartillasData = await CartillaService.getAllCartillas(
         date: _selectedDate,
         assignedTo: assignedTo,
         sold: sold,
-        page: 0, // Siempre página 0 para cargar todo
-        limit: 2000, // Límite alto para cargar todas las cartillas (600+)
+        limitPerPage: 50, // Reducido de 2000 a 50 para optimizar lecturas
       );
       
       debugLog('Cartillas recibidas de Firebase: ${cartillasData.length}');
@@ -419,7 +422,8 @@ class AppProvider extends ChangeNotifier {
   
   // Obtener cartillas filtradas de Firebase
   List<FirebaseCartilla> getFilteredFirebaseCartillas() {
-    List<FirebaseCartilla> filtered = _firebaseCartillas;
+    // Base: resultados de búsqueda si estamos en modo búsqueda, si no, la página actual
+    List<FirebaseCartilla> filtered = _isSearchMode ? _searchResults : _firebaseCartillas;
     
     // Filtro por vendedor
     if (filterVendorId != null) {
@@ -433,20 +437,74 @@ class AppProvider extends ChangeNotifier {
       filtered = filtered.where((c) => !c.isAssigned).toList();
     }
     
-    // Filtro por búsqueda
-    if (searchQuery.isNotEmpty) {
-      filtered = filtered.where((c) => 
-        c.displayNumber.toLowerCase().contains(searchQuery.toLowerCase())
-      ).toList();
-    }
-    
     return filtered;
+  }
+
+  /// Búsqueda global en servidor por número de cartilla (cardNo).
+  /// Reemplaza la lista visible por el resultado, ignorando la página actual.
+  Future<void> searchFirebaseCartillaByNumber(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      await clearSearchAndReload();
+      return;
+    }
+
+    final number = int.tryParse(trimmed);
+    if (number == null) {
+      _firebaseError = 'El número de cartilla debe ser un entero válido';
+      notifyListeners();
+      return;
+    }
+
+    try {
+      _isSearchingFirebase = true;
+      _firebaseError = null;
+      notifyListeners();
+
+      final data = await CartillaService.searchCartillasByNumber(
+        date: _selectedDate,
+        cardNo: number,
+      );
+
+      final results = <FirebaseCartilla>[];
+      for (final item in data) {
+        try {
+          final cartilla = FirebaseCartilla.fromJson(item);
+          if (cartilla.isValidStructure) {
+            results.add(cartilla);
+          }
+        } catch (e) {
+          debugLog('Error procesando resultado de búsqueda: $e');
+        }
+      }
+
+      _isSearchMode = true;
+      _searchResults = results;
+
+      // También actualizar la lista visible principal para que otros componentes vean los resultados.
+      _firebaseCartillas = List<FirebaseCartilla>.from(results);
+      _currentPage = 1;
+      _hasMoreData = false;
+    } catch (e) {
+      _firebaseError = 'Error buscando cartilla: $e';
+    } finally {
+      _isSearchingFirebase = false;
+      notifyListeners();
+    }
+  }
+
+  /// Limpia el modo búsqueda y recarga la lista paginada normal.
+  Future<void> clearSearchAndReload() async {
+    _isSearchMode = false;
+    _searchResults.clear();
+    _uiState.setSearchQuery('');
+    await refreshFirebaseCartillas();
   }
   
   // Desasignar cartilla de vendedor en Firebase
   Future<bool> unassignFirebaseCartilla(String cartillaId) async {
     try {
-      final cartillaData = await CartillaService.unassignCartilla(cartillaId);
+      final cartillaData = await CartillaService.unassignCartilla(cartillaId, date: _selectedDate);
       
       // Actualizar en la lista local
       final index = _firebaseCartillas.indexWhere((c) => c.id == cartillaId);
@@ -466,7 +524,7 @@ class AppProvider extends ChangeNotifier {
       
     } catch (e) {
       _firebaseError = e.toString();
-      print('Error desasignando cartilla en Firebase: $e');
+      debugLog('Error desasignando cartilla en Firebase: $e');
       notifyListeners();
       return false;
     }
@@ -503,7 +561,7 @@ class AppProvider extends ChangeNotifier {
       
     } catch (e) {
       _firebaseError = e.toString();
-      print('Error eliminando cartilla en Firebase: $e');
+      debugLog('Error eliminando cartilla en Firebase: $e');
       notifyListeners();
       return false;
     }
@@ -525,7 +583,7 @@ class AppProvider extends ChangeNotifier {
       return false;
     } catch (e) {
       _firebaseError = e.toString();
-      print('Error generando cartillas en Firebase: $e');
+      debugLog('Error generando cartillas en Firebase: $e');
       notifyListeners();
       return false;
     }
@@ -534,7 +592,7 @@ class AppProvider extends ChangeNotifier {
   // Eliminar TODAS las cartillas de Firebase
   Future<bool> clearAllFirebaseCartillas() async {
     try {
-      final result = await CartillaService.clearAllCartillas();
+      final result = await CartillaService.clearAllCartillas(date: _selectedDate);
       
       if (result != null) {
         // Limpiar todas las listas locales
@@ -559,7 +617,7 @@ class AppProvider extends ChangeNotifier {
       
     } catch (e) {
       _firebaseError = e.toString();
-      print('Error eliminando todas las cartillas de Firebase: $e');
+      debugLog('Error eliminando todas las cartillas de Firebase: $e');
       notifyListeners();
       return false;
     }

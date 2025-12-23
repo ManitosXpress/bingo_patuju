@@ -61,6 +61,9 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   
   // Mapa local para patrones marcados manualmente por el usuario
   final Map<String, bool> _manuallyMarkedPatterns = {};
+  
+  // Bandera para saber si se están cargando juegos
+  bool _loadingGames = false;
 
   @override
   void initState() {
@@ -69,8 +72,11 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     // Cargar juegos predefinidos
     _loadDefaultGames();
     
-    // Cargar rondas guardadas y seleccionar el juego correspondiente
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Cargar juegos desde Firebase para la fecha seleccionada
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      await _loadGamesFromFirebase(appProvider.selectedDate);
+      // Luego cargar rondas guardadas si existen
       _loadSavedRounds();
     });
   }
@@ -84,6 +90,113 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   // Método para cargar juegos predefinidos
   void _loadDefaultGames() {
     _games = BingoGamePresets.defaultGames;
+  }
+  
+  // Método para cargar juegos desde Firebase para la fecha seleccionada
+  Future<void> _loadGamesFromFirebase(String date) async {
+    try {
+      setState(() {
+        _loadingGames = true;
+      });
+      
+      print('DEBUG: Cargando juegos desde Firebase para la fecha: $date');
+      
+      final firebaseGames = await BingoGamesService().getAllBingoGames(date: date);
+      
+      print('DEBUG: ${firebaseGames.length} juegos cargados desde Firebase');
+      
+      // Convertir FirebaseBingoGame a BingoGameConfig
+      final List<BingoGameConfig> loadedGames = [];
+      
+      for (var firebaseGame in firebaseGames) {
+        try {
+          final rounds = firebaseGame.rounds.map((firebaseRound) {
+            return BingoGameRound(
+              id: firebaseRound.id,
+              name: firebaseRound.name,
+              patterns: firebaseRound.patterns.map((patternStr) {
+                // Intentar encontrar el patrón en el enum
+                try {
+                  // 1. Intento directo o con prefijo
+                  return BingoPattern.values.firstWhere(
+                    (pattern) => pattern.toString() == patternStr || 
+                                 pattern.toString() == 'BingoPattern.$patternStr',
+                    orElse: () {
+                      // 2. Intento por nombre (ignorando case y espacios)
+                      return BingoPattern.values.firstWhere(
+                        (pattern) {
+                          final enumName = pattern.toString().split('.').last.toLowerCase();
+                          final strName = patternStr.toLowerCase().replaceAll(' ', '');
+                          return enumName == strName;
+                        },
+                        orElse: () => BingoPattern.cartonLleno,
+                      );
+                    },
+                  );
+                } catch (e) {
+                  print('WARN: Error parseando patrón "$patternStr": $e');
+                  return BingoPattern.cartonLleno;
+                }
+              }).toList(),
+              isCompleted: firebaseRound.isCompleted,
+            );
+          }).toList();
+
+          loadedGames.add(BingoGameConfig(
+            id: firebaseGame.id,
+            name: firebaseGame.name,
+            date: firebaseGame.date,
+            rounds: rounds,
+          ));
+        } catch (e) {
+          print('ERROR: Error procesando juego ${firebaseGame.id}: $e');
+          // Continuar con el siguiente juego si uno falla
+        }
+      }
+      
+      setState(() {
+        _games = loadedGames;
+        _loadingGames = false;
+        
+        // Si hay juegos cargados y ninguno está seleccionado, seleccionar el primero
+        // O si el seleccionado no está en la lista nueva, seleccionar el primero
+        final isSelectedInList = _selectedGame != null && loadedGames.any((g) => g.id == _selectedGame!.id);
+        
+        if (loadedGames.isNotEmpty && (_selectedGame == null || !isSelectedInList)) {
+          _selectedGame = loadedGames.first;
+          _updateCurrentRoundIndex(0);
+        } else if (loadedGames.isEmpty) {
+          // Si no hay juegos para esta fecha, limpiar selección
+          _selectedGame = null;
+          _currentRoundIndex = 0;
+        }
+      });
+      
+      print('DEBUG: Juegos cargados y procesados correctamente. Total: ${loadedGames.length}');
+    } catch (e, stackTrace) {
+      print('ERROR: Error cargando juegos desde Firebase: $e');
+      print('STACK TRACE: $stackTrace');
+      
+      setState(() {
+        _loadingGames = false;
+        // No limpiar _games aquí para evitar parpadeos si falla una recarga, 
+        // pero si es un error crítico, tal vez deberíamos.
+        // Por ahora, mantenemos el estado anterior o vacío si es la primera carga.
+        if (_games.isEmpty) {
+           _games = [];
+           _selectedGame = null;
+        }
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error cargando juegos: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // Método para cargar rondas guardadas
@@ -263,16 +376,86 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       builder: (BuildContext context) {
         return CreateGameModal(
           onGameCreated: (newGame) async {
-            setState(() {
-              _selectedGame = newGame;
-            });
-            
-            // Guardar las rondas del nuevo juego
-            await RoundsPersistenceService.saveGameRounds(newGame);
-            
-            // Usar el método que actualiza la variable estática
-            await _updateCurrentRoundIndex(0);
-            Navigator.of(context).pop();
+            // Mostrar indicador de carga
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => const Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+
+            try {
+              // Obtener el AppProvider para totalCartillas
+              final appProvider = Provider.of<AppProvider>(context, listen: false);
+              
+              print('DEBUG: Iniciando creación de juego: ${newGame.name}');
+              print('DEBUG: Total cartillas: ${appProvider.totalCartillas}');
+              print('DEBUG: Fecha: ${newGame.date}');
+              
+              // Convertir BingoGameConfig a FirebaseBingoGame
+              final firebaseGame = FirebaseBingoGame.fromBingoGameConfig(
+                newGame,
+                totalCartillas: appProvider.totalCartillas,
+              );
+              
+              print('DEBUG: FirebaseGame creado con ID: ${firebaseGame.id}');
+              print('DEBUG: EventId: ${firebaseGame.eventId}');
+              
+              // Guardar en Firebase a través del backend API
+              final savedId = await BingoGamesService().saveBingoGame(firebaseGame);
+              print('DEBUG: Juego guardado con ID: $savedId');
+              
+              // Guardar las rondas del nuevo juego (persistencia local)
+              await RoundsPersistenceService.saveGameRounds(newGame);
+              
+              // Actualizar estado local
+              setState(() {
+                _selectedGame = newGame;
+              });
+              
+              // Usar el método que actualiza la variable estática
+              await _updateCurrentRoundIndex(0);
+              
+              // Cerrar el indicador de carga
+              if (mounted && Navigator.canPop(context)) {
+                Navigator.of(context).pop();
+              }
+              
+              // Cerrar el diálogo
+              if (mounted && Navigator.canPop(context)) {
+                Navigator.of(context).pop();
+              }
+              
+              // Mostrar mensaje de éxito
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Juego "${newGame.name}" creado exitosamente'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            } catch (e, stackTrace) {
+              print('ERROR: Error creando juego: $e');
+              print('STACK TRACE: $stackTrace');
+              
+              // Cerrar el indicador de carga
+              if (mounted && Navigator.canPop(context)) {
+                Navigator.of(context).pop();
+              }
+              
+              // Mostrar error
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error al crear el juego: ${e.toString()}'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 5),
+                  ),
+                );
+              }
+            }
           },
         );
       },
@@ -544,8 +727,6 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         return 'Figura Bandera';
       case BingoPattern.figuraTripleLinea:
         return 'Figura Triple Línea';
-      case BingoPattern.diagonalDerecha:
-        return 'Diagonal Derecha';
     }
   }
 
@@ -603,8 +784,6 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         return 'Figura Bandera';
       case BingoPattern.figuraTripleLinea:
         return 'Figura Triple Línea';
-      case BingoPattern.diagonalDerecha:
-        return 'Diagonal Derecha';
     }
   }
 
@@ -640,13 +819,76 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                       Icon(Icons.games, color: Colors.blue.shade700, size: 24),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          'Juegos de Bingo',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
-                            fontSize: 20,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Juegos de Bingo',
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade700,
+                                fontSize: 20,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            // Selector de fecha del evento
+                            InkWell(
+                              onTap: () async {
+                                final DateTime? picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: DateTime.parse(appProvider.selectedDate),
+                                  firstDate: DateTime(2024, 1, 1),
+                                  lastDate: DateTime(2030, 12, 31),
+                                );
+                                
+                                if (picked != null) {
+                                  final newDate = '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+                                  
+                                  // Actualizar la fecha en AppProvider
+                                  appProvider.setSelectedDate(newDate);
+                                  
+                                  // Cargar juegos desde Firebase para la nueva fecha
+                                  await _loadGamesFromFirebase(newDate);
+                                  
+                                  // Mostrar mensaje de confirmación
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Fecha cambiada a: $newDate'),
+                                        backgroundColor: Colors.blue.shade700,
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.blue.shade300),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.calendar_today, size: 14, color: Colors.blue.shade700),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      appProvider.selectedDate,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.blue.shade700,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.arrow_drop_down, size: 16, color: Colors.blue.shade700),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       // Botón para cambiar de juego

@@ -12,6 +12,7 @@ export interface CardDoc {
     sold: boolean;
     createdAt: number;
     cardNo?: number; // Número secuencial de cartilla
+    date?: string; // Fecha del evento (YYYY-MM-DD)
 }
 
 export interface EventDoc {

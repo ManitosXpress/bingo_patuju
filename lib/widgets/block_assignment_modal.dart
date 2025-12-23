@@ -8,6 +8,7 @@ class BlockAssignmentModal extends StatefulWidget {
   final String apiBase;
   final String vendorId;
   final String vendorName;
+  final String date;
   final Function() onSuccess;
   final List<Map<String, dynamic>>? allVendors; // Nueva: lista completa de vendedores
 
@@ -16,6 +17,7 @@ class BlockAssignmentModal extends StatefulWidget {
     required this.apiBase,
     required this.vendorId,
     required this.vendorName,
+    required this.date,
     required this.onSuccess,
     this.allVendors, // Opcional para compatibilidad
   });
@@ -78,14 +80,14 @@ class _BlockAssignmentModalState extends State<BlockAssignmentModal> {
           throw Exception('No se encontraron vendedores para asignar');
         }
         
-        result = await _service.assignBlocksToAllVendors(allVendorIds, _config);
+        result = await _service.assignBlocksToAllVendors(allVendorIds, _config, widget.date);
       } else {
         // Asignar a un vendedor específico
         if (widget.vendorId.isEmpty) {
           throw Exception('Debes seleccionar un vendedor');
         }
         
-        result = await _service.assignCardsByBlocks(widget.vendorId, _config);
+        result = await _service.assignCardsByBlocks(widget.vendorId, _config, widget.date);
       }
 
       setState(() {

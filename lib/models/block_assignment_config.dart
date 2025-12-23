@@ -29,8 +29,8 @@ class BlockAssignmentConfig {
   /// Cartilla inicial real (considerando startCard)
   int get actualStartCard => startCard;
 
-  /// Cartilla final real
-  int get actualEndCard => totalCards;
+  /// Cartilla final real (considerando startCard y totalCards)
+  int get actualEndCard => startCard + totalCards - 1;
 
   /// Cantidad total de cartillas que se asignarán
   int get totalCardsToAssign => quantityBlocksToAssign * blockSize;
@@ -83,14 +83,18 @@ class BlockAssignmentConfig {
   List<int> generateCardNumbers(List<int> blockNumbers) {
     final cards = <int>[];
     
+    // Calcular el límite máximo de cartillas considerando la cartilla inicial
+    final maxCardNumber = startCard + totalCards - 1;
+    
     for (final blockNumber in blockNumbers) {
       if (blockNumber < 0 || blockNumber >= totalBlocks) continue;
       
       final startCardInBlock = startCard + (blockNumber * blockSize);
-      final endCardInBlock = (startCardInBlock + blockSize - 1).clamp(0, totalCards);
+      final endCardInBlock = (startCardInBlock + blockSize - 1).clamp(startCard, maxCardNumber);
       
       for (int i = startCardInBlock; i <= endCardInBlock; i++) {
-        if (i <= totalCards) {
+        // Asegurar que no excedamos el límite máximo de cartillas
+        if (i >= startCard && i <= maxCardNumber) {
           cards.add(i);
         }
       }

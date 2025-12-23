@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/backend_config.dart';
 
@@ -11,19 +12,18 @@ class CartillaService {
     bool? sold,
     int page = 0,
     int limit = 10,
+    String? startAfter, // Cursor para paginación
   }) async {
     return _makeRequestWithRetry(() async {
       final queryParams = <String, String>{
         'date': date, // Siempre incluir date
-        'page': page.toString(),
         'limit': limit.toString(),
       };
       if (assignedTo != null) queryParams['assignedTo'] = assignedTo;
       if (sold != null) queryParams['sold'] = sold.toString();
+      if (startAfter != null) queryParams['startAfter'] = startAfter;
       
       final uri = Uri.parse(BackendConfig.cardsUrl).replace(queryParameters: queryParams);
-      
-      print('DEBUG: Solicitando cartillas para $date: $uri');
       
       final response = await http.get(
         uri,
@@ -31,12 +31,65 @@ class CartillaService {
       ).timeout(BackendConfig.connectionTimeout);
       
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.cast<Map<String, dynamic>>();
+        // Nueva estructura de respuesta con paginación
+        final responseData = json.decode(response.body) as Map<String, dynamic>;
+        final cards = responseData['cards'] as List<dynamic>? ?? [];
+        return cards.cast<Map<String, dynamic>>();
       } else {
         throw Exception('Error al obtener cartillas: ${response.statusCode} - ${response.body}');
       }
     });
+  }
+  
+  // Obtener todas las cartillas con paginación automática (carga todas las páginas)
+  // OPTIMIZADO: Usa límite de 50 por página para reducir lecturas
+  static Future<List<Map<String, dynamic>>> getAllCartillas({
+    required String date,
+    String? assignedTo,
+    bool? sold,
+    int limitPerPage = 50, // Reducido de 2000 a 50 para optimizar lecturas
+  }) async {
+    final allCards = <Map<String, dynamic>>[];
+    String? lastDocId;
+    bool hasMore = true;
+    
+    while (hasMore) {
+      final queryParams = <String, String>{
+        'date': date,
+        'limit': limitPerPage.toString(),
+      };
+      if (assignedTo != null) queryParams['assignedTo'] = assignedTo;
+      if (sold != null) queryParams['sold'] = sold.toString();
+      if (lastDocId != null) queryParams['startAfter'] = lastDocId;
+      
+      final uri = Uri.parse(BackendConfig.cardsUrl).replace(queryParameters: queryParams);
+      
+      final response = await http.get(
+        uri,
+        headers: BackendConfig.defaultHeaders,
+      ).timeout(BackendConfig.connectionTimeout);
+      
+      if (response.statusCode != 200) {
+        throw Exception('Error al obtener cartillas: ${response.statusCode} - ${response.body}');
+      }
+      
+      // Nueva estructura de respuesta con paginación
+      final responseData = json.decode(response.body) as Map<String, dynamic>;
+      final pageCards = (responseData['cards'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
+      final pagination = responseData['pagination'] as Map<String, dynamic>?;
+      
+      allCards.addAll(pageCards);
+      
+      // Verificar si hay más páginas
+      final hasMorePages = pagination?['hasMore'] as bool? ?? false;
+      lastDocId = pagination?['lastDocId'] as String?;
+      
+      if (!hasMorePages || lastDocId == null || pageCards.isEmpty) {
+        hasMore = false;
+      }
+    }
+    
+    return allCards;
   }
   
   // Crear una nueva cartilla
@@ -80,10 +133,14 @@ class CartillaService {
   }
   
   // Desasignar cartilla
-  static Future<Map<String, dynamic>> unassignCartilla(String cartillaId) async {
+  static Future<Map<String, dynamic>> unassignCartilla(String cartillaId, {required String date}) async {
     return _makeRequestWithRetry(() async {
+      final uri = Uri.parse('${BackendConfig.cardsUrl}/$cartillaId/unassign').replace(
+        queryParameters: {'date': date}
+      );
+      
       final response = await http.post(
-        Uri.parse('${BackendConfig.cardsUrl}/$cartillaId/unassign'),
+        uri,
         headers: BackendConfig.defaultHeaders,
       ).timeout(BackendConfig.connectionTimeout);
       
@@ -101,21 +158,19 @@ class CartillaService {
       final uri = Uri.parse('${BackendConfig.apiBase}/cards/$id').replace(
         queryParameters: {'date': date}
       );
-      
-      print('DEBUG: Eliminando cartilla - URL: $uri');
-      
+
       final response = await _makeRequestWithRetry(
         () => http.delete(
           uri,
           headers: BackendConfig.defaultHeaders,
         ),
       );
-      
-      print('DEBUG: Respuesta de eliminación - Status: ${response.statusCode}, Body: ${response.body}');
-      
+
       return response.statusCode == 200;
     } catch (e) {
-      print('Error eliminando cartilla: $e');
+      if (kDebugMode) {
+        print('Error eliminando cartilla: $e');
+      }
       return false;
     }
   }
@@ -138,24 +193,30 @@ class CartillaService {
 
       if (response.statusCode == 201) {
         final responseData = json.decode(response.body);
-        print('DEBUG: Se generaron $count cartillas exitosamente');
         return responseData;
       } else {
-        print('Error generando cartillas: ${response.statusCode}');
+        if (kDebugMode) {
+          print('Error generando cartillas: ${response.statusCode}');
+        }
         return null;
       }
     } catch (e) {
-      print('Error generando cartillas: $e');
+      if (kDebugMode) {
+        print('Error generando cartillas: $e');
+      }
       return null;
     }
   }
 
   // Eliminar TODAS las cartillas
-  static Future<Map<String, dynamic>?> clearAllCartillas() async {
+  static Future<Map<String, dynamic>?> clearAllCartillas({String? date}) async {
     try {
+      final uri = Uri.parse('${BackendConfig.apiBase}/cards/clear');
+      final finalUri = date != null ? uri.replace(queryParameters: {'date': date}) : uri;
+      
       final response = await _makeRequestWithRetry(
         () => http.delete(
-          Uri.parse('${BackendConfig.apiBase}/cards/clear'),
+          finalUri,
           headers: BackendConfig.defaultHeaders,
         ),
       );
@@ -164,11 +225,15 @@ class CartillaService {
         final responseData = json.decode(response.body);
         return responseData;
       } else {
-        print('Error eliminando todas las cartillas: ${response.statusCode}');
+        if (kDebugMode) {
+          print('Error eliminando todas las cartillas: ${response.statusCode}');
+        }
         return null;
       }
     } catch (e) {
-      print('Error eliminando todas las cartillas: $e');
+      if (kDebugMode) {
+        print('Error eliminando todas las cartillas: $e');
+      }
       return null;
     }
   }
@@ -237,7 +302,9 @@ class CartillaService {
           await Future.delayed(const Duration(milliseconds: 100));
         }
       } catch (e) {
-        print('Error creando cartilla ${i + 1}: $e');
+        if (kDebugMode) {
+          print('Error creando cartilla ${i + 1}: $e');
+        }
         // Continuar con las siguientes cartillas
       }
     }
@@ -273,8 +340,10 @@ class CartillaService {
         
         // Esperar antes del siguiente intento
         await Future.delayed(BackendConfig.retryDelay * attempts);
-        
-        print('Reintentando solicitud (intento $attempts)...');
+
+        if (kDebugMode) {
+          print('Reintentando solicitud (intento $attempts)...');
+        }
       }
     }
     
@@ -291,8 +360,42 @@ class CartillaService {
       
       return response.statusCode == 200;
     } catch (e) {
-      print('Error verificando salud del backend: $e');
+      if (kDebugMode) {
+        print('Error verificando salud del backend: $e');
+      }
       return false;
     }
+  }
+
+  // Búsqueda directa de cartillas por número (cardNo) usando el endpoint optimizado
+  static Future<List<Map<String, dynamic>>> searchCartillasByNumber({
+    required String date,
+    required int cardNo,
+  }) async {
+    return _makeRequestWithRetry(() async {
+      final uri = Uri.parse('${BackendConfig.apiBase}/cards/search').replace(
+        queryParameters: {
+          'date': date,
+          'cardNo': cardNo.toString(),
+        },
+      );
+
+      final response = await http
+          .get(
+            uri,
+            headers: BackendConfig.defaultHeaders,
+          )
+          .timeout(BackendConfig.connectionTimeout);
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body) as Map<String, dynamic>;
+        final cards = responseData['cards'] as List<dynamic>? ?? [];
+        return cards.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception(
+          'Error en búsqueda de cartillas: ${response.statusCode} - ${response.body}',
+        );
+      }
+    });
   }
 } 

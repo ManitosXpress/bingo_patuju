@@ -58,7 +58,6 @@ class BingoPatternsPanel extends StatelessWidget {
                 _patternTile('Figura C Loca', _figuraCLocaPattern(), probs['Figura C Loca']!, Colors.green, gridSize, cellSize, completed['Figura C Loca'] ?? false),
                 _patternTile('Figura Bandera', _figuraBanderaPattern(), probs['Figura Bandera']!, Colors.red, gridSize, cellSize, completed['Figura Bandera'] ?? false),
                 _patternTile('Figura Triple Línea', _figuraTripleLineaPattern(), probs['Figura Triple Línea']!, Colors.pink, gridSize, cellSize, completed['Figura Triple Línea'] ?? false),
-                _patternTile('Diagonal Derecha', _diagonalDerechaPattern(), probs['Diagonal Derecha']!, Colors.amber, gridSize, cellSize, completed['Diagonal Derecha'] ?? false),
                 const SizedBox(height: 8),
                 const Text(
                   'Probabilidad de que cada figura sea la próxima en salir (se actualiza en tiempo real).',
@@ -236,9 +235,6 @@ class BingoPatternsPanel extends StatelessWidget {
         break;
       case 'Figura Triple Línea':
         patternMatrix = _figuraTripleLineaPattern();
-        break;
-      case 'Diagonal Derecha':
-        patternMatrix = _diagonalDerechaPattern();
         break;
       default:
         return false;
@@ -637,15 +633,6 @@ class BingoPatternsPanel extends StatelessWidget {
       [1,1,1,1,1],
       [0,0,0,0,0],
       [1,1,1,1,1],
-    ];
-  }
-  List<List<int>> _diagonalDerechaPattern() {
-    return [
-      [1,0,0,0,0],
-      [0,1,0,0,0],
-      [0,0,1,0,0],
-      [0,0,0,1,0],
-      [0,0,0,0,1],
     ];
   }
 } 

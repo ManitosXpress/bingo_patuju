@@ -70,8 +70,6 @@ class _ControlPanelState extends State<ControlPanel> {
                 // Botones secundarios
                 SecondaryButtonsRow(
                   onViewCartillas: () {
-                    print('DEBUG: Botón "Ver Cartillas" presionado');
-                    print('DEBUG: Número de cartillas: ${bingoGame.cartillas.length}');
                     _showCartillasDialog(context, bingoGame);
                   },
                   onReset: () {

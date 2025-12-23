@@ -494,6 +494,88 @@ class _RoundCardState extends State<_RoundCard> {
     widget.onUpdate(updatedRound);
   }
 
+  List<List<int>> _getPatternMatrix(BingoPattern pattern) {
+    switch (pattern) {
+      case BingoPattern.lineaHorizontal:
+        return [[1,1,1,1,1], [0,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0], [0,0,0,0,0]];
+      case BingoPattern.lineaVertical:
+        return [[1,0,0,0,0], [1,0,0,0,0], [1,0,0,0,0], [1,0,0,0,0], [1,0,0,0,0]];
+      case BingoPattern.diagonalPrincipal:
+        return [[1,0,0,0,0], [0,1,0,0,0], [0,0,1,0,0], [0,0,0,1,0], [0,0,0,0,1]];
+      case BingoPattern.diagonalSecundaria:
+        return [[0,0,0,0,1], [0,0,0,1,0], [0,0,1,0,0], [0,1,0,0,0], [1,0,0,0,0]];
+      case BingoPattern.cartonLleno:
+        return List.generate(5, (_) => List.filled(5, 1));
+      case BingoPattern.consuelo:
+        return List.generate(5, (_) => List.filled(5, 1)); // Igual que Cartón Lleno
+      case BingoPattern.figuraAvion:
+        return [[0,0,0,1,0], [1,0,0,1,0], [1,1,1,1,1], [1,0,0,1,0], [0,0,0,1,0]];
+      case BingoPattern.x:
+        return [[1,0,0,0,1], [0,1,0,1,0], [0,0,1,0,0], [0,1,0,1,0], [1,0,0,0,1]];
+      case BingoPattern.marcoCompleto:
+        return [[1,1,1,1,1], [1,0,0,0,1], [1,0,0,0,1], [1,0,0,0,1], [1,1,1,1,1]];
+      case BingoPattern.corazon:
+        return [[0,1,0,1,0], [1,0,1,0,1], [1,0,0,0,1], [0,1,0,1,0], [0,0,1,0,0]];
+      case BingoPattern.caidaNieve:
+        return [[0,0,1,0,0], [0,1,0,1,0], [1,0,1,0,1], [0,1,0,1,0], [0,0,1,0,0]];
+      case BingoPattern.marcoPequeno:
+        return [[0,0,0,0,0], [0,1,1,1,0], [0,1,0,1,0], [0,1,1,1,0], [0,0,0,0,0]];
+      case BingoPattern.arbolFlecha:
+        return [[0,0,1,0,0], [0,1,1,1,0], [1,1,1,1,1], [0,0,1,0,0], [0,0,1,0,0]];
+      case BingoPattern.spoutnik:
+        return [[1,1,1,1,1], [0,0,1,0,0], [0,1,1,1,0], [0,0,1,0,0], [1,1,1,1,1]];
+      case BingoPattern.letraI:
+        return [[0,1,1,1,0], [0,0,1,0,0], [0,0,1,0,0], [0,0,1,0,0], [0,1,1,1,0]];
+      case BingoPattern.letraN:
+        return [[1,0,0,0,1], [1,1,0,0,1], [1,0,1,0,1], [1,0,0,1,1], [1,0,0,0,1]];
+      case BingoPattern.autopista:
+        return [[0,1,0,1,0], [0,1,0,1,0], [0,1,0,1,0], [0,1,0,1,0], [0,1,0,1,0]];
+      case BingoPattern.relojArena:
+        return [[1,1,1,1,1], [0,1,1,1,0], [0,0,1,0,0], [0,1,1,1,0], [1,1,1,1,1]];
+      case BingoPattern.dobleLineaV:
+        return [[1,0,0,0,1], [1,0,0,0,1], [1,0,0,0,1], [1,0,0,0,1], [1,0,0,0,1]];
+      case BingoPattern.figuraSuegra:
+        return [[1,0,0,0,1], [0,0,1,0,0], [0,1,1,1,0], [0,0,1,0,0], [1,0,0,0,1]];
+      case BingoPattern.figuraComodin: // Infinito
+        return [[1,1,1,0,0], [1,0,1,0,0], [1,1,1,1,1], [0,0,1,0,1], [0,0,1,1,1]];
+      case BingoPattern.letraFE:
+        return [[1,1,1,1,0], [1,0,0,0,0], [1,1,1,0,0], [1,0,0,0,0], [1,0,0,0,0]];
+      case BingoPattern.figuraCLoca:
+        return [[1,1,1,1,0], [0,0,0,0,1], [0,0,0,0,1], [0,0,0,0,1], [1,1,1,1,0]];
+      case BingoPattern.figuraBandera:
+        return [[1,1,1,1,1], [1,1,1,1,1], [1,1,1,1,1], [1,0,0,0,0], [1,0,0,0,0]];
+      case BingoPattern.figuraTripleLinea:
+        return [[1,1,1,1,1], [0,0,0,0,0], [1,1,1,1,1], [0,0,0,0,0], [1,1,1,1,1]];
+      default:
+        return List.generate(5, (_) => List.filled(5, 0));
+    }
+  }
+
+  Widget _patternMiniGrid(List<List<int>> pattern, Color color, double size) {
+    final cellSize = size / 5;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Column(
+        children: List.generate(5, (row) {
+          return Row(
+            children: List.generate(5, (col) {
+              bool isActive = pattern[row][col] == 1;
+              return Container(
+                width: cellSize,
+                height: cellSize,
+                decoration: BoxDecoration(
+                  color: isActive ? color : Colors.grey.shade200,
+                  border: Border.all(color: Colors.grey.shade300, width: 0.5),
+                ),
+              );
+            }),
+          );
+        }),
+      ),
+    );
+  }
+
   List<BingoPattern> _getSortedPatterns() {
     final patterns = List<BingoPattern>.from(BingoPattern.values);
     patterns.sort((a, b) {
@@ -632,22 +714,32 @@ class _RoundCardState extends State<_RoundCard> {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                           child: Row(
                             children: [
-                              Icon(
-                                isSelected ? Icons.check_circle : Icons.circle_outlined,
-                                size: 18,
-                                color: isSelected ? Colors.green.shade600 : Colors.grey.shade400,
-                              ),
-                              const SizedBox(width: 6),
+                              if (isSelected)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8.0),
+                                  child: Icon(
+                                    Icons.check_circle,
+                                    size: 16,
+                                    color: Colors.green.shade600,
+                                  ),
+                                ),
                               Expanded(
                                 child: Text(
                                   _getPatternDisplayName(pattern),
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                                     color: isSelected ? Colors.green.shade700 : Colors.grey.shade700,
                                   ),
                                   overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
                                 ),
+                              ),
+                              const SizedBox(width: 8),
+                              _patternMiniGrid(
+                                _getPatternMatrix(pattern),
+                                isSelected ? Colors.green.shade600 : Colors.grey.shade400,
+                                40, // Aumentado de 24 a 40
                               ),
                             ],
                           ),
@@ -692,7 +784,7 @@ class _RoundCardState extends State<_RoundCard> {
       case BingoPattern.caidaNieve:
         return 'Caída de Nieve';
       case BingoPattern.arbolFlecha:
-        return 'Árbol o Flecha';
+        return 'Flecha';
       case BingoPattern.letraI:
         return 'LETRA I';
       case BingoPattern.letraN:
@@ -715,8 +807,8 @@ class _RoundCardState extends State<_RoundCard> {
         return 'Bandera';
       case BingoPattern.figuraTripleLinea:
         return 'Triple Línea';
-      case BingoPattern.diagonalDerecha:
-        return 'Diagonal Derecha';
+      case BingoPattern.consuelo:
+        return '';
     }
   }
 }

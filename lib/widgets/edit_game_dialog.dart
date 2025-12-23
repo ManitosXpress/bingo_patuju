@@ -24,10 +24,6 @@ class _EditGameDialogState extends State<EditGameDialog> {
   late String _selectedDay;
   late List<BingoGameRound> _rounds;
   
-  final List<String> _availableDays = [
-    'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -134,25 +130,18 @@ class _EditGameDialogState extends State<EditGameDialog> {
                       ),
                       const SizedBox(height: 16),
                       
-                      // Día de la semana
-                      DropdownButtonFormField<String>(
-                        value: _selectedDay,
+                      // Fecha del evento
+                      TextFormField(
+                        initialValue: _selectedDay,
+                        readOnly: true,
                         decoration: const InputDecoration(
-                          labelText: 'Día de la Semana',
+                          labelText: 'Fecha del Evento',
                           border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.calendar_today),
                         ),
-                        items: _availableDays.map((day) {
-                          return DropdownMenuItem(
-                            value: day,
-                            child: Text(day),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectedDay = value;
-                            });
-                          }
+                        onTap: () async {
+                          // Implementación opcional para cambiar la fecha si se desea
+                          // Por ahora solo visualización ya que el error era con el Dropdown
                         },
                       ),
                       const SizedBox(height: 20),

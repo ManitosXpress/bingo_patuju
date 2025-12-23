@@ -117,7 +117,14 @@ router.post('/', async (req: any, res: any) => {
 });
 
 router.get('/', async (_req: any, res: any) => {
-  const { assignedTo, sold, limit, date } = _req.query as { assignedTo?: string; sold?: string; limit?: string; date?: string };
+  const { assignedTo, sold, limit, date, startAfter, countOnly } = _req.query as { 
+    assignedTo?: string; 
+    sold?: string; 
+    limit?: string; 
+    date?: string;
+    startAfter?: string;
+    countOnly?: string;
+  };
 
   // date es REQUERIDO ahora
   if (!date) {
@@ -126,19 +133,73 @@ router.get('/', async (_req: any, res: any) => {
     });
   }
 
+  // Si solo se necesita el conteo, usar count() aggregation para optimizar (1 lectura en lugar de N)
+  if (countOnly === 'true') {
+    let countQuery = db.collection('events').doc(date).collection('cards') as any;
+    if (assignedTo) countQuery = countQuery.where('assignedTo', '==', assignedTo);
+    if (sold === 'true') countQuery = countQuery.where('sold', '==', true);
+    if (sold === 'false') countQuery = countQuery.where('sold', '==', false);
+    
+    // Usar count() aggregation - solo 1 lectura independientemente del número de documentos
+    const countAggregation = await countQuery.count().get();
+    const count = countAggregation.data().count;
+    return res.json({ count });
+  }
+
   // Nueva ruta: events/{date}/cards
   let q = db.collection('events').doc(date).collection('cards') as any;
+
+  const hasAssignedToFilter = !!assignedTo;
+  const hasSoldFilter = sold === 'true' || sold === 'false';
+  const hasMultipleFilters = hasAssignedToFilter && hasSoldFilter;
 
   if (assignedTo) q = q.where('assignedTo', '==', assignedTo);
   if (sold === 'true') q = q.where('sold', '==', true);
   if (sold === 'false') q = q.where('sold', '==', false);
 
-  // Usar el límite del query string o un valor muy alto por defecto para obtener todas las cartillas
-  // Si no se especifica límite, usar 50000 para obtener todas las cartillas disponibles
-  const limitValue = limit ? parseInt(limit) : 50000;
-  const snaps = await q.limit(limitValue).get();
+  // Si hay múltiples filtros, no usar orderBy en Firestore (requiere índice compuesto)
+  // En su lugar, ordenaremos en memoria después
+  let useOrderBy = !hasMultipleFilters;
+  
+  if (useOrderBy) {
+    q = q.orderBy('cardNo', 'asc');
+  }
 
-  const out = snaps.docs.map((d: any) => {
+  // Implementar paginación con cursor - OPTIMIZADO: límite por defecto de 50 para reducir lecturas
+  const pageSize = limit ? Math.min(parseInt(limit), 2000) : 50; // Reducido de 2000 a 50 por defecto
+  q = q.limit(pageSize);
+
+  // Si hay cursor (startAfter) y no hay múltiples filtros, continuar desde ahí
+  if (startAfter && useOrderBy) {
+    try {
+      const startAfterDoc = await db.collection('events').doc(date).collection('cards').doc(startAfter).get();
+      if (startAfterDoc.exists) {
+        q = q.startAfter(startAfterDoc);
+      }
+    } catch (e) {
+      // Si el documento no existe, ignorar el cursor
+    }
+  }
+
+  let snaps;
+  try {
+    snaps = await q.get();
+  } catch (e: any) {
+    // Si falla por falta de índice, intentar sin orderBy y ordenar en memoria
+    if (e.message && e.message.includes('index')) {
+      useOrderBy = false;
+      q = db.collection('events').doc(date).collection('cards') as any;
+      if (assignedTo) q = q.where('assignedTo', '==', assignedTo);
+      if (sold === 'true') q = q.where('sold', '==', true);
+      if (sold === 'false') q = q.where('sold', '==', false);
+      q = q.limit(pageSize);
+      snaps = await q.get();
+    } else {
+      throw e;
+    }
+  }
+
+  let out = snaps.docs.map((d: any) => {
     const data = d.data();
     const size = (data.gridSize as number) ?? 5;
     const numbers = data.numbers ? (data.numbers as number[][]) : expandGrid((data.numbersFlat as number[]) ?? [], size);
@@ -149,23 +210,105 @@ router.get('/', async (_req: any, res: any) => {
       sold: data.sold ?? false,
       createdAt: data.createdAt,
       cardNo: data.cardNo ?? null,
+      date: date, // Incluir la fecha del evento
     } as CardDoc;
   });
 
-  // Ordenar por cardNo de menor a mayor
-  out.sort((a: CardDoc, b: CardDoc) => {
-    // Si ambos tienen cardNo, ordenar por ese valor
-    if (a.cardNo != null && b.cardNo != null) {
-      return a.cardNo - b.cardNo;
-    }
-    // Si solo uno tiene cardNo, poner primero el que sí lo tiene
-    if (a.cardNo != null && b.cardNo == null) return -1;
-    if (a.cardNo == null && b.cardNo != null) return 1;
-    // Si ninguno tiene cardNo, mantener el orden original
-    return 0;
-  });
+  // Si hay múltiples filtros o no se pudo usar orderBy, ordenar en memoria
+  if (hasMultipleFilters || !useOrderBy) {
+    out.sort((a: CardDoc, b: CardDoc) => {
+      if (a.cardNo != null && b.cardNo != null) {
+        return a.cardNo - b.cardNo;
+      }
+      if (a.cardNo != null && b.cardNo == null) return -1;
+      if (a.cardNo == null && b.cardNo != null) return 1;
+      return 0;
+    });
+  }
 
-  return res.json(out);
+  // Determinar si hay más páginas
+  const hasMore = snaps.docs.length === pageSize;
+  const lastDocId = snaps.docs.length > 0 ? snaps.docs[snaps.docs.length - 1].id : null;
+
+  return res.json({
+    cards: out,
+    pagination: {
+      hasMore,
+      lastDocId,
+      pageSize: out.length,
+      totalInPage: out.length
+    }
+  });
+});
+
+// Endpoint de búsqueda directa por número de cartilla (cardNo)
+router.get('/search', async (_req: any, res: any) => {
+  try {
+    const { date, cardNo } = _req.query as {
+      date?: string;
+      cardNo?: string;
+    };
+
+    if (!date) {
+      return res.status(400).json({
+        error: 'El parámetro "date" es requerido (formato: YYYY-MM-DD)',
+      });
+    }
+
+    if (!cardNo) {
+      return res.status(400).json({
+        error: 'El parámetro "cardNo" es requerido para la búsqueda',
+      });
+    }
+
+    const parsedCardNo = parseInt(cardNo, 10);
+    if (isNaN(parsedCardNo)) {
+      return res.status(400).json({
+        error: 'El parámetro "cardNo" debe ser un número válido',
+      });
+    }
+
+    const cardsCollectionRef = db
+      .collection('events')
+      .doc(date)
+      .collection('cards') as any;
+
+    // Búsqueda directa por número de cartilla
+    const snaps = await cardsCollectionRef
+      .where('cardNo', '==', parsedCardNo)
+      .limit(5)
+      .get();
+
+    const cards: CardDoc[] = snaps.docs.map((d: any) => {
+      const data = d.data();
+      const size = (data.gridSize as number) ?? 5;
+      const numbers = data.numbers
+        ? (data.numbers as number[][])
+        : expandGrid((data.numbersFlat as number[]) ?? [], size);
+
+      return {
+        date: date, // Incluir la fecha del evento
+        id: d.id,
+        numbers,
+        assignedTo: data.assignedTo ?? null,
+        sold: data.sold ?? false,
+        createdAt: data.createdAt,
+        cardNo: data.cardNo ?? null,
+      } as CardDoc;
+    });
+
+    return res.json({
+      cards,
+      pagination: {
+        hasMore: false,
+        lastDocId: null,
+        pageSize: cards.length,
+        totalInPage: cards.length,
+      },
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
 });
 
 router.post('/:id/assign', async (req: any, res: any) => {
@@ -192,6 +335,7 @@ router.post('/:id/assign', async (req: any, res: any) => {
       sold: data.sold,
       createdAt: data.createdAt,
       cardNo: data.cardNo ?? null,
+      date: date, // Incluir la fecha del evento
     });
   } catch (e: any) {
     return res.status(400).json({ error: e.message });
@@ -246,67 +390,68 @@ router.post('/bulk-assign', async (req: any, res: any) => {
       return res.status(400).json({ error: 'No se generaron números de cartilla válidos' });
     }
 
-    // Aumentar el límite para asignaciones por bloques (puede haber más de 100 cartillas)
-    // Firebase tiene un límite de 500 operaciones por batch, así que limitamos a 500
-    if (targetCardNumbers.length > 500) {
-      return res.status(400).json({
-        error: 'No se pueden asignar más de 500 cartillas a la vez (límite de Firebase batch)'
-      });
+    // Implementar chunking para asignaciones masivas (>500 cartillas)
+    const BATCH_SIZE = 500;
+    const assignedCards: any[] = [];
+    const notFoundCards: any[] = [];
+
+    // Procesar en chunks si hay más de 500 cartillas
+    const chunks: number[][] = [];
+    for (let i = 0; i < targetCardNumbers.length; i += BATCH_SIZE) {
+      chunks.push(targetCardNumbers.slice(i, i + BATCH_SIZE));
     }
 
-    console.log(`🃏 Asignando ${targetCardNumbers.length} cartilla${targetCardNumbers.length > 1 ? 's' : ''} a vendor ${vendorId}`);
-    console.log(`📋 Números solicitados: ${targetCardNumbers.join(', ')}`);
+    for (const chunk of chunks) {
+      const batch = db.batch();
+      const chunkAssignedCards: any[] = [];
+      const chunkNotFoundCards: any[] = [];
 
-    // Buscar las cartillas por cardNo en events/{date}/cards
-    const batch = db.batch();
-    const assignedCards = [];
-    const notFoundCards = [];
+      // Procesar todas las consultas en paralelo para este chunk
+      const cardQueries = await Promise.all(
+        chunk.map(async (cardNo) => {
+          const cardsSnapshot = await db.collection('events').doc(date).collection('cards')
+            .where('cardNo', '==', cardNo)
+            .where('sold', '==', false)
+            .limit(1)
+            .get();
+          return { cardNo, snapshot: cardsSnapshot };
+        })
+      );
 
-    for (const cardNo of targetCardNumbers) {
-      // Buscar cartilla por cardNo en la fecha específica
-      const cardsSnapshot = await db.collection('events').doc(date).collection('cards')
-        .where('cardNo', '==', cardNo)
-        .where('sold', '==', false)
-        .limit(1)
-        .get();
+      for (const { cardNo, snapshot } of cardQueries) {
+        if (!snapshot.empty) {
+          const cardDoc = snapshot.docs[0];
+          const cardData = cardDoc.data();
 
-      if (!cardsSnapshot.empty) {
-        const cardDoc = cardsSnapshot.docs[0];
-        const cardData = cardDoc.data();
+          if (!cardData.assignedTo) {
+            batch.update(cardDoc.ref, { assignedTo: vendorId });
 
-        // Verificar que no esté ya asignada
-        if (!cardData.assignedTo) {
-          batch.update(cardDoc.ref, { assignedTo: vendorId });
+            const size = (cardData.gridSize as number) ?? 5;
+            const numbers = cardData.numbers ?
+              (cardData.numbers as number[][]) :
+              expandGrid((cardData.numbersFlat as number[]) ?? [], size);
 
-          const size = (cardData.gridSize as number) ?? 5;
-          const numbers = cardData.numbers ?
-            (cardData.numbers as number[][]) :
-            expandGrid((cardData.numbersFlat as number[]) ?? [], size);
-
-          assignedCards.push({
-            id: cardDoc.id,
-            cardNo: cardData.cardNo,
-            numbers,
-            assignedTo: vendorId,
-            sold: cardData.sold,
-            createdAt: cardData.createdAt,
-          });
+            chunkAssignedCards.push({
+              id: cardDoc.id,
+              cardNo: cardData.cardNo,
+              numbers,
+              assignedTo: vendorId,
+              sold: cardData.sold,
+              createdAt: cardData.createdAt,
+            });
+          } else {
+            chunkNotFoundCards.push({ cardNo, reason: 'Ya asignada' });
+          }
         } else {
-          notFoundCards.push({ cardNo, reason: 'Ya asignada' });
+          chunkNotFoundCards.push({ cardNo, reason: 'No encontrada' });
         }
-      } else {
-        notFoundCards.push({ cardNo, reason: 'No encontrada' });
       }
-    }
 
-    if (assignedCards.length > 0) {
-      await batch.commit();
-      console.log(`✅ Se asignaron ${assignedCards.length} cartilla${assignedCards.length > 1 ? 's' : ''} exitosamente`);
-      console.log(`✅ Cartillas asignadas: ${assignedCards.map(c => c.cardNo).join(', ')}`);
-    }
-
-    if (notFoundCards.length > 0) {
-      console.log(`❌ Cartillas no encontradas: ${notFoundCards.map(c => c.cardNo).join(', ')}`);
+      if (chunkAssignedCards.length > 0) {
+        await batch.commit();
+        assignedCards.push(...chunkAssignedCards);
+      }
+      notFoundCards.push(...chunkNotFoundCards);
     }
 
     return res.status(200).json({
@@ -328,7 +473,6 @@ router.post('/bulk-assign', async (req: any, res: any) => {
     });
 
   } catch (e: any) {
-    console.error('Error en asignación masiva:', e);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -359,8 +503,6 @@ router.post('/generate', async (req: any, res: any) => {
       });
     }
 
-    console.log(`🃏 Generando ${count} cartilla${count > 1 ? 's' : ''} para ${date}...`);
-
     // Nueva ruta: events/{date}/cards
     const cardsCollectionRef = db.collection('events').doc(date).collection('cards');
 
@@ -379,18 +521,36 @@ router.post('/generate', async (req: any, res: any) => {
         }
       }
     } catch (e) {
-      console.warn('No se pudo usar índice ordenado, usando método alternativo');
-      const existingCards = await cardsCollectionRef.get();
+      // Si no hay índice, obtener todas las cartillas y encontrar el máximo
+      // Esto es ineficiente pero necesario si no hay índice
+      let allCards: any[] = [];
+      let lastDoc: any = null;
+      let hasMore = true;
 
-      if (!existingCards.empty) {
-        const cardNumbers: number[] = [];
-        existingCards.docs.forEach(doc => {
-          const data = doc.data();
-          if (data.cardNo && typeof data.cardNo === 'number') {
-            cardNumbers.push(data.cardNo);
-          }
-        });
+      while (hasMore) {
+        let query = cardsCollectionRef.orderBy('__name__', 'asc').limit(1000) as any;
+        if (lastDoc) {
+          query = query.startAfter(lastDoc);
+        }
 
+        const snapshot = await query.get();
+        if (snapshot.empty) {
+          hasMore = false;
+          break;
+        }
+
+        allCards.push(...snapshot.docs.map((d: any) => d.data()));
+        lastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+        if (snapshot.docs.length < 1000) {
+          hasMore = false;
+        }
+      }
+
+      if (allCards.length > 0) {
+        const cardNumbers = allCards
+          .map(d => d.cardNo)
+          .filter((n): n is number => typeof n === 'number');
         if (cardNumbers.length > 0) {
           nextCardNo = Math.max(...cardNumbers) + 1;
         }
@@ -443,11 +603,7 @@ router.post('/generate', async (req: any, res: any) => {
       // Commit del batch
       await batch.commit();
       generatedCards.push(...batchCards);
-
-      console.log(`✅ Batch ${batchIndex + 1}/${totalBatches} completado (${batchCount} cartillas)`);
     }
-
-    console.log(`✅ Se generaron ${count} cartilla${count > 1 ? 's' : ''} exitosamente`);
 
     return res.status(201).json({
       message: `Se generaron ${count} cartilla${count > 1 ? 's' : ''} exitosamente`,
@@ -456,38 +612,68 @@ router.post('/generate', async (req: any, res: any) => {
     });
 
   } catch (e: any) {
-    console.error('Error generando cartillas:', e);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Endpoint para eliminar TODAS las cartillas (DEBE ir ANTES de /:id)
-router.delete('/clear', async (_req: any, res: any) => {
+router.delete('/clear', async (req: any, res: any) => {
   try {
-    console.log('⚠️ ADVERTENCIA: Eliminando TODAS las cartillas de la base de datos...');
+    const { date } = req.query as { date?: string };
+    
+    // date es REQUERIDO ahora
+    if (!date) {
+      return res.status(400).json({
+        error: 'El parámetro "date" es requerido (formato: YYYY-MM-DD)'
+      });
+    }
 
-    // Obtener todas las cartillas
-    const allCards = await db.collection('cards').get();
-    const batch = db.batch();
+    const cardsCollectionRef = db.collection('events').doc(date).collection('cards');
+    const BATCH_SIZE = 500; // Límite de Firestore
+    let deletedCount = 0;
+    let lastDoc: any = null;
+    let hasMore = true;
 
-    // Agregar todas las cartillas al batch de eliminación
-    allCards.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
+    // Procesar en chunks para evitar exceder el límite de 500 operaciones por batch
+    while (hasMore) {
+      let query = cardsCollectionRef.orderBy('__name__', 'asc').limit(BATCH_SIZE) as any;
+      
+      // Si hay un documento anterior, continuar desde ahí
+      if (lastDoc) {
+        query = query.startAfter(lastDoc);
+      }
 
-    // Ejecutar el batch
-    await batch.commit();
+      const batch = db.batch();
+      const snapshot = await query.get();
 
-    const deletedCount = allCards.docs.length;
-    console.log(`✅ Se eliminaron ${deletedCount} cartillas de la base de datos`);
+      if (snapshot.empty) {
+        hasMore = false;
+        break;
+      }
+
+      // Agregar todas las cartillas del chunk al batch
+      snapshot.docs.forEach((doc: any) => {
+        batch.delete(doc.ref);
+        lastDoc = doc;
+      });
+
+      // Ejecutar el batch
+      await batch.commit();
+      deletedCount += snapshot.docs.length;
+
+      // Si obtuvimos menos de BATCH_SIZE, no hay más documentos
+      if (snapshot.docs.length < BATCH_SIZE) {
+        hasMore = false;
+      }
+    }
 
     return res.status(200).json({
-      message: `Se eliminaron ${deletedCount} cartillas correctamente`,
-      deletedCount
+      message: `Se eliminaron ${deletedCount} cartillas correctamente del evento ${date}`,
+      deletedCount,
+      eventDate: date
     });
   } catch (e: any) {
-    console.error('Error eliminando todas las cartillas:', e);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', details: e.message });
   }
 });
 
@@ -511,7 +697,6 @@ router.delete('/:id', async (req: any, res: any) => {
     await cardRef.delete();
     return res.status(200).json({ message: 'Card deleted successfully', id });
   } catch (e: any) {
-    console.error('Error deleting card:', e);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -520,7 +705,14 @@ router.delete('/:id', async (req: any, res: any) => {
 router.post('/:id/unassign', async (req: any, res: any) => {
   try {
     const id = req.params.id;
-    const cardRef = db.collection('cards').doc(id);
+    const { date } = req.query as { date?: string };
+
+    if (!date) {
+      return res.status(400).json({ error: 'El parámetro "date" es requerido' });
+    }
+
+    // Nueva ruta: events/{date}/cards
+    const cardRef = db.collection('events').doc(date).collection('cards').doc(id);
     const card = await cardRef.get();
 
     if (!card.exists) {
@@ -537,10 +729,11 @@ router.post('/:id/unassign', async (req: any, res: any) => {
       numbers,
       assignedTo: data.assignedTo,
       sold: data.sold,
-      createdAt: data.createdAt
+      createdAt: data.createdAt,
+      cardNo: data.cardNo ?? null,
+      date: date, // Incluir la fecha del evento
     });
   } catch (e: any) {
-    console.error('Error unassigning card:', e);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -569,7 +762,6 @@ router.post('/:id/sold', async (req: any, res: any) => {
       createdAt: data.createdAt
     });
   } catch (e: any) {
-    console.error('Error marking card as sold:', e);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -602,30 +794,30 @@ function validateBingoCard(numbers: number[][]): boolean {
 // Endpoint para validar y corregir cartillas existentes según las reglas del BINGO
 router.post('/validate-and-fix', async (_req: any, res: any) => {
   try {
-    console.log('🔍 Validando y corrigiendo cartillas existentes...');
-
     const existingCards = await db.collection('cards').get();
     let correctedCount = 0;
     let validCount = 0;
 
-    const batch = db.batch();
+    const BATCH_SIZE = 500;
+    const docsToUpdate: any[] = [];
 
     for (const doc of existingCards.docs) {
       const data = doc.data();
       const currentNumbers = data.numbers ? (data.numbers as number[][]) : expandGrid((data.numbersFlat as number[]) ?? [], 5);
 
-      // Validar si la cartilla cumple con las reglas del BINGO
       const isValid = validateBingoCard(currentNumbers);
 
       if (!isValid) {
-        // Generar nueva cartilla válida
         const newNumbers = generateRandomBingoNumbers();
         const newFlat = flattenGrid(newNumbers);
 
-        batch.update(doc.ref, {
-          numbersFlat: newFlat,
-          updatedAt: Date.now(),
-          wasCorrected: true,
+        docsToUpdate.push({
+          ref: doc.ref,
+          data: {
+            numbersFlat: newFlat,
+            updatedAt: Date.now(),
+            wasCorrected: true,
+          }
         });
 
         correctedCount++;
@@ -634,11 +826,16 @@ router.post('/validate-and-fix', async (_req: any, res: any) => {
       }
     }
 
-    if (correctedCount > 0) {
+    // Procesar actualizaciones en batches
+    for (let i = 0; i < docsToUpdate.length; i += BATCH_SIZE) {
+      const batch = db.batch();
+      const chunk = docsToUpdate.slice(i, i + BATCH_SIZE);
+
+      chunk.forEach(({ ref, data }) => {
+        batch.update(ref, data);
+      });
+
       await batch.commit();
-      console.log(`✅ Se corrigieron ${correctedCount} cartillas, ${validCount} ya eran válidas`);
-    } else {
-      console.log(`✅ Todas las cartillas ya son válidas (${validCount} cartillas)`);
     }
 
     return res.status(200).json({
@@ -648,7 +845,6 @@ router.post('/validate-and-fix', async (_req: any, res: any) => {
       total: correctedCount + validCount,
     });
   } catch (e: any) {
-    console.error('❌ Error validando cartillas:', e);
     return res.status(500).json({ error: e.message });
   }
 });
@@ -656,44 +852,114 @@ router.post('/validate-and-fix', async (_req: any, res: any) => {
 // Endpoint para obtener el total de cartillas y el número máximo de cartilla
 router.get('/total', async (_req: any, res: any) => {
   try {
-    console.log('🔍 Obteniendo total de cartillas...');
+    const { date } = _req.query as { date?: string };
 
-    // Obtener la cartilla con el número más alto usando orderBy
-    const maxCardQuery = await db.collection('cards')
+    if (!date) {
+      return res.status(400).json({
+        error: 'El parámetro "date" es requerido (formato: YYYY-MM-DD)'
+      });
+    }
+
+    const cardsCollectionRef = db.collection('events').doc(date).collection('cards');
+
+    // Obtener la cartilla con el número más alto usando orderBy (1 lectura)
+    const maxCardQuery = await cardsCollectionRef
       .orderBy('cardNo', 'desc')
       .limit(1)
       .get();
 
     let maxCardNo = 0;
-    let totalCards = 0;
-
     if (!maxCardQuery.empty) {
       const maxCard = maxCardQuery.docs[0].data();
       maxCardNo = maxCard.cardNo || 0;
     }
 
-    // También contar el total de documentos (puede ser diferente si hay cartillas sin número)
-    const allCardsSnapshot = await db.collection('cards')
-      .limit(50000)
-      .get();
+    // Usar count() aggregation - solo 1 lectura en lugar de descargar todos los documentos
+    const countAggregation = await cardsCollectionRef.count().get();
+    const totalDocuments = countAggregation.data().count;
 
-    totalCards = allCardsSnapshot.size;
-
-    // El total real es el máximo entre el número máximo de cartilla y el total de documentos
-    const actualTotal = Math.max(maxCardNo, totalCards);
-
-    console.log(`📊 Total de cartillas: ${actualTotal}`);
-    console.log(`📊 Número máximo de cartilla: ${maxCardNo}`);
-    console.log(`📊 Total de documentos: ${totalCards}`);
+    const actualTotal = Math.max(maxCardNo, totalDocuments);
 
     return res.json({
       totalCards: actualTotal,
       maxCardNo: maxCardNo,
-      totalDocuments: totalCards,
+      totalDocuments: totalDocuments,
     });
   } catch (e: any) {
-    console.error('❌ Error obteniendo total de cartillas:', e);
     return res.status(500).json({ error: e.message });
+  }
+});
+
+// Endpoint optimizado para obtener conteos de cartillas asignadas para múltiples vendors
+// Usa count() aggregation para reducir lecturas de 3000+ a solo 2 por vendor
+router.post('/counts', async (req: any, res: any) => {
+  try {
+    const { vendorIds, date } = req.body as { vendorIds: string[]; date: string };
+
+    if (!date) {
+      return res.status(400).json({
+        error: 'El parámetro "date" es requerido (formato: YYYY-MM-DD)'
+      });
+    }
+
+    if (!vendorIds || !Array.isArray(vendorIds) || vendorIds.length === 0) {
+      return res.status(400).json({
+        error: 'vendorIds debe ser un array no vacío'
+      });
+    }
+
+    const cardsCollectionRef = db.collection('events').doc(date).collection('cards');
+    const counts: Record<string, { assigned: number; sold: number }> = {};
+
+    // Inicializar todos los conteos en 0
+    vendorIds.forEach(id => {
+      counts[id] = { assigned: 0, sold: 0 };
+    });
+
+    // Usar count() aggregation en lugar de .get() para reducir lecturas drásticamente
+    // De 3000+ lecturas a solo 2 por vendor (assigned y sold)
+    const BATCH_SIZE = 20; // Procesar 20 vendors en paralelo
+    const vendorBatches: string[][] = [];
+    
+    for (let i = 0; i < vendorIds.length; i += BATCH_SIZE) {
+      vendorBatches.push(vendorIds.slice(i, i + BATCH_SIZE));
+    }
+
+    // Procesar batches en paralelo usando count() aggregation
+    await Promise.all(
+      vendorBatches.map(async (batch) => {
+        const queries = await Promise.all(
+          batch.map(async (vendorId) => {
+            // Usar count() aggregation - solo 1 lectura por query en lugar de descargar todos los documentos
+            const [assignedCount, soldCount] = await Promise.all([
+              cardsCollectionRef
+                .where('assignedTo', '==', vendorId)
+                .count()
+                .get(),
+              cardsCollectionRef
+                .where('assignedTo', '==', vendorId)
+                .where('sold', '==', true)
+                .count()
+                .get()
+            ]);
+
+            return {
+              vendorId,
+              assigned: assignedCount.data().count,
+              sold: soldCount.data().count
+            };
+          })
+        );
+
+        queries.forEach(({ vendorId, assigned, sold }) => {
+          counts[vendorId] = { assigned, sold };
+        });
+      })
+    );
+
+    return res.json({ counts });
+  } catch (e: any) {
+    return res.status(500).json({ error: 'Internal server error', details: e.message });
   }
 });
 

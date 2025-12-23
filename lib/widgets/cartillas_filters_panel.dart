@@ -133,8 +133,17 @@ class _CartillasFiltersPanelState extends State<CartillasFiltersPanel> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.search),
                 ),
+                keyboardType: TextInputType.number,
                 onChanged: (value) {
                   appProvider.setSearchQuery(value);
+                  if (value.isEmpty) {
+                    // Si el usuario borra el texto, volver a la lista paginada normal
+                    appProvider.clearSearchAndReload();
+                  }
+                },
+                onSubmitted: (value) {
+                  // Búsqueda global en servidor al presionar Enter
+                  appProvider.searchFirebaseCartillaByNumber(value);
                 },
               ),
             ),
@@ -376,6 +385,7 @@ class _CartillasFiltersPanelState extends State<CartillasFiltersPanel> {
                         );
                         
                         if (finalConfirmed == true) {
+                          // Usar la fecha del evento seleccionada
                           final success = await appProvider.clearAllFirebaseCartillas();
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(

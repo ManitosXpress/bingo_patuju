@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/bingo_game_config.dart';
 import '../services/bingo_games_service.dart';
 import '../models/firebase_bingo_game.dart';
+import '../providers/app_provider.dart';
 
 /// Diálogo para seleccionar un juego de bingo desde Firebase
 /// Los juegos se agrupan por fecha
@@ -17,6 +19,8 @@ class GameSelectorDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    
     return Dialog(
       child: Container(
         width: MediaQuery.of(context).size.width * 0.8,
@@ -43,7 +47,7 @@ class GameSelectorDialog extends StatelessWidget {
             
             Expanded(
               child: FutureBuilder<List<FirebaseBingoGame>>(
-                future: BingoGamesService().getAllBingoGames(),
+                future: BingoGamesService().getAllBingoGames(date: appProvider.selectedDate),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());

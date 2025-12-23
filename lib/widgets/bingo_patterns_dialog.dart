@@ -249,7 +249,6 @@ class BingoPatternsDialog extends StatelessWidget {
       {'name': 'Figura C Loca', 'matrix': _figuraCLocaPattern()},
       {'name': 'Figura Bandera', 'matrix': _figuraBanderaPattern()},
       {'name': 'Figura Triple Línea', 'matrix': _figuraTripleLineaPattern()},
-      {'name': 'Diagonal Derecha', 'matrix': _diagonalDerechaPattern()},
     ];
   }
 
@@ -456,7 +455,7 @@ class BingoPatternsDialog extends StatelessWidget {
       'Caída de Nieve', 'Marco Pequeño', 'Árbol o Flecha', 'Spoutnik', 'LETRA I', 'LETRA N', 'Autopista',
       // Figuras legendarias
       'Reloj de Arena', 'Doble Línea V', 'Figura la Suegra', 'Figura Infinito', 'Letra FE',
-      'Figura C Loca', 'Figura Bandera', 'Figura Triple Línea', 'Diagonal Derecha'
+      'Figura C Loca', 'Figura Bandera', 'Figura Triple Línea'
     ];
     
     for (String pattern in patterns) {
@@ -519,7 +518,6 @@ class BingoPatternsDialog extends StatelessWidget {
       'Figura C Loca': 15.0,
       'Figura Bandera': 20.0,
       'Figura Triple Línea': 22.0,
-      'Diagonal Derecha': 8.0,
     };
     
     final result = <String, String>{};
@@ -592,8 +590,6 @@ class BingoPatternsDialog extends StatelessWidget {
         return _figuraBanderaPattern();
       case 'Figura Triple Línea':
         return _figuraTripleLineaPattern();
-      case 'Diagonal Derecha':
-        return _diagonalDerechaPattern();
       default:
         return List.generate(5, (_) => List.filled(5, 0));
     }
@@ -925,8 +921,6 @@ class BingoPatternsDialog extends StatelessWidget {
         return 'Figura Bandera';
       case BingoPattern.figuraTripleLinea:
         return 'Figura Triple Línea';
-      case BingoPattern.diagonalDerecha:
-        return 'Diagonal Derecha';
     }
   }
 
@@ -1008,16 +1002,6 @@ class BingoPatternsDialog extends StatelessWidget {
       [1,1,1,1,1],
       [0,0,0,0,0],
       [1,1,1,1,1],
-    ];
-  }
-
-  List<List<int>> _diagonalDerechaPattern() {
-    return [
-      [0,0,0,0,1],
-      [0,0,0,1,0],
-      [0,0,1,0,0],
-      [0,1,0,0,0],
-      [1,0,0,0,0],
     ];
   }
 } 

@@ -97,24 +97,26 @@ class GameStateProvider extends ChangeNotifier {
       _vendorNameCache.clear();
       
       final url = '${BackendConfig.apiBase}/vendors';
-      print('DEBUG: Cargando vendedores desde: $url');
+      // print('DEBUG: Cargando vendedores desde: $url');
       
       final resp = await http.get(Uri.parse(url));
-      print('DEBUG: Respuesta del servidor: ${resp.statusCode}');
-      print('DEBUG: Cuerpo de la respuesta: ${resp.body}');
+      // print('DEBUG: Respuesta del servidor: ${resp.statusCode}');
+      // print('DEBUG: Cuerpo de la respuesta: ${resp.body}');
       
       if (resp.statusCode < 300) {
         _vendors = List<Map<String, dynamic>>.from(json.decode(resp.body));
-        print('DEBUG: Vendedores cargados: ${_vendors.length}');
+        // print('DEBUG: Vendedores cargados: ${_vendors.length}');
         
         // Debug: mostrar cada vendedor cargado
-        for (final vendor in _vendors) {
-          print('DEBUG: Vendedor cargado - ID: ${vendor['id']}, Nombre: ${vendor['name']}');
-        }
+        // for (final vendor in _vendors) {
+        //   print('DEBUG: Vendedor cargado - ID: ${vendor['id']}, Nombre: ${vendor['name']}');
+        // }
         
         notifyListeners();
       } else {
-        print('DEBUG: Error del servidor: ${resp.statusCode} - ${resp.body}');
+        if (kDebugMode) {
+          print('Error del servidor al cargar vendedores: ${resp.statusCode}');
+        }
       }
     } catch (e) {
       if (kDebugMode) {
@@ -300,41 +302,33 @@ class GameStateProvider extends ChangeNotifier {
   // Método para obtener el nombre del vendedor
   String? getVendorName(String? vendorId) {
     if (vendorId == null) {
-      print('DEBUG: getVendorName llamado con vendorId null');
       return null;
     }
     
-    print('DEBUG: getVendorName buscando vendorId: $vendorId');
-    print('DEBUG: Vendedores disponibles: ${_vendors.length}');
-    
     // Usar cache si está disponible
     if (_vendorNameCache.containsKey(vendorId)) {
-      print('DEBUG: Nombre encontrado en cache: ${_vendorNameCache[vendorId]}');
       return _vendorNameCache[vendorId];
     }
     
     try {
-      print('DEBUG: Buscando vendedor en lista...');
       for (final vendor in _vendors) {
-        print('DEBUG: Comparando con vendedor ID: ${vendor['id']}, Nombre: ${vendor['name']}');
         if (vendor['id'] == vendorId) {
           final name = vendor['name'] as String?;
-          print('DEBUG: Vendedor encontrado: $name');
           
           // Guardar en cache
           if (name != null) {
             _vendorNameCache[vendorId] = name;
-            print('DEBUG: Nombre guardado en cache');
           }
           
           return name;
         }
       }
       
-      print('DEBUG: Vendedor no encontrado en la lista');
       return null;
     } catch (e) {
-      print('DEBUG: Error en getVendorName: $e');
+      if (kDebugMode) {
+        print('Error en getVendorName: $e');
+      }
       return null;
     }
   }
@@ -342,7 +336,7 @@ class GameStateProvider extends ChangeNotifier {
   // Método para sincronizar cartillas de Firebase con el juego local
   Future<void> syncFirebaseCartillasWithGame(List<List<List<int>>> firebaseCartillas) async {
     try {
-      print('DEBUG: Sincronizando ${firebaseCartillas.length} cartillas de Firebase con el juego local');
+      // print('DEBUG: Sincronizando ${firebaseCartillas.length} cartillas de Firebase con el juego local');
       
       // Sincronizar cartillas
       _bingoGame.syncCartillasFromFirebase(firebaseCartillas);
@@ -350,14 +344,18 @@ class GameStateProvider extends ChangeNotifier {
       // Verificar si hay bingo después de la sincronización
       final bingoCheck = _bingoGame.checkBingoInRealTime();
       if (bingoCheck['hasBingo'] == true) {
-        print('DEBUG: ¡BINGO detectado después de sincronización!');
-        print('DEBUG: ${bingoCheck['message']}');
-        print('DEBUG: Cartillas ganadoras: ${bingoCheck['totalWinningCards']}');
+        if (kDebugMode) {
+          print('¡BINGO detectado después de sincronización!');
+          // print('${bingoCheck['message']}');
+          // print('Cartillas ganadoras: ${bingoCheck['totalWinningCards']}');
+        }
       }
       
       notifyListeners();
     } catch (e) {
-      print('DEBUG: Error sincronizando cartillas de Firebase: $e');
+      if (kDebugMode) {
+        print('Error sincronizando cartillas de Firebase: $e');
+      }
     }
   }
   

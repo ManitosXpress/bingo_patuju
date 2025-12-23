@@ -6,6 +6,7 @@ const saleSchema = z.object({
   cardId: z.string(),
   sellerId: z.string(),
   amount: z.number().default(20),
+  date: z.string(), // Fecha del evento (YYYY-MM-DD)
 });
 
 export const router = Router();
@@ -22,10 +23,10 @@ router.get('/', async (req: any, res: any) => {
 
 router.post('/', async (req: any, res: any) => {
   try {
-    const { cardId, sellerId, amount } = saleSchema.parse(req.body);
+    const { cardId, sellerId, amount, date } = saleSchema.parse(req.body);
 
     // Ensure card exists and not sold
-    const cardRef = db.collection('cards').doc(cardId);
+    const cardRef = db.collection('events').doc(date).collection('cards').doc(cardId);
     const card = await cardRef.get();
     if (!card.exists) return res.status(404).json({ error: 'Card not found' });
     if ((card.data() as any)?.sold) return res.status(400).json({ error: 'Card already sold' });
@@ -79,6 +80,7 @@ router.post('/', async (req: any, res: any) => {
         subleader: subleaderCommission,
       },
       createdAt: Date.now(),
+      date, // Guardar la fecha del evento para reportes
     });
 
     // Update card as sold and attach saleId

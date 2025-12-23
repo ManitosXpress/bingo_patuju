@@ -18,9 +18,12 @@ router.get('/:eventId/games', async (req, res) => {
     // Verificar que el evento existe
     const eventDoc = await db.collection('events').doc(eventId).get();
     if (!eventDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        error: 'Evento no encontrado'
+      // Si el evento no existe, simplemente retornamos una lista vacía
+      // en lugar de un error 404, para que el frontend no falle
+      return res.json({
+        success: true,
+        data: [],
+        count: 0
       });
     }
 
@@ -110,13 +113,24 @@ router.post('/:eventId/games', async (req, res) => {
     const { eventId } = req.params;
     const gameData: CreateBingoGameRequest = req.body;
 
-    // Verificar que el evento existe
+    // Verificar que el evento existe, si no crearlo automáticamente
     const eventDoc = await db.collection('events').doc(eventId).get();
     if (!eventDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        error: 'Evento no encontrado'
+      console.log(`⚠️ Evento ${eventId} no existe, creándolo automáticamente...`);
+
+      // Crear el evento automáticamente
+      const now = new Date();
+      await db.collection('events').doc(eventId).set({
+        name: `Evento ${eventId}`,
+        date: eventId,
+        description: 'Evento creado automáticamente',
+        status: 'active',
+        totalCartillas: 0,
+        createdAt: now,
+        updatedAt: now,
       });
+
+      console.log(`✅ Evento ${eventId} creado automáticamente`);
     }
 
     // Validar datos requeridos

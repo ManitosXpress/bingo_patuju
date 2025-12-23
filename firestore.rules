@@ -1,0 +1,127 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // REGLAS GENERALES DE SEGURIDAD
+    // ============================================
+    // Por defecto, denegar todo acceso directo desde clientes
+    // El acceso debe ser solo a través de Firebase Functions (backend)
+    // que usa Firebase Admin SDK (bypass de reglas)
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: events (Eventos de Bingo)
+    // ============================================
+    // Permitir lectura pública de eventos activos
+    // Solo el backend puede escribir (a través de Firebase Functions)
+    
+    match /events/{eventId} {
+      // Permitir lectura de eventos
+      allow read: if true;
+      
+      // Solo el backend puede crear/actualizar/eliminar eventos
+      // (a través de Firebase Functions con Admin SDK)
+      allow write: if false;
+      
+      // ============================================
+      // SUBCOLECCIÓN: games (Juegos dentro de eventos)
+      // ============================================
+      match /games/{gameId} {
+        // Permitir lectura de juegos
+        allow read: if true;
+        
+        // Solo el backend puede escribir
+        allow write: if false;
+        
+        // ============================================
+        // SUBCOLECCIÓN: rounds (Rondas dentro de juegos)
+        // ============================================
+        match /rounds/{roundId} {
+          // Permitir lectura de rondas
+          allow read: if true;
+          
+          // Solo el backend puede escribir
+          allow write: if false;
+        }
+      }
+      
+      // ============================================
+      // SUBCOLECCIÓN: cards (Cartillas dentro de eventos)
+      // ============================================
+      match /cards/{cardId} {
+        // Permitir lectura de cartillas
+        allow read: if true;
+        
+        // Solo el backend puede escribir
+        allow write: if false;
+      }
+    }
+    
+    // ============================================
+    // COLECCIÓN: cards (Cartillas globales)
+    // ============================================
+    // Permitir lectura de cartillas
+    // Solo el backend puede escribir
+    
+    match /cards/{cardId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: vendors (Vendedores)
+    // ============================================
+    // Permitir lectura de vendedores
+    // Solo el backend puede escribir
+    
+    match /vendors/{vendorId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: sales (Ventas)
+    // ============================================
+    // Solo lectura para reportes
+    // Solo el backend puede escribir
+    
+    match /sales/{saleId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: balances (Balances)
+    // ============================================
+    // Solo lectura para reportes
+    // Solo el backend puede escribir
+    
+    match /balances/{balanceId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // ============================================
+    // NOTAS IMPORTANTES
+    // ============================================
+    // 1. Estas reglas solo aplican para acceso directo desde clientes
+    // 2. Firebase Functions usa Firebase Admin SDK que BYPASSEA estas reglas
+    // 3. Si necesitas acceso de escritura desde el cliente, deberás:
+    //    a) Implementar autenticación (Firebase Auth)
+    //    b) Agregar validaciones específicas aquí
+    //    c) O mantener todo a través del backend (recomendado)
+    //
+    // Para habilitar autenticación, descomenta y ajusta:
+    // allow write: if request.auth != null && request.auth.uid != null;
+    //
+    // Para permitir escritura solo a usuarios autenticados específicos:
+    // allow write: if request.auth != null && 
+    //              request.auth.uid in ['uid1', 'uid2'];
+  }
+}
+
