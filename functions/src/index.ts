@@ -16,7 +16,7 @@ if (!admin.apps.length) {
 
 // Exportar la base de datos Firestore
 export const db = admin.firestore();
-export const bucket = admin.storage().bucket('bingo-baitty.appspot.com');
+export const bucket = admin.storage().bucket();
 
 // Crear la aplicación Express
 const app = express();
@@ -45,4 +45,4 @@ app.use('/bingo', bingoRouter);
 app.use('/events', eventsRouter);
 
 // Exportar la función HTTP de Firebase usando la sintaxis v2
-export const api = onRequest(app);
+export const api = onRequest({ timeoutSeconds: 300, memory: "1GiB" }, app);
