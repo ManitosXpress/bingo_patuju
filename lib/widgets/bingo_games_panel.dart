@@ -13,6 +13,8 @@ import '../utils/bingo_pattern_names.dart';
 import '../services/bingo_games_service.dart';
 import '../models/firebase_bingo_game.dart';
 import 'create_game_modal.dart';
+import 'glass_container.dart';
+
 
 class BingoGamesPanel extends StatefulWidget {
   final VoidCallback? onGameStateChanged;
@@ -793,14 +795,11 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       builder: (context, appProvider, child) {
 
         
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SingleChildScrollView(
+        return GlassContainer(
+          borderRadius: 24,
+          blurIntensity: 12.0,
+          padding: const EdgeInsets.all(16.0),
+          child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -1084,7 +1083,6 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                 ],
               ),
             ),
-          ),
         );
       },
     );

@@ -41,6 +41,8 @@ dependencies:
   cloud_firestore: ^5.4.0
   shared_preferences: ^2.2.2
   excel: ^4.0.6
+  url_launcher: ^6.2.4
+  font_awesome_flutter: ^10.7.0
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +71,8 @@ flutter:
     - assets/images/bingo_imperial.png
     - assets/images/logo.png
     - assets/images/free.png
+    - assets/images/bingo_background_luxury.png
+    - assets/images/dark_casino_background.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

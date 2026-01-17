@@ -25,101 +25,92 @@ router.post('/', async (req: any, res: any) => {
   try {
     const { cardId, sellerId, amount, date } = saleSchema.parse(req.body);
 
-    // Ensure card exists and not sold
-    const cardRef = db.collection('events').doc(date).collection('cards').doc(cardId);
-    const card = await cardRef.get();
-    if (!card.exists) return res.status(404).json({ error: 'Card not found' });
-    if ((card.data() as any)?.sold) return res.status(400).json({ error: 'Card already sold' });
+    await db.runTransaction(async (t) => {
+      // 1. Validar Cartilla
+      const cardRef = db.collection('events').doc(date).collection('cards').doc(cardId);
+      const cardDoc = await t.get(cardRef);
 
-    // Get seller and leader
-    const sellerRef = db.collection('vendors').doc(sellerId);
-    const sellerDoc = await sellerRef.get();
-    if (!sellerDoc.exists) return res.status(404).json({ error: 'Seller not found' });
-    const seller = sellerDoc.data() as any;
+      if (!cardDoc.exists) throw new Error('Card not found');
+      const cardData = cardDoc.data() as any;
+      if (cardData.sold) throw new Error('Card already sold');
 
-    let leaderId: string | null = seller.leaderId ?? null;
+      // 2. Validar Vendedor
+      const sellerRef = db.collection('vendors').doc(sellerId);
+      const sellerDoc = await t.get(sellerRef);
+      if (!sellerDoc.exists) throw new Error('Seller not found');
+      const seller = sellerDoc.data() as any;
 
-    // Nueva estructura de comisiones:
-    // - Líder: 3 Bs por cartilla vendida directamente, 1.5 Bs por vendedor de línea
-    // - Vendedor: 3 Bs por cartilla vendida directamente, 1.5 Bs por subvendedor
-    // - Subvendedor: 3 Bs por cartilla vendida
-    
-    let sellerCommission = 3; // Todos reciben 3 Bs por venta directa
-    let leaderCommission = 0;
-    let subleaderCommission = 0; // Para vendedores que tienen subvendedores
-    
-    if (seller.role === 'LEADER') {
-      // Líder vendiendo directamente - solo recibe 3 Bs
-      leaderCommission = 0;
-    } else if (seller.role === 'SELLER') {
-      // Vendedor vendiendo - líder recibe 1.5 Bs
-      leaderCommission = 1.5;
-    } else if (seller.role === 'SUBSELLER') {
-      // Subvendedor vendiendo - vendedor padre recibe 1.5 Bs, líder NO recibe nada
-      leaderCommission = 0; // El líder NO recibe del subvendedor
-      subleaderCommission = 1.5; // Para el vendedor padre
-    }
+      // 3. Calcular Comisiones
+      // Reglas:
+      // - Vendedor (SELLER): Gana 4 Bs. Su Líder gana 2 Bs.
+      // - Líder (LEADER): Gana 4 Bs. (Venta directa).
 
-    // Obtener el vendedor padre si es un subvendedor
-    let subleaderId: string | null = null;
-    if (seller.role === 'SUBSELLER' && seller.sellerId) {
-      // Usar el sellerId directamente del subvendedor
-      subleaderId = seller.sellerId;
-    }
+      let leaderId: string | null = seller.leaderId ?? null;
+      let sellerCommission = 4; // Comisión base para quien vende
+      let leaderCommission = 0; // Comisión pasiva para el líder
 
-    // Create sale
-    const saleRef = await db.collection('sales').add({
-      cardId,
-      sellerId,
-      leaderId,
-      subleaderId,
-      amount,
-      commissions: {
-        seller: sellerCommission,
-        leader: leaderCommission,
-        subleader: subleaderCommission,
-      },
-      createdAt: Date.now(),
-      date, // Guardar la fecha del evento para reportes
-    });
+      if (seller.role === 'LEADER') {
+        // Caso B: Vende un Líder
+        leaderCommission = 0;
+      } else if (seller.role === 'SELLER') {
+        // Caso A: Vende un Vendedor
+        leaderCommission = 2;
 
-    // Update card as sold and attach saleId
-    await cardRef.update({ sold: true, saleId: saleRef.id });
+        // Validar que tenga líder
+        if (!leaderId) throw new Error('Seller has no leader assigned');
+      }
 
-    // Record balances
-    await db.collection('balances').add({
-      vendorId: sellerId,
-      type: 'COMMISSION',
-      amount: sellerCommission,
-      source: saleRef.id,
-      createdAt: Date.now(),
-    });
-    
-    if (leaderCommission > 0 && leaderId) {
-      await db.collection('balances').add({
-        vendorId: leaderId,
+      // 4. Crear Registro de Venta
+      const saleRef = db.collection('sales').doc();
+      const saleData = {
+        cardId,
+        sellerId,
+        leaderId,
+        amount,
+        commissions: {
+          seller: sellerCommission,
+          leader: leaderCommission,
+        },
+        createdAt: Date.now(),
+        date,
+      };
+      t.set(saleRef, saleData);
+
+      // 5. Actualizar Cartilla
+      t.update(cardRef, { sold: true, saleId: saleRef.id });
+
+      // 6. Registrar Balances (Comisiones)
+      // Balance del Vendedor
+      const sellerBalanceRef = db.collection('balances').doc();
+      t.set(sellerBalanceRef, {
+        vendorId: sellerId,
         type: 'COMMISSION',
-        amount: leaderCommission,
+        amount: sellerCommission,
         source: saleRef.id,
         createdAt: Date.now(),
+        description: `Venta Cartilla ${cardData.cardNo ?? cardId}`
       });
-    }
-    
-    if (subleaderCommission > 0 && subleaderId) {
-      await db.collection('balances').add({
-        vendorId: subleaderId,
-        type: 'COMMISSION',
-        amount: subleaderCommission,
-        source: saleRef.id,
-        createdAt: Date.now(),
-      });
-    }
 
-    const saleSnap = await saleRef.get();
-    return res.status(201).json({ id: saleRef.id, ...(saleSnap.data() as any) });
+      // Balance del Líder (si aplica)
+      if (leaderCommission > 0 && leaderId) {
+        const leaderBalanceRef = db.collection('balances').doc();
+        t.set(leaderBalanceRef, {
+          vendorId: leaderId,
+          type: 'COMMISSION',
+          amount: leaderCommission,
+          source: saleRef.id,
+          createdAt: Date.now(),
+          description: `Comisión por venta de ${seller.name} (Cartilla ${cardData.cardNo ?? cardId})`
+        });
+      }
+
+      return { id: saleRef.id, ...saleData };
+    });
+
+    return res.status(201).json({ message: 'Sale registered successfully' });
   } catch (e: any) {
     return res.status(400).json({ error: e.message });
   }
 });
 
-export default router; 
+export default router;

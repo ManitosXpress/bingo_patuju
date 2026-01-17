@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'glass_container.dart'; // Importar el nuevo componente de vidrio
 
 class NumbersPanel extends StatelessWidget {
   final List<int> allNumbers;
@@ -21,37 +22,41 @@ class NumbersPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      padding: const EdgeInsets.all(8), // Reducido de 8 a 6 para mejor ajuste
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12), // Aumentado de 8 a 12
-      ),
+    // ✨ USANDO GLASSMORPHISM REUTILIZABLE
+    return GlassContainer(
+      borderRadius: 24,
+      blurIntensity: 12.0,
+      padding: const EdgeInsets.all(8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), // Aumentado el padding
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.blue.shade50, Colors.blue.shade100],
+                colors: [
+                  Colors.white.withOpacity(0.15),
+                  Colors.white.withOpacity(0.08),
+                ],
               ),
-              borderRadius: BorderRadius.circular(8), // Aumentado de 6 a 8
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: const Text(
               'Números del Bingo',
               style: TextStyle(
-                fontSize: 18, // Aumentado de 16 a 18
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.blue,
               ),
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(height: 8), // Reducido de 10 a 8 para mejor ajuste
+          const SizedBox(height: 8),
           // Encabezados de columnas
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -63,12 +68,15 @@ class NumbersPanel extends StatelessWidget {
               _buildColumnHeader('O', '61-75'),
             ],
           ),
-          const SizedBox(height: 8), // Reducido de 10 a 8 para mejor ajuste
+          const SizedBox(height: 8),
           // Números del bingo
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade200, width: 1),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.1),
+                  width: 1,
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: SingleChildScrollView(
@@ -96,21 +104,21 @@ class NumbersPanel extends StatelessWidget {
 
   Widget _buildColumnHeader(String letter, String range) {
     return Container(
-      width: 65, // Reducido de 70 a 65 para coincidir con las columnas
-      padding: const EdgeInsets.symmetric(vertical: 6), // Aumentado de 4 a 6
+      width: 65,
+      padding: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.blue.shade100, Colors.blue.shade200],
+          colors: [Colors.white.withOpacity(0.2), Colors.white.withOpacity(0.1)],
         ),
-        borderRadius: BorderRadius.circular(8), // Aumentado de 5 a 8
-        border: Border.all(color: Colors.blue.shade300, width: 1.5), // Aumentado de 1 a 1.5
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
       ),
       child: Column(
         children: [
           Text(
             letter,
             style: TextStyle(
-              fontSize: 18, // Reducido de 20 a 18 para mejor ajuste
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.blue.shade800,
             ),
@@ -118,7 +126,7 @@ class NumbersPanel extends StatelessWidget {
           Text(
             range,
             style: TextStyle(
-              fontSize: 10, // Reducido de 11 a 10 para mejor ajuste
+              fontSize: 10,
               color: Colors.blue.shade600,
               fontWeight: FontWeight.w500,
             ),
@@ -234,8 +242,8 @@ class _AnimatedNumberTileState extends State<_AnimatedNumberTile>
                   )
                 : LinearGradient(
                     colors: [
-                      widget.colors[0].withValues(alpha: 0.3),
-                      widget.colors[1].withValues(alpha: 0.5),
+                      widget.colors[0].withOpacity(0.8),
+                      widget.colors[1].withOpacity(0.9),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -244,7 +252,7 @@ class _AnimatedNumberTileState extends State<_AnimatedNumberTile>
               border: Border.all(
                 color: widget.isCalled 
                   ? Colors.red.shade700 
-                  : widget.colors[1].withValues(alpha: 0.5),
+                  : widget.colors[1].withOpacity(0.7),
                 width: widget.isCalled ? 2.5 : 1.5,
               ),
               boxShadow: widget.isCalled ? [
@@ -256,7 +264,7 @@ class _AnimatedNumberTileState extends State<_AnimatedNumberTile>
                 ),
               ] : [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 2,
                   offset: const Offset(0, 1),
                 ),
@@ -268,14 +276,20 @@ class _AnimatedNumberTileState extends State<_AnimatedNumberTile>
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: widget.isCalled ? Colors.white : Colors.grey.shade700,
+                  color: widget.isCalled ? Colors.white : Colors.white,
                   shadows: widget.isCalled ? [
                     Shadow(
-                      color: Colors.black.withValues(alpha: 0.3),
+                      color: Colors.black.withOpacity(0.5),
                       offset: const Offset(0, 1),
                       blurRadius: 2,
                     ),
-                  ] : null,
+                  ] : [
+                    Shadow(
+                      color: Colors.black.withOpacity(0.3),
+                      offset: const Offset(0, 1),
+                      blurRadius: 1,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -284,4 +298,4 @@ class _AnimatedNumberTileState extends State<_AnimatedNumberTile>
       },
     );
   }
-} 
+}

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../index';
 
-export type VendorRole = 'LEADER' | 'SELLER' | 'SUBSELLER';
+export type VendorRole = 'LEADER' | 'SELLER';
 
 interface VendorDoc {
   id: string;
@@ -10,7 +10,6 @@ interface VendorDoc {
   phone?: string;
   role: VendorRole;
   leaderId?: string; // seller -> leader
-  sellerId?: string; // subseller -> seller
   createdAt: number;
   isActive: boolean;
 }
@@ -18,12 +17,9 @@ interface VendorDoc {
 const vendorSchema = z.object({
   name: z.string().min(2),
   phone: z.string().min(6).optional(),
-  role: z.enum(['LEADER', 'SELLER', 'SUBSELLER']),
+  role: z.enum(['LEADER', 'SELLER']),
   leaderId: z.string().optional(),
-  sellerId: z.string().optional(), // Para subvendedores
 });
-
-export const router = Router();
 
 const updateSchema = z.object({
   name: z.string().min(2).optional(),
@@ -31,35 +27,42 @@ const updateSchema = z.object({
   leaderId: z.string().optional(),
 });
 
+export const router = Router();
+
 // Create vendor (leaders can only create SELLERs)
 router.post('/', async (req: any, res: any) => {
   try {
     const parsed = vendorSchema.parse(req.body);
 
-    if (parsed.role === 'SELLER' && !parsed.leaderId) {
-      return res.status(400).json({ error: 'SELLER requires leaderId' });
-    }
-    if (parsed.role === 'SUBSELLER' && !parsed.sellerId) {
-      return res.status(400).json({ error: 'SUBSELLER requires sellerId' });
-    }
+    // REGLA DE NEGOCIO: Jerarquía Plana (2 niveles)
+    // 1. LEADER: No puede tener padre (leaderId debe ser null)
+    // 2. SELLER: Debe tener padre (leaderId) y ese padre debe ser LEADER
 
-    // Para subvendedores, obtener el leaderId del vendedor padre
-    let finalLeaderId = parsed.leaderId;
-    if (parsed.role === 'SUBSELLER' && parsed.sellerId) {
-      const sellerDoc = await db.collection('vendors').doc(parsed.sellerId).get();
-      if (!sellerDoc.exists) {
-        return res.status(400).json({ error: 'Seller not found' });
+    if (parsed.role === 'LEADER') {
+      if (parsed.leaderId) {
+        return res.status(400).json({ error: 'LEADER cannot have a leaderId (must be root)' });
       }
-      const sellerData = sellerDoc.data() as any;
-      finalLeaderId = sellerData.leaderId;
+    } else if (parsed.role === 'SELLER') {
+      if (!parsed.leaderId) {
+        return res.status(400).json({ error: 'SELLER requires leaderId' });
+      }
+
+      // Validar que el padre sea un LEADER real
+      const leaderDoc = await db.collection('vendors').doc(parsed.leaderId).get();
+      if (!leaderDoc.exists) {
+        return res.status(400).json({ error: 'Leader not found' });
+      }
+      const leaderData = leaderDoc.data() as any;
+      if (leaderData.role !== 'LEADER') {
+        return res.status(400).json({ error: 'Parent must be a LEADER (cannot nest Sellers)' });
+      }
     }
 
     const ref = await db.collection('vendors').add({
       name: parsed.name,
       phone: parsed.phone ?? null,
       role: parsed.role,
-      leaderId: finalLeaderId ?? null,
-      sellerId: parsed.sellerId ?? null, // Nuevo campo para subvendedores
+      leaderId: parsed.leaderId ?? null,
       createdAt: Date.now(),
       isActive: true,
     });
@@ -114,55 +117,47 @@ router.delete('/:id', async (req: any, res: any) => {
     const id = req.params.id;
     const vendorRef = db.collection('vendors').doc(id);
     const vendorSnap = await vendorRef.get();
-    
+
     if (!vendorSnap.exists) {
       return res.status(404).json({ error: 'Vendor not found' });
     }
-    
+
     const vendorData = vendorSnap.data() as any;
     const vendorRole = vendorData.role;
     const vendorId = vendorSnap.id;
-    
+
     // Si es un líder, verificar que no tenga vendedores asignados
     if (vendorRole === 'LEADER') {
       const sellersQuery = await db.collection('vendors').where('leaderId', '==', vendorId).get();
       if (!sellersQuery.empty) {
-        return res.status(400).json({ 
-          error: 'Cannot delete leader with assigned sellers. Reassign or delete sellers first.' 
+        return res.status(400).json({
+          error: 'Cannot delete leader with assigned sellers. Reassign or delete sellers first.'
         });
       }
     }
-    
-    // Si es un vendedor, verificar que no tenga subvendedores asignados
+
+    // Si es un vendedor, verificar que no tenga cartillas asignadas
     if (vendorRole === 'SELLER') {
-      const subsellersQuery = await db.collection('vendors').where('sellerId', '==', vendorId).get();
-      if (!subsellersQuery.empty) {
-        return res.status(400).json({ 
-          error: 'Cannot delete seller with assigned subsellers. Reassign or delete subsellers first.' 
-        });
-      }
-      
-      // También verificar que no tenga cartillas asignadas
       const cardsQuery = await db.collection('cards').where('assignedTo', '==', vendorId).get();
       if (!cardsQuery.empty) {
-        return res.status(400).json({ 
-          error: 'Cannot delete seller with assigned cards. Reassign or sell cards first.' 
+        return res.status(400).json({
+          error: 'Cannot delete seller with assigned cards. Reassign or sell cards first.'
         });
       }
     }
-    
+
     // Verificar que no tenga ventas registradas
     const salesQuery = await db.collection('sales').where('sellerId', '==', vendorId).get();
     if (!salesQuery.empty) {
-      return res.status(400).json({ 
-        error: 'Cannot delete vendor with sales history. Sales records must be preserved.' 
+      return res.status(400).json({
+        error: 'Cannot delete vendor with sales history. Sales records must be preserved.'
       });
     }
-    
+
     // Eliminar el vendor
     await vendorRef.delete();
-    
-    return res.json({ 
+
+    return res.json({
       message: 'Vendor deleted successfully',
       deletedVendor: {
         id: vendorId,
@@ -170,10 +165,10 @@ router.delete('/:id', async (req: any, res: any) => {
         role: vendorData.role
       }
     });
-    
+
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }
 });
 
-export default router; 
+export default router;

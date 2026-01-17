@@ -12,6 +12,9 @@ import '../widgets/cartilla_widget.dart';
 import '../widgets/date_selector_widget.dart';
 import '../block_assignment.dart';
 import '../providers/app_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../services/cartillas_service.dart';
 
 class CrmScreen extends StatefulWidget {
   const CrmScreen({super.key});
@@ -54,7 +57,54 @@ class _CrmScreenState extends State<CrmScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('Ventas (${sales.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text('Cartillas asignadas sin vender (${cards.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Text('Cartillas asignadas sin vender (${cards.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        if (cards.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const FaIcon(FontAwesomeIcons.whatsapp, color: Colors.green),
+                            tooltip: 'Compartir reporte por WhatsApp',
+                            onPressed: () async {
+                              // Show loading
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (c) => const Center(child: CircularProgressIndicator()),
+                              );
+
+                              try {
+                                final result = await CartillaService.shareAssignedCards(
+                                  assignmentId: sellerId.toString(),
+                                  vendorName: vendor['name'] ?? 'Vendedor',
+                                  date: selectedDate,
+                                );
+
+                                Navigator.pop(context); // Hide loading
+
+                                if (result['url'] != null) {
+                                  final url = Uri.parse(result['url']);
+                                  final message = Uri.encodeComponent(
+                                      'Hola ${vendor['name']}, aquí tienes tu reporte de cartillas asignadas para la fecha $selectedDate: ${result['url']}');
+                                  final whatsappUrl = Uri.parse('https://wa.me/?text=$message');
+
+                                  if (await canLaunchUrl(whatsappUrl)) {
+                                    await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+                                  } else {
+                                    throw 'No se pudo abrir WhatsApp';
+                                  }
+                                }
+                              } catch (e) {
+                                Navigator.pop(context); // Hide loading if error
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                );
+                              }
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -1030,21 +1080,25 @@ class _CrmScreenState extends State<CrmScreen> {
 
 
 
-  Future<void> _createVendor({required bool isLeader, bool isSubseller = false}) async {
+  Future<void> _createVendor({required bool isLeader}) async {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
-    String? leaderId = _leaderId;
-    String? sellerId; // Para subvendedores
+    String? leaderId = _leaderId; // Si hay un filtro de líder seleccionado, usarlo por defecto
+
+    // Si el usuario logueado es un LÍDER (esto dependería de cómo manejes la sesión, 
+    // pero por ahora asumimos que si está en esta pantalla es Admin o tiene permisos).
+    // Si quisieras restringir que un Líder solo cree Vendedores bajo su mando, 
+    // deberías verificar el rol del usuario actual aquí.
     
     await showDialog(context: context, builder: (_) {
       return AlertDialog(
-        title: Text(isLeader ? 'Nuevo Líder' : (isSubseller ? 'Nuevo Subvendedor' : 'Nuevo Vendedor')),
+        title: Text(isLeader ? 'Nuevo Líder' : 'Nuevo Vendedor'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
             TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Teléfono')),
-            if (!isLeader && !isSubseller)
+            if (!isLeader)
               DropdownButtonFormField<String>(
                 value: leaderId,
                 items: _leaders
@@ -1054,20 +1108,7 @@ class _CrmScreenState extends State<CrmScreen> {
                         ))
                     .toList(),
                 onChanged: (v) => leaderId = v,
-                decoration: const InputDecoration(labelText: 'Líder'),
-              ),
-            if (isSubseller)
-              DropdownButtonFormField<String>(
-                value: sellerId,
-                items: _vendorsAll
-                    .where((v) => (v['role'] ?? '') == 'SELLER')
-                    .map((s) => DropdownMenuItem<String>(
-                          value: (s['id'] as String),
-                          child: Text('${s['name']} (${s['leaderName'] ?? 'Sin líder'})'),
-                        ))
-                    .toList(),
-                onChanged: (v) => sellerId = v,
-                decoration: const InputDecoration(labelText: 'Vendedor'),
+                decoration: const InputDecoration(labelText: 'Líder Asignado'),
               ),
           ],
         ),
@@ -1080,24 +1121,32 @@ class _CrmScreenState extends State<CrmScreen> {
 
     if (nameController.text.isEmpty) return;
 
-    final role = isLeader ? 'LEADER' : (isSubseller ? 'SUBSELLER' : 'SELLER');
+    // Validación: Si es vendedor, DEBE tener un líder
+    if (!isLeader && leaderId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debe asignar un líder al vendedor')));
+      return;
+    }
+
+    final role = isLeader ? 'LEADER' : 'SELLER';
     
     final body = {
       'name': nameController.text,
       'phone': phoneController.text,
       'role': role,
-      if (!isLeader && !isSubseller) 'leaderId': leaderId,
-      if (isSubseller) 'sellerId': sellerId, // Nuevo campo para subvendedores
+      if (!isLeader) 'leaderId': leaderId,
     };
+    
     final resp = await http.post(
       Uri.parse('$_apiBase/vendors'), 
       headers: {'Content-Type': 'application/json'}, 
       body: json.encode(body),
     );
+    
     if (!mounted) return;
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Creado correctamente')));
-      setState(() {});
+      setState(() { _refreshTick++; });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ${resp.body}')));
     }
@@ -1389,6 +1438,10 @@ class _CrmScreenState extends State<CrmScreen> {
           )
         : {'name': 'Todos los vendedores'};
 
+    // URGENT FIX: DESBLOQUEO TOTAL
+    // Pasamos TODOS los vendedores (Líderes y Vendedores) para que el Admin pueda asignar a quien quiera.
+    // El backend ya ha sido actualizado para permitir esto.
+    
     await showDialog(
       context: context,
       builder: (context) => BlockAssignmentModal(
@@ -1396,9 +1449,9 @@ class _CrmScreenState extends State<CrmScreen> {
         vendorId: vendorId ?? '',
         vendorName: vendor['name'] ?? 'Vendedor',
         date: selectedDate,
-        allVendors: _vendorsAll, // Pasar la lista completa de vendedores
+        allVendors: _vendorsAll, // Pasar la lista completa SIN FILTROS
         onSuccess: () {
-          setState(() {});
+          setState(() { _refreshTick++; });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Cartillas asignadas exitosamente por bloques'),
@@ -1664,11 +1717,22 @@ class _CrmScreenState extends State<CrmScreen> {
   Future<void> _showAssignedCardsDialog(String vendorId) async {
     final appProvider = Provider.of<AppProvider>(context, listen: false);
     final selectedDate = appProvider.selectedDate;
+    // Buscar datos del vendedor
+    final vendor = _vendorsAll.firstWhere(
+      (v) => (v['vendorId'] ?? v['id']) == vendorId,
+      orElse: () => {'name': 'Vendedor', 'phone': ''},
+    );
+    
+    final vendorName = vendor['name'] ?? 'Vendedor';
+    final vendorPhone = vendor['phone'] ?? '';
+
     // Mostrar diálogo inmediatamente con widget optimizado
     await showDialog(
       context: context,
       builder: (context) => _AssignedCardsDialog(
         vendorId: vendorId,
+        vendorName: vendorName,
+        vendorPhone: vendorPhone,
         apiBase: _apiBase,
         eventDate: selectedDate,
         onDownloadAll: (cards) => _downloadAllAssignedCards(cards, vendorId),
@@ -2773,7 +2837,7 @@ class _CrmScreenState extends State<CrmScreen> {
                         _compactIconButton(Icons.refresh, 'Actualizar', () => setState(() {}), Colors.indigo),
                         _compactIconButton(Icons.star, 'Nuevo Líder', () => _createVendor(isLeader: true), Colors.amber.shade700),
                         _compactIconButton(Icons.person_add, 'Nuevo Vendedor', () => _createVendor(isLeader: false), Colors.blue),
-                        _compactIconButton(Icons.people_alt, 'Nuevo Subvendedor', () => _createVendor(isLeader: false, isSubseller: true), Colors.purple),
+
                         _compactIconButton(Icons.assignment_ind, 'Asignar Cartillas', _assignCard, Colors.teal),
                         _compactIconButton(Icons.inventory_2, 'Inventario', _showInventoryDialog, Colors.blueGrey),
                         _compactIconButton(Icons.table_chart, 'Exportar Excel', _exportToExcel, Colors.green),
@@ -2832,7 +2896,6 @@ class _CrmScreenState extends State<CrmScreen> {
                         
                         // Separar vendedores y subvendedores
                         final sellers = sellerObjs.where((s) => (s['role'] ?? '') == 'SELLER').toList();
-                        final subsellers = sellerObjs.where((s) => (s['role'] ?? '') == 'SUBSELLER').toList();
                         
                         return Container(
                           margin: const EdgeInsets.only(bottom: 16),
@@ -2910,7 +2973,7 @@ class _CrmScreenState extends State<CrmScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    '${sellers.length} vendedores • ${subsellers.length} subvendedores',
+                                    '${sellers.length} vendedores',
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: 14,
@@ -3002,7 +3065,7 @@ class _CrmScreenState extends State<CrmScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  ...sellers.map((seller) => _buildSellerCardWithSubsellers(seller, subsellers)),
+                                  ...sellers.map((seller) => _buildSellerCard(seller)),
                                 ],
                               ],
                             ),
@@ -3035,7 +3098,7 @@ class _CrmScreenState extends State<CrmScreen> {
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               subtitle: Text(
-                                (s['role'] ?? '') == 'SELLER' ? 'Vendedor sin líder' : 'Subvendedor sin líder',
+                                'Vendedor sin líder',
                                 style: TextStyle(color: Colors.grey[600]),
                               ),
                               trailing: Row(
@@ -3258,10 +3321,10 @@ class _CrmScreenState extends State<CrmScreen> {
     );
   }
   
-  Widget _buildSellerCard(Map<String, dynamic> seller, {required bool isSubseller}) {
-    final color = isSubseller ? Colors.purple : Colors.blue;
-    final icon = isSubseller ? Icons.people_alt : Icons.person;
-    final roleLabel = isSubseller ? 'SUBVENDEDOR' : 'VENDEDOR';
+  Widget _buildSellerCard(Map<String, dynamic> seller) {
+    final color = Colors.blue;
+    final icon = Icons.person;
+    final roleLabel = 'VENDEDOR';
     
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -3352,12 +3415,7 @@ class _CrmScreenState extends State<CrmScreen> {
                         'Bs ${seller['commissionsBs'] ?? 0}',
                         color: Colors.green,
                       ),
-                      if (isSubseller && seller['subleaderCommissionBs'] != null)
-                        _modernStat(
-                          'Com. Subvendedor',
-                          'Bs ${seller['subleaderCommissionBs']}',
-                          color: Colors.orange,
-                        ),
+
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -3366,7 +3424,7 @@ class _CrmScreenState extends State<CrmScreen> {
                     runSpacing: 8,
                     alignment: WrapAlignment.center,
                     children: [
-                      if (!isSubseller)
+
                         _modernButton(
                           'Reasignar líder',
                           Icons.swap_horiz,
@@ -3406,192 +3464,8 @@ class _CrmScreenState extends State<CrmScreen> {
     );
   }
 
-  Widget _buildSellerCardWithSubsellers(Map<String, dynamic> seller, List<Map<String, dynamic>> allSubsellers) {
-    // Filtrar subvendedores que pertenecen a este vendedor específico
-    final sellerId = seller['vendorId'] ?? seller['id'];
-    final subsellers = allSubsellers.where((sub) => 
-      (sub['sellerId'] == sellerId)
-    ).toList();
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          childrenPadding: const EdgeInsets.all(16),
-          leading: Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.blue.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: const Icon(Icons.person, color: Colors.white, size: 24),
-          ),
-          title: Text(
-            seller['name'] ?? '—',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Color(0xFF2D3748),
-            ),
-          ),
-          subtitle: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'VENDEDOR',
-                  style: TextStyle(
-                    color: Color(0xFF2196F3),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${seller['soldCount'] ?? 0} vendidas',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
-              ),
-              if (subsellers.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Text(
-                  '• ${subsellers.length} subvendedores',
-                  style: TextStyle(
-                    color: Colors.purple[600],
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          children: [
-            // Estadísticas del vendedor
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.blue.withOpacity(0.05),
-                    Colors.blue.withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _modernStat(
-                        'Vendidas',
-                        (seller['soldCount'] ?? 0).toString(),
-                        assignedValue: (seller['assignedCount'] ?? 0).toString(),
-                        vendorId: sellerId,
-                        color: Colors.blue,
-                      ),
-                      _modernStat(
-                        'Comisión',
-                        'Bs ${seller['commissionsBs'] ?? 0}',
-                        color: Colors.green,
-                      ),
-                      if (seller['subleaderCommissionBs'] != null)
-                        _modernStat(
-                          'Com. Subvendedor',
-                          'Bs ${seller['subleaderCommissionBs']}',
-                          color: Colors.orange,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
-                    children: [
-                      _modernButton(
-                        'Vender',
-                        Icons.point_of_sale,
-                        () => _registerSaleDialog(sellerId),
-                        Colors.blue,
-                      ),
-                      _modernButton(
-                        'Vender Todo',
-                        Icons.sell_outlined,
-                        () => _sellAllAssigned(sellerId),
-                        Colors.green,
-                      ),
-                      _modernButton(
-                        'Eliminar',
-                        Icons.delete_forever,
-                        () => _deleteVendor(seller),
-                        Colors.red,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            
-            // Subvendedores del vendedor
-            if (subsellers.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.people_alt, color: Colors.purple, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'SUBVENDEDORES (${subsellers.length})',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.purple,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              ...subsellers.map((subseller) => Container(
-                margin: const EdgeInsets.only(left: 20, bottom: 8),
-                child: _buildSellerCard(subseller, isSubseller: true),
-              )),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+
+
 
   int _getTotalSold(List<Map<String, dynamic>> vendors) {
     return vendors.fold<int>(0, (sum, vendor) => sum + (_toInt(vendor['soldCount'])));
@@ -3635,8 +3509,8 @@ class _CrmScreenState extends State<CrmScreen> {
       ).toList();
       
       for (final seller in sellers) {
-        final sellerRole = (seller['role'] ?? '') == 'SUBSELLER' ? 'Subvendedor' : 'Vendedor';
-        final sellerIcon = (seller['role'] ?? '') == 'SUBSELLER' ? '👥' : '👤';
+        final sellerRole = 'Vendedor';
+        final sellerIcon = '👤';
         
         items.add(DropdownMenuItem<String>(
           value: seller['id'] as String,
@@ -3662,8 +3536,8 @@ class _CrmScreenState extends State<CrmScreen> {
       ));
       
       for (final seller in orphanSellers) {
-        final sellerRole = (seller['role'] ?? '') == 'SUBSELLER' ? 'Subvendedor' : 'Vendedor';
-        final sellerIcon = (seller['role'] ?? '') == 'SUBSELLER' ? '👥' : '👤';
+        final sellerRole = 'Vendedor';
+        final sellerIcon = '👤';
         
         items.add(DropdownMenuItem<String>(
           value: seller['id'] as String,
@@ -4856,6 +4730,8 @@ class _CrmScreenState extends State<CrmScreen> {
 // Widget optimizado para el diálogo de cartillas asignadas
 class _AssignedCardsDialog extends StatefulWidget {
   final String vendorId;
+  final String vendorName;
+  final String vendorPhone;
   final String apiBase;
   final String eventDate;
   final Function(List<Map<String, dynamic>>) onDownloadAll;
@@ -4865,6 +4741,8 @@ class _AssignedCardsDialog extends StatefulWidget {
 
   const _AssignedCardsDialog({
     required this.vendorId,
+    required this.vendorName,
+    required this.vendorPhone,
     required this.apiBase,
     required this.eventDate,
     required this.onDownloadAll,
@@ -4880,6 +4758,7 @@ class _AssignedCardsDialog extends StatefulWidget {
 class _AssignedCardsDialogState extends State<_AssignedCardsDialog> {
   List<Map<String, dynamic>>? _cards;
   bool _isLoading = true;
+  bool _isSharing = false;
   String? _errorMessage;
 
   @override
@@ -4972,6 +4851,63 @@ class _AssignedCardsDialogState extends State<_AssignedCardsDialog> {
     _loadCards();
   }
 
+  Future<void> _shareOnWhatsApp() async {
+    setState(() => _isSharing = true);
+    try {
+      // 1. Generar el PDF en el backend
+      final response = await http.post(
+        Uri.parse('${widget.apiBase}/reports/share-assigned-cards'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'assignmentId': widget.vendorId,
+          'vendorName': widget.vendorName,
+          'date': widget.eventDate,
+        }),
+      );
+
+      if (response.statusCode >= 300) {
+        throw Exception('Error generando reporte: ${response.body}');
+      }
+
+      final data = json.decode(response.body);
+      final pdfUrl = data['url'];
+
+      if (pdfUrl == null) throw Exception('No se recibió la URL del PDF');
+
+      // 2. Preparar número de teléfono
+      String phone = widget.vendorPhone.replaceAll(RegExp(r'[^\d]'), '');
+      if (phone.isEmpty) {
+        throw Exception('El vendedor no tiene número de teléfono registrado');
+      }
+      if (!phone.startsWith('591')) {
+        phone = '591$phone';
+      }
+
+      // 3. Crear mensaje y URL de WhatsApp
+      final message = 'Hola ${widget.vendorName}, aquí están tus cartillas asignadas para el evento del ${widget.eventDate}: $pdfUrl';
+      final whatsappUrl = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
+
+      // 4. Abrir WhatsApp
+      if (await canLaunchUrl(whatsappUrl)) {
+        await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('No se pudo abrir WhatsApp');
+      }
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al compartir: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -5056,59 +4992,67 @@ class _AssignedCardsDialogState extends State<_AssignedCardsDialog> {
           ),
         ),
         SizedBox(height: 8),
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.center,
           children: [
-            Expanded(
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.blue.shade600, size: 16),
-                    SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'Haz clic en el botón rojo para desasignar cartillas individuales',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade600, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Haz clic en el botón rojo para desasignar',
+                    style: TextStyle(
+                      color: Colors.blue.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            SizedBox(width: 12),
             ElevatedButton.icon(
               onPressed: () => widget.onDownloadAll(_cards!),
               icon: Icon(Icons.download, color: Colors.white),
-              label: Text('Descargar Todas (${_cards!.length})'),
+              label: Text('Descargar (${_cards!.length})'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
             ),
-            SizedBox(width: 8),
             ElevatedButton.icon(
               onPressed: () async {
                 await widget.onDeleteAll(_cards!);
                 _refreshCards();
               },
               icon: Icon(Icons.person_remove, color: Colors.white),
-              label: Text('Desasignar Todas (${_cards!.length})'),
+              label: Text('Desasignar (${_cards!.length})'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: _isSharing ? null : _shareOnWhatsApp,
+              icon: _isSharing 
+                ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : Icon(FontAwesomeIcons.whatsapp, color: Colors.white),
+              label: Text('WhatsApp'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade600,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
             ),
           ],

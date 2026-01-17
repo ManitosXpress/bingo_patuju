@@ -488,9 +488,9 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
           autofocus: true,
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('Bingo 5x5 - 75 Números'),
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
+              title: const Text('BINGO IMPERIAL', style: TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold, fontSize: 22)),
+              backgroundColor: const Color(0xFF2C1810),
+              foregroundColor: const Color(0xFFFFD700),
               elevation: 0,
               flexibleSpace: Container(
                 decoration: BoxDecoration(
@@ -498,8 +498,8 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Colors.blue.shade600,
-                      Colors.blue.shade800,
+                      const Color(0xFF3D2817),
+                      const Color(0xFF1A0F08),
                     ],
                   ),
                 ),
@@ -559,13 +559,9 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
             ),
             body: Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.grey.shade50,
-                    Colors.grey.shade100,
-                  ],
+                image: DecorationImage(
+                  image: AssetImage('assets/images/dark_casino_background.png'),
+                  fit: BoxFit.cover,
                 ),
               ),
               child: _showCrystalBall 
@@ -588,19 +584,8 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
           // Panel izquierdo - Todos los números del bingo
           Expanded(
             flex: 1,
-            child: Container(
-              margin: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 6,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
               child: Consumer<AppProvider>(
                 builder: (context, appProvider, child) {
                   return NumbersPanel(
@@ -614,19 +599,8 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
           // Panel central - Bola actual y controles
           Expanded(
             flex: 1,
-            child: Container(
-              margin: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 6,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
               child: ControlPanel(
                 bingoGame: _bingoGame,
                 onStateChanged: _onGameStateChanged,
@@ -636,19 +610,8 @@ class _BingoGameScreenState extends State<BingoGameScreen> {
           // Panel derecho - Juegos de bingo
           Expanded(
             flex: 1,
-            child: Container(
-              margin: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 6,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
+            child: Padding(
+              padding: const EdgeInsets.all(2),
               child: BingoGamesPanel(),
             ),
           ),

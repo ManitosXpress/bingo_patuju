@@ -398,4 +398,28 @@ class CartillaService {
       }
     });
   }
+  // Compartir cartillas asignadas por WhatsApp
+  static Future<Map<String, dynamic>> shareAssignedCards({
+    required String assignmentId,
+    required String vendorName,
+    required String date,
+  }) async {
+    return _makeRequestWithRetry(() async {
+      final response = await http.post(
+        Uri.parse('${BackendConfig.apiBase}/reports/share-assigned-cards'),
+        headers: BackendConfig.defaultHeaders,
+        body: json.encode({
+          'assignmentId': assignmentId,
+          'vendorName': vendorName,
+          'date': date,
+        }),
+      ).timeout(BackendConfig.connectionTimeout);
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Error al generar reporte: ${response.statusCode} - ${response.body}');
+      }
+    });
+  }
 } 

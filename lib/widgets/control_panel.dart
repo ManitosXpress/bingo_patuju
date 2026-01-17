@@ -6,6 +6,7 @@ import '../models/firebase_cartilla.dart';
 import 'cartillas_dialog.dart';
 import 'control_panel_sections.dart';
 import 'bingo_games_panel.dart';
+import 'glass_container.dart'; // Importar componente de vidrio
 
 class ControlPanel extends StatefulWidget {
   final BingoGame bingoGame;
@@ -31,13 +32,11 @@ class _ControlPanelState extends State<ControlPanel> {
         final totalBalls = bingoGame.allNumbers.length;
         final remainingBalls = totalBalls - calledNumbers.length;
         
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
+        return GlassContainer(
+          borderRadius: 24,
+          blurIntensity: 12.0,
+          padding: const EdgeInsets.all(20.0),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
