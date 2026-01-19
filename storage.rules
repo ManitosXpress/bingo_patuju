@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // PDFs de cartillas enviadas - acceso público de lectura
+    match /cartillas_enviadas/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Reportes temporales - acceso público de lectura
+    match /temp_reports/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+    
+    // Regla por defecto: denegar todo lo demás
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

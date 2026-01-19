@@ -351,13 +351,51 @@ class GameStatsCard extends StatelessWidget {
   }
 }
 
-class CalledNumbersSection extends StatelessWidget {
+class CalledNumbersSection extends StatefulWidget {
   final List<int> calledNumbers;
 
   const CalledNumbersSection({
     super.key,
     required this.calledNumbers,
   });
+
+  @override
+  State<CalledNumbersSection> createState() => _CalledNumbersSectionState();
+}
+
+class _CalledNumbersSectionState extends State<CalledNumbersSection> {
+  final ScrollController _scrollController = ScrollController();
+  int _previousCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousCount = widget.calledNumbers.length;
+  }
+
+  @override
+  void didUpdateWidget(CalledNumbersSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Auto-scroll to bottom when new balls are added
+    if (widget.calledNumbers.length > _previousCount) {
+      _previousCount = widget.calledNumbers.length;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -369,36 +407,45 @@ class CalledNumbersSection extends StatelessWidget {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
+            color: Color(0xFFD4AF37), // Dorado
           ),
         ),
         
         const SizedBox(height: 12),
         
-        // Grid de bolas cantadas
-        if (calledNumbers.isNotEmpty)
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: calledNumbers.map((number) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  _getBallLabel(number),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              );
-            }).toList(),
+        // Grid de bolas cantadas con scroll interno
+        Expanded(
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            child: calledNumbers.isNotEmpty
+              ? Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: widget.calledNumbers.map((number) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        _getBallLabel(number),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                )
+              : const SizedBox.shrink(),
           ),
+        ),
       ],
     );
   }
+
+  List<int> get calledNumbers => widget.calledNumbers;
 
   String _getBallLabel(int number) {
     if (number >= 1 && number <= 15) return 'B$number';
@@ -408,4 +455,4 @@ class CalledNumbersSection extends StatelessWidget {
     if (number >= 61 && number <= 75) return 'O$number';
     return number.toString();
   }
-} 
+}

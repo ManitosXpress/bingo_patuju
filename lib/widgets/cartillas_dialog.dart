@@ -36,13 +36,37 @@ class _CartillasDialogState extends State<CartillasDialog> {
   }
 
   void _refreshData() async {
+    final appProvider = Provider.of<AppProvider>(context, listen: false);
+    
+    // Verificar que hay una fecha seleccionada válida
+    final selectedDate = appProvider.selectedDate;
+    if (selectedDate.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Seleccione una fecha para refrescar los datos'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
     try {
       setState(() {
         _errorMessage = null;
       });
       
-      final appProvider = Provider.of<AppProvider>(context, listen: false);
-      await appProvider.refreshCartillasData();
+      // Usar refreshFirebaseCartillas que recarga las cartillas de la fecha seleccionada
+      await appProvider.refreshFirebaseCartillas();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Datos actualizados para la fecha: $selectedDate'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -85,11 +109,11 @@ class _CartillasDialogState extends State<CartillasDialog> {
                       ),
                     ),
                   ),
-                  // Botón de refrescar con indicador de carga
+                  // Botón de refrescar con indicador de carga (usa isLoadingFirebase)
                   Consumer<AppProvider>(
                     builder: (context, appProvider, child) {
                       return IconButton(
-                        icon: appProvider.isLoading 
+                        icon: appProvider.isLoadingFirebase 
                           ? const SizedBox(
                               width: 20,
                               height: 20,
@@ -99,7 +123,7 @@ class _CartillasDialogState extends State<CartillasDialog> {
                               ),
                             )
                           : const Icon(Icons.refresh, color: Colors.white),
-                        onPressed: appProvider.isLoading ? null : () {
+                        onPressed: appProvider.isLoadingFirebase ? null : () {
                           _refreshData();
                         },
                         tooltip: 'Refrescar datos',
@@ -185,4 +209,4 @@ class _CartillasDialogState extends State<CartillasDialog> {
       ),
     );
   }
-} 
+}

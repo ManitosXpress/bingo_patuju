@@ -36,8 +36,7 @@ class _ControlPanelState extends State<ControlPanel> {
           borderRadius: 24,
           blurIntensity: 12.0,
           padding: const EdgeInsets.all(20.0),
-          child: SingleChildScrollView(
-            child: Column(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Bola actual llamada
@@ -89,13 +88,11 @@ class _ControlPanelState extends State<ControlPanel> {
                 
                 const SizedBox(height: 24),
                 
-                // Lista de bolas cantadas
-                CalledNumbersSection(calledNumbers: calledNumbers),
-                
-                // Espacio extra para evitar overflow
-                const SizedBox(height: 20),
-              ],
-            ),
+                // Lista de bolas cantadas (con scroll interno)
+              Expanded(
+                child: CalledNumbersSection(calledNumbers: calledNumbers),
+              ),
+            ],
           ),
         );
       },

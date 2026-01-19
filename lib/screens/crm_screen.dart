@@ -15,6 +15,8 @@ import '../providers/app_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../services/cartillas_service.dart';
+import '../services/storage_service.dart';
+import '../utils/pdf_generator.dart';
 
 class CrmScreen extends StatefulWidget {
   const CrmScreen({super.key});
@@ -4854,27 +4856,27 @@ class _AssignedCardsDialogState extends State<_AssignedCardsDialog> {
   Future<void> _shareOnWhatsApp() async {
     setState(() => _isSharing = true);
     try {
-      // 1. Generar el PDF en el backend
-      final response = await http.post(
-        Uri.parse('${widget.apiBase}/reports/share-assigned-cards'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'assignmentId': widget.vendorId,
-          'vendorName': widget.vendorName,
-          'date': widget.eventDate,
-        }),
-      );
-
-      if (response.statusCode >= 300) {
-        throw Exception('Error generando reporte: ${response.body}');
+      // Verificar que hay cartillas cargadas
+      if (_cards == null || _cards!.isEmpty) {
+        throw Exception('No hay cartillas para compartir');
       }
 
-      final data = json.decode(response.body);
-      final pdfUrl = data['url'];
+      // 1. Generar el PDF localmente con las cartillas asignadas
+      final Uint8List pdfBytes = await PdfGenerator.generateMultipleCartillasPdf(
+        cards: _cards!,
+        vendorName: widget.vendorName,
+        eventDate: widget.eventDate,
+      );
 
-      if (pdfUrl == null) throw Exception('No se recibió la URL del PDF');
+      // 2. Subir el PDF a Firebase Storage
+      final String pdfUrl = await StorageService.uploadMultipleCartillasPdf(
+        bytes: pdfBytes,
+        vendorId: widget.vendorId,
+        vendorName: widget.vendorName,
+        eventDate: widget.eventDate,
+      );
 
-      // 2. Preparar número de teléfono
+      // 3. Preparar número de teléfono (Bolivia: código +591)
       String phone = widget.vendorPhone.replaceAll(RegExp(r'[^\d]'), '');
       if (phone.isEmpty) {
         throw Exception('El vendedor no tiene número de teléfono registrado');
@@ -4883,13 +4885,24 @@ class _AssignedCardsDialogState extends State<_AssignedCardsDialog> {
         phone = '591$phone';
       }
 
-      // 3. Crear mensaje y URL de WhatsApp
-      final message = 'Hola ${widget.vendorName}, aquí están tus cartillas asignadas para el evento del ${widget.eventDate}: $pdfUrl';
+      // 4. Crear mensaje con la URL del PDF
+      final message = 'Hola ${widget.vendorName}, aquí están tus cartillas asignadas de Bingo Imperial para el evento del ${widget.eventDate}:\n\n📥 $pdfUrl';
+      
+      // 5. Construir URL de WhatsApp Web
       final whatsappUrl = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
 
-      // 4. Abrir WhatsApp
+      // 6. Abrir WhatsApp en nueva pestaña/aplicación externa
       if (await canLaunchUrl(whatsappUrl)) {
         await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ WhatsApp abierto con el enlace del PDF'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } else {
         throw Exception('No se pudo abrir WhatsApp');
       }
@@ -4898,7 +4911,7 @@ class _AssignedCardsDialogState extends State<_AssignedCardsDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al compartir: $e'),
+            content: Text('❌ Error al compartir: $e'),
             backgroundColor: Colors.red,
           ),
         );

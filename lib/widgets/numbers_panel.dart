@@ -51,7 +51,7 @@ class NumbersPanel extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.blue,
+                color: Color(0xFFD4AF37), // Dorado
               ),
               textAlign: TextAlign.center,
             ),
@@ -117,17 +117,17 @@ class NumbersPanel extends StatelessWidget {
         children: [
           Text(
             letter,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.blue.shade800,
+              color: Color(0xFFD4AF37), // Dorado
             ),
           ),
           Text(
             range,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 10,
-              color: Colors.blue.shade600,
+              color: Color(0xFFD4AF37), // Dorado
               fontWeight: FontWeight.w500,
             ),
           ),
