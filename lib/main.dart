@@ -15,7 +15,7 @@ class BingoApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (context) => AppProvider(),
       child: MaterialApp(
-        title: 'Bingo 5x5',
+        title: 'Bingo Imperial',
         theme: ThemeData(
           primarySwatch: Colors.blue,
           useMaterial3: true,
