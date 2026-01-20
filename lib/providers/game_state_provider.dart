@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/bingo_game.dart';
 import '../config/backend_config.dart';
+import '../services/rounds_persistence_service.dart';
 
 class GameStateProvider extends ChangeNotifier {
   // Estado del juego
@@ -34,6 +35,82 @@ class GameStateProvider extends ChangeNotifier {
   GameStateProvider() {
     // No cargar vendedores automáticamente para mejor rendimiento
     // Se cargarán solo cuando se necesiten
+    _loadPersistenceData();
+  }
+
+  // Persistencia
+  final Map<String, String> _selectedRounds = {};
+  List<String> _completedGames = [];
+  final Map<String, List<String>> _completedRounds = {}; // gameId -> List<roundId>
+  
+  List<String> get completedGames => _completedGames;
+
+  Future<void> _loadPersistenceData() async {
+    _completedGames = await RoundsPersistenceService().getCompletedGames();
+    notifyListeners();
+  }
+  
+  Future<void> loadCompletedRounds(String gameId) async {
+    if (!_completedRounds.containsKey(gameId)) {
+      _completedRounds[gameId] = await RoundsPersistenceService().getCompletedRounds(gameId);
+      notifyListeners();
+    }
+  }
+
+  Future<void> selectRound(String gameId, String roundId) async {
+    _selectedRounds[gameId] = roundId;
+    notifyListeners();
+    await RoundsPersistenceService().saveSelectedRound(gameId, roundId);
+  }
+
+  Future<String?> getSelectedRound(String gameId) async {
+    if (_selectedRounds.containsKey(gameId)) {
+      return _selectedRounds[gameId];
+    }
+    final savedRound = await RoundsPersistenceService().getSelectedRound(gameId);
+    if (savedRound != null) {
+      _selectedRounds[gameId] = savedRound;
+    }
+    return savedRound;
+  }
+  
+  // Versión síncrona para la UI si ya está cargado
+  String? getSelectedRoundSync(String gameId) {
+    return _selectedRounds[gameId];
+  }
+
+  Future<void> toggleGameCompletion(String gameId) async {
+    if (_completedGames.contains(gameId)) {
+      _completedGames.remove(gameId);
+    } else {
+      _completedGames.add(gameId);
+    }
+    notifyListeners();
+    await RoundsPersistenceService().saveCompletedGames(_completedGames);
+  }
+
+  bool isGameCompleted(String gameId) {
+    return _completedGames.contains(gameId);
+  }
+  
+  Future<void> toggleRoundCompletion(String gameId, String roundId) async {
+    if (!_completedRounds.containsKey(gameId)) {
+      await loadCompletedRounds(gameId);
+    }
+    
+    final rounds = _completedRounds[gameId]!;
+    if (rounds.contains(roundId)) {
+      rounds.remove(roundId);
+    } else {
+      rounds.add(roundId);
+    }
+    
+    notifyListeners();
+    await RoundsPersistenceService().saveCompletedRounds(gameId, rounds);
+  }
+  
+  bool isRoundCompleted(String gameId, String roundId) {
+    return _completedRounds[gameId]?.contains(roundId) ?? false;
   }
   
   // Métodos para el juego
@@ -368,4 +445,4 @@ class GameStateProvider extends ChangeNotifier {
   Map<String, dynamic> checkBingoForRoundPatterns(List<String> roundPatterns) {
     return _bingoGame.checkBingoForRoundPatterns(roundPatterns);
   }
-} 
+}

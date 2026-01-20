@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/app_provider.dart';
+import 'providers/game_state_provider.dart';
 import 'screens/bingo_game_screen.dart';
 
 void main() {
@@ -12,8 +13,11 @@ class BingoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => AppProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppProvider()),
+        ChangeNotifierProvider(create: (_) => GameStateProvider()),
+      ],
       child: MaterialApp(
         title: 'Bingo Imperial',
         theme: ThemeData(

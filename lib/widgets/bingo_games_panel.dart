@@ -4,6 +4,7 @@ import '../models/bingo_game_config.dart';
 import 'bingo_patterns_dialog.dart';
 import '../models/bingo_game.dart';
 import '../providers/app_provider.dart';
+import '../providers/game_state_provider.dart';
 import '../services/rounds_persistence_service.dart';
 import 'game_selector_dialog.dart';
 import 'edit_game_dialog.dart';
@@ -56,7 +57,23 @@ class BingoGamesPanelState {
 
 class _BingoGamesPanelState extends State<BingoGamesPanel> {
   BingoGameConfig? _selectedGame;
-  int _currentRoundIndex = 0;
+  
+  // Getter para obtener el índice de la ronda actual desde el Provider
+  int get _currentRoundIndex {
+    if (_selectedGame == null || !mounted) return 0;
+    try {
+      final provider = Provider.of<GameStateProvider>(context, listen: false);
+      final savedRoundId = provider.getSelectedRoundSync(_selectedGame!.id);
+      
+      if (savedRoundId != null) {
+         final index = _selectedGame!.rounds.indexWhere((r) => r.id == savedRoundId);
+         if (index != -1) return index;
+      }
+    } catch (e) {
+      print('Error obteniendo índice de ronda: $e');
+    }
+    return 0;
+  }
   
   // Lista de juegos disponibles
   List<BingoGameConfig> _games = [];
@@ -78,8 +95,6 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final appProvider = Provider.of<AppProvider>(context, listen: false);
       await _loadGamesFromFirebase(appProvider.selectedDate);
-      // Luego cargar rondas guardadas si existen
-      _loadSavedRounds();
     });
   }
 
@@ -156,23 +171,46 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         }
       }
       
+      // Determinar el juego seleccionado
+      BingoGameConfig? newSelectedGame;
+      
+      // Si hay juegos cargados y ninguno está seleccionado, seleccionar el primero
+      // O si el seleccionado no está en la lista nueva, seleccionar el primero
+      final isSelectedInList = _selectedGame != null && loadedGames.any((g) => g.id == _selectedGame!.id);
+      
+      if (loadedGames.isNotEmpty && (_selectedGame == null || !isSelectedInList)) {
+        newSelectedGame = loadedGames.first;
+      } else if (isSelectedInList) {
+        newSelectedGame = _selectedGame;
+      }
+      
+      // Actualizar estado
       setState(() {
         _games = loadedGames;
         _loadingGames = false;
-        
-        // Si hay juegos cargados y ninguno está seleccionado, seleccionar el primero
-        // O si el seleccionado no está en la lista nueva, seleccionar el primero
-        final isSelectedInList = _selectedGame != null && loadedGames.any((g) => g.id == _selectedGame!.id);
-        
-        if (loadedGames.isNotEmpty && (_selectedGame == null || !isSelectedInList)) {
-          _selectedGame = loadedGames.first;
-          _updateCurrentRoundIndex(0);
-        } else if (loadedGames.isEmpty) {
-          // Si no hay juegos para esta fecha, limpiar selección
-          _selectedGame = null;
-          _currentRoundIndex = 0;
-        }
+        _selectedGame = newSelectedGame;
       });
+      
+      // Acciones posteriores a la actualización del estado
+      if (newSelectedGame != null) {
+        // Verificar si hay una ronda guardada para este juego
+        final provider = Provider.of<GameStateProvider>(context, listen: false);
+        
+        // Cargar rondas completadas (async)
+        await provider.loadCompletedRounds(newSelectedGame.id);
+        
+        final savedRoundId = provider.getSelectedRoundSync(newSelectedGame.id);
+        int initialIndex = 0;
+        
+        if (savedRoundId != null) {
+           final index = newSelectedGame.rounds.indexWhere((r) => r.id == savedRoundId);
+           if (index != -1) {
+              initialIndex = index;
+           }
+        }
+        
+        await _updateCurrentRoundIndex(initialIndex);
+      }
       
       print('DEBUG: Juegos cargados y procesados correctamente. Total: ${loadedGames.length}');
     } catch (e, stackTrace) {
@@ -201,60 +239,6 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     }
   }
 
-  // Método para cargar rondas guardadas
-  Future<void> _loadSavedRounds() async {
-    try {
-      // Verificar si hay datos guardados
-      final hasData = await RoundsPersistenceService.hasSavedData();
-      
-      if (hasData) {
-        // Obtener el ID del juego actual
-        final currentGameId = await RoundsPersistenceService.getCurrentGameId();
-        
-        if (currentGameId != null) {
-          // Buscar el juego en la lista de juegos disponibles
-          final savedGame = _games.firstWhere(
-            (game) => game.id == currentGameId,
-            orElse: () => _games.first,
-          );
-          
-          // Cargar las rondas guardadas
-          final savedRounds = await RoundsPersistenceService.loadGameRounds(currentGameId);
-          
-          if (savedRounds != null && savedRounds.rounds.isNotEmpty) {
-            // Actualizar el juego seleccionado con las rondas guardadas
-            setState(() {
-              _selectedGame = savedRounds;
-              // Actualizar el juego en la lista de juegos
-              final gameIndex = _games.indexWhere((game) => game.id == currentGameId);
-              if (gameIndex != -1) {
-                _games[gameIndex] = savedRounds;
-              }
-            });
-            
-                         // Cargar el índice de la ronda actual
-             final currentRoundIndex = await RoundsPersistenceService.loadCurrentRoundIndex();
-             await _updateCurrentRoundIndex(currentRoundIndex);
-            
-            print('DEBUG: Rondas guardadas cargadas para el juego: ${savedRounds.name}');
-          } else {
-            // No hay rondas guardadas, seleccionar el primer juego
-            _selectDefaultGame();
-          }
-        } else {
-          // No hay juego actual guardado, seleccionar el primer juego
-          _selectDefaultGame();
-        }
-      } else {
-        // No hay datos guardados, seleccionar el primer juego
-        _selectDefaultGame();
-      }
-    } catch (e) {
-      print('ERROR: Error cargando rondas guardadas: $e');
-      // En caso de error, seleccionar el primer juego
-      _selectDefaultGame();
-    }
-  }
 
   // Método para seleccionar el juego por defecto
   Future<void> _selectDefaultGame() async {
@@ -291,13 +275,9 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
             ),
             ElevatedButton.icon(
               onPressed: () async {
-                // Limpiar datos guardados
-                await RoundsPersistenceService.clearAllData();
-                
                 // Resetear el estado local
                 setState(() {
                   _selectedGame = _games.first;
-                  _currentRoundIndex = 0;
                 });
                 
                 // Actualizar la variable estática
@@ -308,7 +288,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                 // Mostrar mensaje de confirmación
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('🗑️ Todos los datos han sido limpiados'),
+                    content: Text('🗑️ Estado local reiniciado'),
                     backgroundColor: Colors.orange,
                     duration: Duration(seconds: 3),
                   ),
@@ -360,8 +340,9 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
               _selectedGame = game;
             });
             
-            // Guardar las rondas del juego seleccionado
-            await RoundsPersistenceService.saveGameRounds(game);
+            // Cargar rondas completadas para el nuevo juego
+            final provider = Provider.of<GameStateProvider>(context, listen: false);
+            await provider.loadCompletedRounds(game.id);
             
             // Usar el método que actualiza la variable estática
             await _updateCurrentRoundIndex(0);
@@ -408,8 +389,6 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
               final savedId = await BingoGamesService().saveBingoGame(firebaseGame);
               print('DEBUG: Juego guardado con ID: $savedId');
               
-              // Guardar las rondas del nuevo juego (persistencia local)
-              await RoundsPersistenceService.saveGameRounds(newGame);
               
               // Actualizar estado local
               setState(() {
@@ -475,8 +454,6 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
               _selectedGame = updatedGame;
             });
             
-            // Guardar las rondas del juego actualizado
-            await RoundsPersistenceService.saveGameRounds(updatedGame);
             
             // Usar el método que actualiza la variable estática
             await _updateCurrentRoundIndex(0);
@@ -489,12 +466,16 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
 
   void _markCurrentRoundAsCompleted() async {
     if (_selectedGame != null && _currentRoundIndex < _selectedGame!.rounds.length) {
-      setState(() {
-        _selectedGame!.rounds[_currentRoundIndex].isCompleted = true;
-      });
+      final round = _selectedGame!.rounds[_currentRoundIndex];
       
-      // Guardar el estado del juego
-      await RoundsPersistenceService.saveGameRounds(_selectedGame!);
+      // Actualizar en provider (persistencia)
+      final provider = Provider.of<GameStateProvider>(context, listen: false);
+      await provider.toggleRoundCompletion(_selectedGame!.id, round.id);
+      
+      // Actualizar estado local para reflejar cambio inmediato
+      setState(() {
+        round.isCompleted = true;
+      });
       
       // Avanzar automáticamente a la siguiente ronda si no es la última
       if (_currentRoundIndex < _selectedGame!.rounds.length - 1) {
@@ -514,8 +495,6 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       // Limpiar todos los patrones marcados manualmente
       _clearAllManuallyMarkedPatterns();
       
-      // Guardar el estado del juego reseteado
-      await RoundsPersistenceService.saveGameRounds(_selectedGame!);
       
       // Usar el método que actualiza la variable estática
       await _updateCurrentRoundIndex(0);
@@ -523,8 +502,13 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   }
 
   bool get _isGameCompleted {
-    if (_selectedGame == null) return false;
-    return _selectedGame!.rounds.every((round) => round.isCompleted);
+    if (_selectedGame == null || !mounted) return false;
+    try {
+      final provider = Provider.of<GameStateProvider>(context, listen: false);
+      return provider.isGameCompleted(_selectedGame!.id);
+    } catch (e) {
+      return false;
+    }
   }
 
   // Método para forzar la actualización del estado
@@ -536,21 +520,25 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
 
   // Método para actualizar la variable estática cuando cambie la ronda
   Future<void> _updateCurrentRoundIndex(int newIndex) async {
+    if (_selectedGame == null) return;
     print('DEBUG: Cambiando ronda de $_currentRoundIndex a $newIndex');
     
     // Limpiar patrones marcados manualmente de la ronda anterior
     _clearManuallyMarkedPatternsForRound(_currentRoundIndex);
     
-    setState(() {
-      _currentRoundIndex = newIndex;
-    });
-    
-    // Guardar el índice de la ronda actual
-    await RoundsPersistenceService.saveCurrentRoundIndex(newIndex);
+    // Guardar en Provider
+    if (newIndex >= 0 && newIndex < _selectedGame!.rounds.length) {
+       final roundId = _selectedGame!.rounds[newIndex].id;
+       final provider = Provider.of<GameStateProvider>(context, listen: false);
+       await provider.selectRound(_selectedGame!.id, roundId);
+    }
     
     // Actualizar la variable estática después de cambiar la ronda
     final patterns = getCurrentRoundPatterns();
     print('DEBUG: Patrones actualizados después del cambio de ronda: $patterns');
+    
+    // Forzar reconstrucción para actualizar UI
+    if (mounted) setState(() {});
   }
 
   // Método para limpiar patrones marcados manualmente de una ronda específica
@@ -791,6 +779,9 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
 
   @override
   Widget build(BuildContext context) {
+    // Escuchar cambios en GameStateProvider para actualizar la UI cuando cambie la persistencia
+    Provider.of<GameStateProvider>(context);
+    
     return Consumer<AppProvider>(
       builder: (context, appProvider, child) {
 
@@ -1105,6 +1096,19 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         children: [
           Row(
             children: [
+              // Checkbox de completado
+              Checkbox(
+                value: _isGameCompleted,
+                onChanged: (value) async {
+                  if (_selectedGame != null) {
+                    final provider = Provider.of<GameStateProvider>(context, listen: false);
+                    await provider.toggleGameCompletion(_selectedGame!.id);
+                    setState(() {});
+                  }
+                },
+                activeColor: Colors.green.shade600,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              ),
               Icon(
                 _isGameCompleted ? Icons.celebration : Icons.info_outline,
                 color: _isGameCompleted ? Colors.green.shade700 : Colors.blue.shade700,
@@ -1213,6 +1217,13 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                     itemBuilder: (context, index) {
                       final round = _selectedGame!.rounds[index];
                       final isCurrentRound = index == _currentRoundIndex;
+                      
+                      // Verificar completado desde el provider o el modelo local
+                      final provider = Provider.of<GameStateProvider>(context);
+                      // Asegurar que tenemos los datos cargados para este juego
+                      if (provider.isRoundCompleted(_selectedGame!.id, round.id)) {
+                        round.isCompleted = true;
+                      }
                       final isCompleted = round.isCompleted;
                       
                       return Container(
@@ -1362,7 +1373,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                                 ),
                             ],
                           ),
-                                                     onTap: isCompleted ? null : () async {
+                                                     onTap: (_isGameCompleted || isCompleted) ? null : () async {
                              await _updateCurrentRoundIndex(index);
                            },
                         ),
@@ -1458,25 +1469,28 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   }
 
   // Método para confirmar y ejecutar la eliminación de la ronda
-  void _confirmDeleteRound(int roundIndex) {
+  Future<void> _confirmDeleteRound(int roundIndex) async {
     if (_selectedGame == null) return;
     
     try {
       final roundToDelete = _selectedGame!.rounds[roundIndex];
       print('DEBUG: Eliminando ronda: ${roundToDelete.name}');
       
+      // Eliminar la ronda
+      _selectedGame!.rounds.removeAt(roundIndex);
+      
+      // Ajustar el índice de la ronda actual si es necesario
+      int newIndex = _currentRoundIndex;
+      if (newIndex >= _selectedGame!.rounds.length) {
+        newIndex = _selectedGame!.rounds.length - 1;
+      }
+      if (newIndex < 0) {
+        newIndex = 0;
+      }
+      
+      await _updateCurrentRoundIndex(newIndex);
+      
       setState(() {
-        // Eliminar la ronda
-        _selectedGame!.rounds.removeAt(roundIndex);
-        
-        // Ajustar el índice de la ronda actual si es necesario
-        if (_currentRoundIndex >= _selectedGame!.rounds.length) {
-          _currentRoundIndex = _selectedGame!.rounds.length - 1;
-        }
-        if (_currentRoundIndex < 0) {
-          _currentRoundIndex = 0;
-        }
-        
         // Actualizar la variable estática después de la eliminación
         if (_selectedGame!.rounds.isNotEmpty) {
           getCurrentRoundPatterns();

@@ -1,109 +1,84 @@
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/bingo_game_config.dart';
 
 class RoundsPersistenceService {
-  static const String _roundsKey = 'bingo_game_rounds';
-  static const String _currentGameKey = 'current_bingo_game';
-  static const String _currentRoundIndexKey = 'current_round_index';
+  static final RoundsPersistenceService _instance = RoundsPersistenceService._internal();
+  
+  factory RoundsPersistenceService() {
+    return _instance;
+  }
+  
+  RoundsPersistenceService._internal();
+  
+  static const String _selectedRoundsKey = 'selected_rounds_map';
+  static const String _completedGamesKey = 'completed_games_list';
 
-  /// Guardar las rondas de un juego específico
-  static Future<void> saveGameRounds(BingoGameConfig game) async {
+  /// Guarda la ronda seleccionada para un juego específico
+  Future<void> saveSelectedRound(String gameId, String roundId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      // Obtener mapa actual o crear uno nuevo
+      // El formato será "gameId:roundId" en una lista de strings para simular un mapa
+      // O mejor, usamos un prefijo para cada key: "selected_round_gameId"
       
-      // Guardar el juego completo
-      final gameData = game.toJson();
-      await prefs.setString(_roundsKey, jsonEncode(gameData));
-      
-      // Guardar el ID del juego actual
-      await prefs.setString(_currentGameKey, game.id);
-      
-      print('DEBUG: Rondas guardadas para el juego: ${game.name}');
+      await prefs.setString('selected_round_$gameId', roundId);
+      print('DEBUG: Ronda $roundId guardada para el juego $gameId');
     } catch (e) {
-      print('ERROR: Error guardando rondas: $e');
+      print('ERROR: Error guardando ronda seleccionada: $e');
     }
   }
 
-  /// Cargar las rondas guardadas para un juego específico
-  static Future<BingoGameConfig?> loadGameRounds(String gameId) async {
+  /// Obtiene la ronda seleccionada para un juego
+  Future<String?> getSelectedRound(String gameId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final roundsData = prefs.getString(_roundsKey);
-      
-      if (roundsData != null) {
-        final gameData = jsonDecode(roundsData) as Map<String, dynamic>;
-        final savedGameId = gameData['id'] as String?;
-        
-        // Solo cargar si es el mismo juego
-        if (savedGameId == gameId) {
-          final game = BingoGameConfig.fromJson(gameData);
-          print('DEBUG: Rondas cargadas para el juego: ${game.name}');
-          return game;
-        }
-      }
-      
-      return null;
+      return prefs.getString('selected_round_$gameId');
     } catch (e) {
-      print('ERROR: Error cargando rondas: $e');
+      print('ERROR: Error obteniendo ronda seleccionada: $e');
       return null;
     }
   }
 
-  /// Guardar el índice de la ronda actual
-  static Future<void> saveCurrentRoundIndex(int roundIndex) async {
+  /// Guarda la lista de juegos completados (tachados)
+  Future<void> saveCompletedGames(List<String> gameIds) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_currentRoundIndexKey, roundIndex);
-      print('DEBUG: Índice de ronda actual guardado: $roundIndex');
+      await prefs.setStringList(_completedGamesKey, gameIds);
+      print('DEBUG: Juegos completados guardados: $gameIds');
     } catch (e) {
-      print('ERROR: Error guardando índice de ronda: $e');
+      print('ERROR: Error guardando juegos completados: $e');
     }
   }
 
-  /// Cargar el índice de la ronda actual
-  static Future<int> loadCurrentRoundIndex() async {
+  /// Obtiene la lista de juegos completados
+  Future<List<String>> getCompletedGames() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getInt(_currentRoundIndexKey) ?? 0;
+      return prefs.getStringList(_completedGamesKey) ?? [];
     } catch (e) {
-      print('ERROR: Error cargando índice de ronda: $e');
-      return 0;
+      print('ERROR: Error obteniendo juegos completados: $e');
+      return [];
     }
   }
 
-  /// Obtener el ID del juego actual
-  static Future<String?> getCurrentGameId() async {
+  // Obtener rondas completadas de un juego
+  Future<List<String>> getCompletedRounds(String gameId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(_currentGameKey);
+      return prefs.getStringList('completed_rounds_$gameId') ?? [];
     } catch (e) {
-      print('ERROR: Error obteniendo ID del juego actual: $e');
-      return null;
+      print('ERROR: Error obteniendo rondas completadas: $e');
+      return [];
     }
   }
 
-  /// Limpiar todos los datos guardados
-  static Future<void> clearAllData() async {
+  // Guardar rondas completadas de un juego
+  Future<void> saveCompletedRounds(String gameId, List<String> completedRounds) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_roundsKey);
-      await prefs.remove(_currentGameKey);
-      await prefs.remove(_currentRoundIndexKey);
-      print('DEBUG: Todos los datos de persistencia han sido limpiados');
+      await prefs.setStringList('completed_rounds_$gameId', completedRounds);
+      print('DEBUG: Rondas completadas guardadas para $gameId: $completedRounds');
     } catch (e) {
-      print('ERROR: Error limpiando datos: $e');
-    }
-  }
-
-  /// Verificar si hay datos guardados
-  static Future<bool> hasSavedData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.containsKey(_roundsKey);
-    } catch (e) {
-      print('ERROR: Error verificando datos guardados: $e');
-      return false;
+      print('ERROR: Error guardando rondas completadas: $e');
     }
   }
 }
