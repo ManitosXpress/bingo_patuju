@@ -1,4 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config/backend_config.dart';
 
 class RoundsPersistenceService {
   static final RoundsPersistenceService _instance = RoundsPersistenceService._internal();
@@ -79,6 +82,94 @@ class RoundsPersistenceService {
       print('DEBUG: Rondas completadas guardadas para $gameId: $completedRounds');
     } catch (e) {
       print('ERROR: Error guardando rondas completadas: $e');
+    }
+  }
+
+  /// Guarda el mapa de patrones marcados manualmente para un juego específico
+  static Future<void> saveMarkedPatterns(String gameId, String gameDate, Map<String, bool> patterns) async {
+    try {
+      // Usar la fecha del juego como eventId
+      final date = gameDate;
+      
+      final url = '${BackendConfig.apiBase}/bingo/$date/games/$gameId/patterns';
+      print('DEBUG: Guardando patrones marcados en: $url');
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: BackendConfig.defaultHeaders,
+        body: json.encode({'patterns': patterns}),
+      ).timeout(BackendConfig.connectionTimeout);
+      
+      if (response.statusCode == 200) {
+        print('DEBUG: ${patterns.length} patrones guardados exitosamente para $gameId');
+        print('DEBUG: Respuesta del servidor: ${response.body}');
+      } else {
+        print('ERROR: Error guardando patrones: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      print('ERROR: Error guardando patrones marcados: $e');
+    }
+  }
+
+  /// Carga el mapa de patrones marcados manualmente para un juego específico
+  static Future<Map<String, bool>> loadMarkedPatterns(String gameId, String gameDate) async {
+    try {
+      // Usar la fecha del juego como eventId
+      final date = gameDate;
+      
+      final url = '${BackendConfig.apiBase}/bingo/$date/games/$gameId/patterns';
+      print('DEBUG: Cargando patrones marcados desde: $url');
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: BackendConfig.defaultHeaders,
+      ).timeout(BackendConfig.connectionTimeout);
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final patternsData = data['data'] as Map<String, dynamic>;
+        
+        // Convertir a Map<String, bool>
+        final Map<String, bool> patterns = {};
+        patternsData.forEach((key, value) {
+          patterns[key] = value == true;
+        });
+        
+        print('DEBUG: ${patterns.length} patrones marcados cargados para $gameId');
+        return patterns;
+      } else if (response.statusCode == 404) {
+        print('DEBUG: No hay patrones marcados guardados para $gameId');
+        return {};
+      } else {
+        print('ERROR: Error cargando patrones: ${response.statusCode}');
+        return {};
+      }
+    } catch (e) {
+      print('ERROR: Error cargando patrones marcados: $e');
+      return {};
+    }
+  }
+
+  /// Limpia los patrones marcados manualmente para un juego específico
+  static Future<void> clearMarkedPatterns(String gameId, String gameDate) async {
+    try {
+      final date = gameDate;
+      
+      final url = '${BackendConfig.apiBase}/bingo/$date/games/$gameId/patterns';
+      print('DEBUG: Limpiando patrones marcados en: $url');
+      
+      final response = await http.delete(
+        Uri.parse(url),
+        headers: BackendConfig.defaultHeaders,
+      ).timeout(BackendConfig.connectionTimeout);
+      
+      if (response.statusCode == 200) {
+        print('DEBUG: Patrones marcados eliminados para $gameId');
+      } else {
+        print('ERROR: Error eliminando patrones: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('ERROR: Error eliminando patrones marcados: $e');
     }
   }
 }

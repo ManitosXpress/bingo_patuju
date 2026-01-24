@@ -546,6 +546,20 @@ class _RoundCardState extends State<_RoundCard> {
         return [[1,1,1,1,1], [1,1,1,1,1], [1,1,1,1,1], [1,0,0,0,0], [1,0,0,0,0]];
       case BingoPattern.figuraTripleLinea:
         return [[1,1,1,1,1], [0,0,0,0,0], [1,1,1,1,1], [0,0,0,0,0], [1,1,1,1,1]];
+      case BingoPattern.cactus:
+        return [[1,0,1,0,1], [1,0,1,0,1], [1,1,1,1,1], [0,0,1,0,0], [0,0,1,0,0]];
+      case BingoPattern.silla:
+        return [[1,0,0,0,0], [1,0,0,0,0], [1,1,1,1,1], [1,0,0,0,1], [1,0,0,0,1]];
+      case BingoPattern.sieteDeLaSuerte:
+        return [[1,1,1,1,1], [0,0,0,1,0], [0,0,1,0,0], [0,1,0,0,0], [1,0,0,0,0]];
+      case BingoPattern.cometa:
+        return [[1,1,0,0,0], [1,1,0,0,0], [0,0,1,0,0], [0,0,0,1,0], [0,0,0,0,1]];
+      case BingoPattern.sombrero:
+        return [[0,0,0,0,0], [0,1,1,1,0], [0,1,1,1,0], [1,1,1,1,1], [0,0,0,0,0]];
+      case BingoPattern.mancuerna:
+        return [[0,0,0,0,0], [0,1,0,1,0], [1,1,1,1,1], [0,1,0,1,0], [0,0,0,0,0]];
+      case BingoPattern.mesa:
+        return [[0,0,0,0,0], [1,1,1,1,1], [0,0,1,0,0], [0,1,0,1,0], [1,0,0,0,1]];
       default:
         return List.generate(5, (_) => List.filled(5, 0));
     }
@@ -807,8 +821,20 @@ class _RoundCardState extends State<_RoundCard> {
         return 'Bandera';
       case BingoPattern.figuraTripleLinea:
         return 'Triple Línea';
-      case BingoPattern.consuelo:
-        return '';
+      case BingoPattern.cactus:
+        return 'Cactus';
+      case BingoPattern.silla:
+        return 'Silla';
+      case BingoPattern.sieteDeLaSuerte:
+        return '7 de la Suerte';
+      case BingoPattern.cometa:
+        return 'Cometa';
+      case BingoPattern.sombrero:
+        return 'Sombrero';
+      case BingoPattern.mancuerna:
+        return 'Mancuerna';
+      case BingoPattern.mesa:
+        return 'Mesa';
     }
   }
 }

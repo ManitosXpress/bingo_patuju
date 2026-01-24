@@ -99,6 +99,33 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Cargar patrones guardados cada vez que el widget se reconstruya
+    // Esto asegura que los patrones persistan al volver a esta pantalla
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (_selectedGame != null) {
+        print('DEBUG: Intentando cargar patrones en didChangeDependencies');
+        print('DEBUG: Game ID: ${_selectedGame!.id}');
+        print('DEBUG: Game Date: ${_selectedGame!.date}');
+        
+        final savedPatterns = await RoundsPersistenceService.loadMarkedPatterns(_selectedGame!.id, _selectedGame!.date);
+        print('DEBUG: Patrones recuperados: ${savedPatterns.length}');
+        
+        if (savedPatterns.isNotEmpty && mounted) {
+          setState(() {
+            _manuallyMarkedPatterns.clear();
+            _manuallyMarkedPatterns.addAll(savedPatterns);
+          });
+          print('DEBUG: ${savedPatterns.length} patrones marcados restaurados en didChangeDependencies para ${_selectedGame!.id}');
+        }
+      } else {
+        print('DEBUG: _selectedGame es NULL en didChangeDependencies');
+      }
+    });
+  }
+
+  @override
   void dispose() {
     super.dispose();
   }
@@ -198,6 +225,14 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         
         // Cargar rondas completadas (async)
         await provider.loadCompletedRounds(newSelectedGame.id);
+        
+        // Cargar patrones marcados manualmente desde persistencia
+        final savedPatterns = await RoundsPersistenceService.loadMarkedPatterns(newSelectedGame.id, newSelectedGame.date);
+        if (savedPatterns.isNotEmpty) {
+          _manuallyMarkedPatterns.clear();
+          _manuallyMarkedPatterns.addAll(savedPatterns);
+          print('DEBUG: ${savedPatterns.length} patrones marcados restaurados para ${newSelectedGame.id}');
+        }
         
         final savedRoundId = provider.getSelectedRoundSync(newSelectedGame.id);
         int initialIndex = 0;
@@ -343,6 +378,14 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
             // Cargar rondas completadas para el nuevo juego
             final provider = Provider.of<GameStateProvider>(context, listen: false);
             await provider.loadCompletedRounds(game.id);
+            
+            // Cargar patrones marcados manualmente para el nuevo juego
+            final savedPatterns = await RoundsPersistenceService.loadMarkedPatterns(game.id, game.date);
+            _manuallyMarkedPatterns.clear();
+            if (savedPatterns.isNotEmpty) {
+              _manuallyMarkedPatterns.addAll(savedPatterns);
+              print('DEBUG: ${savedPatterns.length} patrones marcados restaurados para ${game.id}');
+            }
             
             // Usar el método que actualiza la variable estática
             await _updateCurrentRoundIndex(0);
@@ -523,8 +566,8 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
     if (_selectedGame == null) return;
     print('DEBUG: Cambiando ronda de $_currentRoundIndex a $newIndex');
     
-    // Limpiar patrones marcados manualmente de la ronda anterior
-    _clearManuallyMarkedPatternsForRound(_currentRoundIndex);
+    // No limpiar patrones al cambiar de ronda, queremos que persistan
+    // _clearManuallyMarkedPatternsForRound(_currentRoundIndex);
     
     // Guardar en Provider
     if (newIndex >= 0 && newIndex < _selectedGame!.rounds.length) {
@@ -542,7 +585,7 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
   }
 
   // Método para limpiar patrones marcados manualmente de una ronda específica
-  void _clearManuallyMarkedPatternsForRound(int roundIndex) {
+  void _clearManuallyMarkedPatternsForRound(int roundIndex) async {
     if (_selectedGame == null || roundIndex >= _selectedGame!.rounds.length) return;
     
     final round = _selectedGame!.rounds[roundIndex];
@@ -559,13 +602,25 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       }
     }
     
+    // Persistir los cambios
+    if (_selectedGame != null) {
+      await RoundsPersistenceService.saveMarkedPatterns(_selectedGame!.id, _selectedGame!.date, _manuallyMarkedPatterns);
+    }
+    
     print('DEBUG: Patrones manuales limpiados para ronda ${round.name}');
   }
 
   // Método para limpiar todos los patrones marcados manualmente
-  void _clearAllManuallyMarkedPatterns() {
+  Future<void> _clearAllManuallyMarkedPatterns() async {
     print('DEBUG: Limpiando todos los patrones marcados manualmente');
     _manuallyMarkedPatterns.clear();
+    
+    // Limpiar también la persistencia
+    if (_selectedGame != null) {
+      await RoundsPersistenceService.clearMarkedPatterns(_selectedGame!.id, _selectedGame!.date);
+      print('DEBUG: Persistencia de patrones limpiada para ${_selectedGame!.id}');
+    }
+    
     setState(() {});
   }
 
@@ -717,6 +772,20 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         return 'Figura Bandera';
       case BingoPattern.figuraTripleLinea:
         return 'Figura Triple Línea';
+      case BingoPattern.cactus:
+        return 'Cactus';
+      case BingoPattern.silla:
+        return 'Silla';
+      case BingoPattern.sieteDeLaSuerte:
+        return '7 de la Suerte';
+      case BingoPattern.cometa:
+        return 'Cometa';
+      case BingoPattern.sombrero:
+        return 'Sombrero';
+      case BingoPattern.mancuerna:
+        return 'Mancuerna';
+      case BingoPattern.mesa:
+        return 'Mesa';
     }
   }
 
@@ -774,6 +843,20 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
         return 'Figura Bandera';
       case BingoPattern.figuraTripleLinea:
         return 'Figura Triple Línea';
+      case BingoPattern.cactus:
+        return 'Cactus';
+      case BingoPattern.silla:
+        return 'Silla';
+      case BingoPattern.sieteDeLaSuerte:
+        return '7 de la Suerte';
+      case BingoPattern.cometa:
+        return 'Cometa';
+      case BingoPattern.sombrero:
+        return 'Sombrero';
+      case BingoPattern.mancuerna:
+        return 'Mancuerna';
+      case BingoPattern.mesa:
+        return 'Mesa';
     }
   }
 
@@ -1224,7 +1307,20 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
                       if (provider.isRoundCompleted(_selectedGame!.id, round.id)) {
                         round.isCompleted = true;
                       }
-                      final isCompleted = round.isCompleted;
+                      
+                      // Verificar si todos los patrones de esta ronda están marcados manualmente
+                      final allRoundPatterns = _getAllPatternsForRound(round);
+                      bool allPatternsMarkedManually = allRoundPatterns.isNotEmpty;
+                      for (var pattern in allRoundPatterns) {
+                        final patternName = _getPatternName(pattern);
+                        if (_manuallyMarkedPatterns[patternName] != true) {
+                          allPatternsMarkedManually = false;
+                          break;
+                        }
+                      }
+                      
+                      // La ronda está completa si está marcada en el provider O todos los patrones están marcados manualmente
+                      final isCompleted = round.isCompleted || allPatternsMarkedManually;
                       
                       return Container(
                         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1960,7 +2056,19 @@ class _BingoGamesPanelState extends State<BingoGamesPanel> {
       // Actualizar el estado en el mapa local
       _manuallyMarkedPatterns[patternName] = isCompleted;
       
-      print('DEBUG: Figura "$patternName" actualizada manualmente');
+      // Persistir el cambio inmediatamente
+      if (_selectedGame != null) {
+        print('DEBUG: Intentando guardar patrón manual');
+        print('DEBUG: Game ID: ${_selectedGame!.id}');
+        print('DEBUG: Game Date: ${_selectedGame!.date}');
+        print('DEBUG: Patrones a guardar: ${_manuallyMarkedPatterns.length}');
+        
+        await RoundsPersistenceService.saveMarkedPatterns(_selectedGame!.id, _selectedGame!.date, _manuallyMarkedPatterns);
+      } else {
+        print('DEBUG: No se pudo guardar patrón: _selectedGame es NULL');
+      }
+      
+      print('DEBUG: Figura "$patternName" actualizada manualmente y persistida');
       
       // Verificar si la ronda actual se puede completar después de este cambio
       if (_selectedGame != null && _currentRoundIndex < _selectedGame!.rounds.length) {

@@ -107,6 +107,20 @@ class _RoundEditorState extends State<RoundEditor> {
         return [[1,1,1,1,1], [1,1,1,1,1], [1,1,1,1,1], [0,0,1,1,1], [0,0,1,1,1]];
       case BingoPattern.figuraTripleLinea:
         return [[1,1,1,1,1], [0,0,0,0,0], [1,1,1,1,1], [0,0,0,0,0], [1,1,1,1,1]];
+      case BingoPattern.cactus:
+        return [[1,0,1,0,1], [1,0,1,0,1], [1,1,1,1,1], [0,0,1,0,0], [0,0,1,0,0]];
+      case BingoPattern.silla:
+        return [[1,0,0,0,0], [1,0,0,0,0], [1,1,1,1,1], [1,0,0,0,1], [1,0,0,0,1]];
+      case BingoPattern.sieteDeLaSuerte:
+        return [[1,1,1,1,1], [0,0,0,1,0], [0,0,1,0,0], [0,1,0,0,0], [1,0,0,0,0]];
+      case BingoPattern.cometa:
+        return [[1,1,0,0,0], [1,1,0,0,0], [0,0,1,0,0], [0,0,0,1,0], [0,0,0,0,1]];
+      case BingoPattern.sombrero:
+        return [[0,0,0,0,0], [0,1,1,1,0], [0,1,1,1,0], [1,1,1,1,1], [0,0,0,0,0]];
+      case BingoPattern.mancuerna:
+        return [[0,0,0,0,0], [0,1,0,1,0], [1,1,1,1,1], [0,1,0,1,0], [0,0,0,0,0]];
+      case BingoPattern.mesa:
+        return [[0,0,0,0,0], [1,1,1,1,1], [0,0,1,0,0], [0,1,0,1,0], [1,0,0,0,1]];
       default:
         return List.generate(5, (_) => List.filled(5, 0));
     }

@@ -214,3 +214,62 @@ router.get('/vendors-summary', async (req: any, res: any) => {
     return res.status(500).json({ error: e.message });
   }
 });
+
+// Endpoint to clear all sales and balances data
+router.post('/clear-commissions', async (req: any, res: any) => {
+  try {
+    const { confirm, vendorId } = req.body;
+
+    if (confirm !== 'ELIMINAR_DATOS_2024') {
+      return res.status(400).json({ error: 'Invalid confirmation code' });
+    }
+
+    console.log(`🚨 STARTING DATA DELETION: Sales and Balances ${vendorId ? `for vendor ${vendorId}` : '(ALL DATA)'}`);
+
+    const deleteCollection = async (collectionPath: string) => {
+      let totalDeleted = 0;
+      let query: FirebaseFirestore.Query = db.collection(collectionPath);
+
+      if (vendorId) {
+        // If filtering by vendor, we need to check the field names
+        if (collectionPath === 'sales') {
+          query = query.where('sellerId', '==', vendorId);
+        } else if (collectionPath === 'balances') {
+          query = query.where('vendorId', '==', vendorId);
+        }
+      }
+
+      while (true) {
+        const snapshot = await query.limit(500).get();
+        if (snapshot.empty) break;
+
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+
+        totalDeleted += snapshot.size;
+        console.log(`Deleted ${snapshot.size} docs from ${collectionPath}`);
+      }
+      return totalDeleted;
+    };
+
+    const salesDeleted = await deleteCollection('sales');
+    const balancesDeleted = await deleteCollection('balances');
+
+    console.log(`✅ DATA DELETION COMPLETE. Sales: ${salesDeleted}, Balances: ${balancesDeleted}`);
+
+    return res.json({
+      success: true,
+      summary: {
+        salesDeleted,
+        balancesDeleted,
+        totalRecordsDeleted: salesDeleted + balancesDeleted,
+        timestamp: Date.now()
+      }
+    });
+
+  } catch (e: any) {
+    console.error('Error clearing data:', e);
+    return res.status(500).json({ error: e.message });
+  }
+});

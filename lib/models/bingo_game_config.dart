@@ -19,6 +19,13 @@ enum BingoPattern {
   letraI, // Agregado
   letraN, // Agregado
   autopista, // Agregado
+  cactus,
+  silla,
+  sieteDeLaSuerte, // Renamed
+  cometa,
+  sombrero,
+  mancuerna,
+  mesa,
   // Nuevas figuras legendarias
   relojArena,
   dobleLineaV,
@@ -198,6 +205,20 @@ class BingoGameRound {
         return 'Figura Bandera';
       case BingoPattern.figuraTripleLinea:
         return 'Figura Triple Línea';
+      case BingoPattern.cactus:
+        return 'Cactus';
+      case BingoPattern.silla:
+        return 'Silla';
+      case BingoPattern.sieteDeLaSuerte: // Renombrado
+        return '7 de la Suerte';
+      case BingoPattern.cometa:
+        return 'Cometa';
+      case BingoPattern.sombrero:
+        return 'Sombrero';
+      case BingoPattern.mancuerna:
+        return 'Mancuerna';
+      case BingoPattern.mesa:
+        return 'Mesa';
     }
   }
 }
@@ -336,4 +357,4 @@ class BingoGamePresets {
       rounds: rounds,
     );
   }
-} 
+}

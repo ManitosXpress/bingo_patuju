@@ -438,4 +438,133 @@ router.delete('/:eventId/games/:gameId/rounds/:roundId', async (req, res) => {
   }
 });
 
+// POST /api/events/:eventId/games/:gameId/patterns - Guardar patrones marcados manualmente
+router.post('/:eventId/games/:gameId/patterns', async (req, res) => {
+  try {
+    const { eventId, gameId } = req.params;
+    const { patterns } = req.body;
+
+    if (!patterns || typeof patterns !== 'object') {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere un objeto de patrones'
+      });
+    }
+
+    const gameRef = db
+      .collection('events')
+      .doc(eventId)
+      .collection('games')
+      .doc(gameId);
+
+    const gameDoc = await gameRef.get();
+
+    if (!gameDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Juego de bingo no encontrado'
+      });
+    }
+
+    // Guardar patrones en el documento del juego directamente
+    // Usar set con merge: true para asegurar que se guarde incluso si el campo no existe
+    await gameRef.set({
+      markedPatterns: patterns,
+      updatedAt: new Date()
+    }, { merge: true });
+
+    console.log(`✅ Patrones guardados para juego ${gameId}: ${Object.keys(patterns).length} patrones`);
+
+    return res.json({
+      success: true,
+      message: 'Patrones guardados exitosamente',
+      savedPatterns: patterns // Devolver para verificación
+    });
+  } catch (error) {
+    console.error('Error saving marked patterns:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// GET /api/events/:eventId/games/:gameId/patterns - Obtener patrones marcados manualmente
+router.get('/:eventId/games/:gameId/patterns', async (req, res) => {
+  try {
+    const { eventId, gameId } = req.params;
+
+    const gameDoc = await db
+      .collection('events')
+      .doc(eventId)
+      .collection('games')
+      .doc(gameId)
+      .get();
+
+    if (!gameDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Juego de bingo no encontrado'
+      });
+    }
+
+    const data = gameDoc.data();
+    const patterns = data?.markedPatterns || {};
+
+    console.log(`✅ Patrones cargados para juego ${gameId}: ${Object.keys(patterns).length} patrones`);
+
+    return res.json({
+      success: true,
+      data: patterns
+    });
+  } catch (error) {
+    console.error('Error loading marked patterns:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
+// DELETE /api/events/:eventId/games/:gameId/patterns - Limpiar patrones marcados manualmente
+router.delete('/:eventId/games/:gameId/patterns', async (req, res) => {
+  try {
+    const { eventId, gameId } = req.params;
+
+    const gameRef = db
+      .collection('events')
+      .doc(eventId)
+      .collection('games')
+      .doc(gameId);
+
+    const gameDoc = await gameRef.get();
+
+    if (!gameDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'Juego de bingo no encontrado'
+      });
+    }
+
+    // Limpiar patrones del juego
+    await gameRef.update({
+      markedPatterns: {},
+      updatedAt: new Date()
+    });
+
+    console.log(`🗑️ Patrones limpiados para juego ${gameId}`);
+
+    return res.json({
+      success: true,
+      message: 'Patrones limpiados exitosamente'
+    });
+  } catch (error) {
+    console.error('Error clearing marked patterns:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    });
+  }
+});
+
 export { router as bingoRouter };

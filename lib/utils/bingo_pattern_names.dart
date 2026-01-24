@@ -53,5 +53,19 @@ String getBingoPatternDisplayName(BingoPattern pattern) {
       return 'Figura Bandera';
     case BingoPattern.figuraTripleLinea:
       return 'Figura Triple Línea';
+    case BingoPattern.cactus:
+      return 'Cactus';
+    case BingoPattern.silla:
+      return 'Silla';
+    case BingoPattern.sieteDeLaSuerte:
+      return '7 de la Suerte';
+    case BingoPattern.cometa:
+      return 'Cometa';
+    case BingoPattern.sombrero:
+      return 'Sombrero';
+    case BingoPattern.mancuerna:
+      return 'Mancuerna';
+    case BingoPattern.mesa:
+      return 'Mesa';
   }
 }

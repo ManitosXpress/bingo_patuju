@@ -66,7 +66,7 @@ class BingoPatternsDialog extends StatelessWidget {
                                 fontSize: 24,
                               ),
                             ),
-                            if (currentRound != null) ...[
+                            if (currentRound != null) ...[ 
                               const SizedBox(height: 2),
                               Text(
                                 'Ronda actual del juego',
@@ -141,29 +141,29 @@ class BingoPatternsDialog extends StatelessWidget {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: patternsToShow.length,
-                          itemBuilder: (context, index) {
-                            final pattern = patternsToShow[index];
-                            final patternName = pattern['name'] as String;
-                            final patternMatrix = pattern['matrix'] as List<List<int>>;
-                            final probability = probs[patternName] ?? '0.00%';
-                            final isCompleted = completed[patternName] ?? false;
-                            
-                            // Resaltar si es parte de la ronda actual
-                            final isCurrentRoundPattern = currentRound != null && 
-                                currentRound!.patterns.any((p) => _getPatternName(p) == patternName);
-                            
-                            return _buildPatternListItem(
-                              context,
-                              patternName,
-                              patternMatrix,
-                              probability,
-                              isCompleted,
-                              gridSize,
-                              cellSize,
-                              isCurrentRoundPattern: isCurrentRoundPattern,
-                              isFullscreen: isFullscreen,
-                            );
-                          },
+                            itemBuilder: (context, index) {
+                              final pattern = patternsToShow[index];
+                              final patternName = pattern['name'] as String;
+                              final patternMatrix = pattern['matrix'] as List<List<int>>;
+                              final probability = probs[patternName] ?? '0.00%';
+                              final isCompleted = completed[patternName] ?? false;
+                              
+                              // Resaltar si es parte de la ronda actual
+                              final isCurrentRoundPattern = currentRound != null && 
+                                  currentRound!.patterns.any((p) => _getPatternName(p) == patternName);
+                              
+                              return _buildPatternListItem(
+                                context,
+                                patternName,
+                                patternMatrix,
+                                probability,
+                                isCompleted,
+                                gridSize,
+                                cellSize,
+                                isCurrentRoundPattern: isCurrentRoundPattern,
+                                isFullscreen: isFullscreen,
+                              );
+                            },
                           ),
                         ),
                       );
@@ -222,6 +222,7 @@ class BingoPatternsDialog extends StatelessWidget {
     );
   }
 
+  // Lista completa de todos los patrones disponibles
   List<Map<String, dynamic>> _getAllPatterns() {
     return [
       {'name': 'Línea Horizontal', 'matrix': _horizontalPattern()},
@@ -240,7 +241,7 @@ class BingoPatternsDialog extends StatelessWidget {
       {'name': 'LETRA I', 'matrix': _ingPattern()},
       {'name': 'LETRA N', 'matrix': _ngoPattern()},
       {'name': 'Autopista', 'matrix': _highwayPattern()},
-      // Figuras legendarias
+      // Nuevas figuras legendarias
       {'name': 'Reloj de Arena', 'matrix': _relojArenaPattern()},
       {'name': 'Doble Línea V', 'matrix': _dobleLineaVPattern()},
       {'name': 'Figura la Suegra', 'matrix': _figuraSuegraPattern()},
@@ -249,9 +250,17 @@ class BingoPatternsDialog extends StatelessWidget {
       {'name': 'Figura C Loca', 'matrix': _figuraCLocaPattern()},
       {'name': 'Figura Bandera', 'matrix': _figuraBanderaPattern()},
       {'name': 'Figura Triple Línea', 'matrix': _figuraTripleLineaPattern()},
+      {'name': 'Cactus', 'matrix': _cactusPattern()},
+      {'name': 'Silla', 'matrix': _sillaPattern()},
+      {'name': '7 de la Suerte', 'matrix': _sieteDeLaSuertePattern()},
+      {'name': 'Cometa', 'matrix': _cometaPattern()},
+      {'name': 'Sombrero', 'matrix': _sombreroPattern()},
+      {'name': 'Mancuerna', 'matrix': _mancuernaPattern()},
+      {'name': 'Mesa', 'matrix': _mesaPattern()},
     ];
   }
 
+  // Método auxiliar para construir cada item de patrón en la lista
   Widget _buildPatternListItem(
     BuildContext context,
     String name,
@@ -262,11 +271,9 @@ class BingoPatternsDialog extends StatelessWidget {
     double cellSize,
     {bool isCurrentRoundPattern = false, bool isFullscreen = false}
   ) {
-    
-    // Determinar colores basados en el estado
     Color borderColor;
-    Color? backgroundColor;
-    
+    Color backgroundColor;
+
     if (completed) {
       borderColor = Colors.green.shade400;
       backgroundColor = Colors.green.withOpacity(0.1);
@@ -404,12 +411,45 @@ class BingoPatternsDialog extends StatelessWidget {
         return 'Completar las casillas que forman un árbol o flecha';
       case 'Spoutnik':
         return 'Completar las casillas en forma de satélite';
+      case 'LETRA I':
       case 'ING':
-        return 'Completar las casillas que forman las letras ING';
+        return 'Completar las casillas que forman la letra I';
+      case 'LETRA N':
       case 'NGO':
-        return 'Completar las casillas que forman las letras NGO';
+        return 'Completar las casillas que forman la letra N';
       case 'Autopista':
         return 'Completar las casillas en forma de autopista';
+      // Nuevas figuras legendarias
+      case 'Reloj de Arena':
+        return 'Completar las casillas en forma de reloj de arena';
+      case 'Doble Línea V':
+        return 'Completar las casillas formando una doble V';
+      case 'Figura la Suegra':
+        return 'Completar las casillas formando la figura de la suegra';
+      case 'Figura Infinito':
+        return 'Completar las casillas formando un símbolo de infinito';
+      case 'Letra FE':
+        return 'Completar las casillas formando la palabra FE';
+      case 'Figura C Loca':
+        return 'Completar las casillas formando una C loca';
+      case 'Figura Bandera':
+        return 'Completar las casillas formando una bandera';
+      case 'Figura Triple Línea':
+        return 'Completar tres líneas horizontales';
+      case 'Cactus':
+        return 'Completar las casillas en forma de cactus';
+      case 'Silla':
+        return 'Completar las casillas en forma de silla';
+      case '7 de la Suerte':
+        return 'Completar las casillas formando un número 7';
+      case 'Cometa':
+        return 'Completar las casillas en forma de cometa';
+      case 'Sombrero':
+        return 'Completar las casillas en forma de sombrero';
+      case 'Mancuerna':
+        return 'Completar las casillas en forma de mancuerna';
+      case 'Mesa':
+        return 'Completar las casillas en forma de mesa';
       default:
         return 'Patrón de bingo personalizado';
     }
@@ -453,9 +493,10 @@ class BingoPatternsDialog extends StatelessWidget {
       'Línea Horizontal', 'Línea Vertical', 'Diagonal Principal', 'Diagonal Secundaria',
       'Cartón Lleno', 'Figura Avión', 'X', 'Marco Completo', 'Corazón',
       'Caída de Nieve', 'Marco Pequeño', 'Árbol o Flecha', 'Spoutnik', 'LETRA I', 'LETRA N', 'Autopista',
-      // Figuras legendarias
+      // Nuevas figuras
       'Reloj de Arena', 'Doble Línea V', 'Figura la Suegra', 'Figura Infinito', 'Letra FE',
-      'Figura C Loca', 'Figura Bandera', 'Figura Triple Línea'
+      'Figura C Loca', 'Figura Bandera', 'Figura Triple Línea', 'Cactus', 'Silla', '7 de la Suerte',
+      'Cometa', 'Sombrero', 'Mancuerna', 'Mesa'
     ];
     
     for (String pattern in patterns) {
@@ -506,10 +547,12 @@ class BingoPatternsDialog extends StatelessWidget {
       'Marco Pequeño': 18.0,
       'Árbol o Flecha': 14.0,
       'Spoutnik': 6.0,
+      'LETRA I': 16.0,
       'ING': 16.0,
+      'LETRA N': 16.0,
       'NGO': 16.0,
       'Autopista': 22.0,
-      // Figuras legendarias
+      // Nuevas figuras
       'Reloj de Arena': 12.0,
       'Doble Línea V': 10.0,
       'Figura la Suegra': 14.0,
@@ -518,6 +561,13 @@ class BingoPatternsDialog extends StatelessWidget {
       'Figura C Loca': 15.0,
       'Figura Bandera': 20.0,
       'Figura Triple Línea': 22.0,
+      'Cactus': 15.0,
+      'Silla': 15.0,
+      '7 de la Suerte': 10.0,
+      'Cometa': 12.0,
+      'Sombrero': 14.0,
+      'Mancuerna': 16.0,
+      'Mesa': 18.0,
     };
     
     final result = <String, String>{};
@@ -551,6 +601,7 @@ class BingoPatternsDialog extends StatelessWidget {
 
   List<List<int>> _getPatternMatrix(String patternName) {
     switch (patternName) {
+      case 'Figura Avión':
       case 'Avión':
         return _diagonal5Pattern();
       case 'X':
@@ -567,13 +618,15 @@ class BingoPatternsDialog extends StatelessWidget {
         return _treeArrowPattern();
       case 'Spoutnik':
         return _spoutnikPattern();
+      case 'LETRA I':
       case 'ING':
         return _ingPattern();
+      case 'LETRA N':
       case 'NGO':
         return _ngoPattern();
       case 'Autopista':
         return _highwayPattern();
-      // Figuras legendarias
+      // Nuevas figuras legendarias
       case 'Reloj de Arena':
         return _relojArenaPattern();
       case 'Doble Línea V':
@@ -590,6 +643,20 @@ class BingoPatternsDialog extends StatelessWidget {
         return _figuraBanderaPattern();
       case 'Figura Triple Línea':
         return _figuraTripleLineaPattern();
+      case 'Cactus':
+        return _cactusPattern();
+      case 'Silla':
+        return _sillaPattern();
+      case '7 de la Suerte':
+        return _sieteDeLaSuertePattern();
+      case 'Cometa':
+        return _cometaPattern();
+      case 'Sombrero':
+        return _sombreroPattern();
+      case 'Mancuerna':
+        return _mancuernaPattern();
+      case 'Mesa':
+        return _mesaPattern();
       default:
         return List.generate(5, (_) => List.filled(5, 0));
     }
@@ -820,9 +887,158 @@ class BingoPatternsDialog extends StatelessWidget {
     ];
   }
 
+  // Nuevas figuras legendarias
+  List<List<int>> _relojArenaPattern() {
+    return [
+      [1,1,1,1,1],
+      [0,1,1,1,0],
+      [0,0,1,0,0],
+      [0,1,1,1,0],
+      [1,1,1,1,1],
+    ];
+  }
+  
+  List<List<int>> _dobleLineaVPattern() {
+    return [
+      [1,0,0,0,1],
+      [0,1,0,1,0],
+      [0,0,1,0,0],
+      [0,1,0,1,0],
+      [1,0,0,0,1],
+    ];
+  }
+  
+  List<List<int>> _figuraSuegraPattern() {
+    return [
+      [1,0,0,0,1],
+      [0,0,1,0,0],
+      [0,1,1,1,0],
+      [0,0,1,0,0],
+      [1,0,0,0,1],
+    ];
+  }
+  
+  List<List<int>> _figuraComodinPattern() {
+    return [
+      [1,1,1,0,0],
+      [1,0,1,0,0],
+      [1,1,1,1,1],
+      [0,0,1,0,1],
+      [0,0,1,1,1],
+    ];
+  }
+  
+  List<List<int>> _letraFEPattern() {
+    return [
+      [1,1,1,1,0],
+      [1,0,0,0,0],
+      [1,1,1,0,0],
+      [1,0,0,0,0],
+      [1,0,0,0,0],
+    ];
+  }
+  
+  List<List<int>> _figuraCLocaPattern() {
+    return [
+      [1,1,1,1,0],
+      [0,0,0,0,1],
+      [0,0,0,0,1],
+      [0,0,0,0,1],
+      [1,1,1,1,0],
+    ];
+  }
+  
+  List<List<int>> _figuraBanderaPattern() {
+    return [
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [1,0,0,0,0],
+      [1,0,0,0,0],
+    ];
+  }
+  
+  List<List<int>> _figuraTripleLineaPattern() {
+    return [
+      [1,1,1,1,1],
+      [0,0,0,0,0],
+      [1,1,1,1,1],
+      [0,0,0,0,0],
+      [1,1,1,1,1],
+    ];
+  }
+
+  List<List<int>> _cactusPattern() {
+    return [
+      [1,0,1,0,1],
+      [1,0,1,0,1],
+      [1,1,1,1,1],
+      [0,0,1,0,0],
+      [0,0,1,0,0],
+    ];
+  }
+
+  List<List<int>> _sillaPattern() {
+    return [
+      [1,0,0,0,0],
+      [1,0,0,0,0],
+      [1,1,1,1,1],
+      [1,0,0,0,1],
+      [1,0,0,0,1],
+    ];
+  }
+
+  List<List<int>> _sieteDeLaSuertePattern() {
+    return [
+      [1,1,1,1,1],
+      [0,0,0,1,0],
+      [0,0,1,0,0],
+      [0,1,0,0,0],
+      [1,0,0,0,0],
+    ];
+  }
+
+  List<List<int>> _cometaPattern() {
+    return [
+      [1,1,0,0,0],
+      [1,1,0,0,0],
+      [0,0,1,0,0],
+      [0,0,0,1,0],
+      [0,0,0,0,1],
+    ];
+  }
+
+  List<List<int>> _sombreroPattern() {
+    return [
+      [0,0,0,0,0],
+      [0,1,1,1,0],
+      [0,1,1,1,0],
+      [1,1,1,1,1],
+      [0,0,0,0,0],
+    ];
+  }
+
+  List<List<int>> _mancuernaPattern() {
+    return [
+      [0,0,0,0,0],
+      [0,1,0,1,0],
+      [1,1,1,1,1],
+      [0,1,0,1,0],
+      [0,0,0,0,0],
+    ];
+  }
+
+  List<List<int>> _mesaPattern() {
+    return [
+      [0,0,0,0,0],
+      [1,1,1,1,1],
+      [0,0,1,0,0],
+      [0,1,0,1,0],
+      [1,0,0,0,1],
+    ];
+  }
+
   // Método para obtener solo los patrones de una ronda específica
-  // Mantiene el orden original de los patrones en la ronda
-  // Con reglas especiales: Cartón Lleno siempre penúltimo, Consuelo siempre último
   List<Map<String, dynamic>> _getPatternsForRound(BingoGameRound round) {
     final allPatterns = _getAllPatterns();
     final patternsMap = <String, Map<String, dynamic>>{};
@@ -867,6 +1083,7 @@ class BingoPatternsDialog extends StatelessWidget {
     return orderedPatterns;
   }
 
+  // Método auxiliar para obtener el nombre de un patrón desde BingoPattern
   String _getPatternName(BingoPattern pattern) {
     switch (pattern) {
       case BingoPattern.diagonalPrincipal:
@@ -921,87 +1138,20 @@ class BingoPatternsDialog extends StatelessWidget {
         return 'Figura Bandera';
       case BingoPattern.figuraTripleLinea:
         return 'Figura Triple Línea';
+      case BingoPattern.cactus:
+        return 'Cactus';
+      case BingoPattern.silla:
+        return 'Silla';
+      case BingoPattern.sieteDeLaSuerte:
+        return '7 de la Suerte';
+      case BingoPattern.cometa:
+        return 'Cometa';
+      case BingoPattern.sombrero:
+        return 'Sombrero';
+      case BingoPattern.mancuerna:
+        return 'Mancuerna';
+      case BingoPattern.mesa:
+        return 'Mesa';
     }
   }
-
-  // Métodos para las figuras legendarias
-  List<List<int>> _relojArenaPattern() {
-    return [
-      [1,1,1,1,1],
-      [0,1,1,1,0],
-      [0,0,1,0,0],
-      [0,1,1,1,0],
-      [1,1,1,1,1],
-    ];
-  }
-
-  List<List<int>> _dobleLineaVPattern() {
-    return [
-      [1,0,0,0,1],
-      [1,0,0,0,1],
-      [1,0,0,0,1],
-      [1,0,0,0,1],
-      [1,0,0,0,1],
-    ];
-  }
-
-  List<List<int>> _figuraSuegraPattern() {
-    return [
-      [1,0,0,0,1],
-      [0,0,1,0,0],
-      [0,1,1,1,0],
-      [0,0,1,0,0],
-      [1,0,0,0,1],
-    ];
-  }
-
-  List<List<int>> _figuraComodinPattern() {
-    return [
-      [1,1,1,0,0],
-      [1,0,1,0,0],
-      [1,1,1,1,1],
-      [0,0,1,0,1],
-      [0,0,1,1,1],
-    ];
-  }
-
-  List<List<int>> _letraFEPattern() {
-    return [
-      [1,1,1,1,0],
-      [1,0,0,0,0],
-      [1,1,1,0,0],
-      [1,0,0,0,0],
-      [1,0,0,0,0],
-    ];
-  }
-
-  List<List<int>> _figuraCLocaPattern() {
-    return [
-      [1,1,1,1,0],
-      [0,0,0,0,1],
-      [0,0,0,0,1],
-      [0,0,0,0,1],
-      [1,1,1,1,0],
-    ];
-  }
-
-  List<List<int>> _figuraBanderaPattern() {
-    return [
-      [1,1,1,1,1],
-      [1,1,1,1,1],
-      [1,1,1,1,1],
-      [1,0,0,0,0],
-      [1,0,0,0,0],
-    ];
-  }
-
-  List<List<int>> _figuraTripleLineaPattern() {
-    return [
-      [1,1,1,1,1],
-      [0,0,0,0,0],
-      [1,1,1,1,1],
-      [0,0,0,0,0],
-      [1,1,1,1,1],
-    ];
-  }
-} 
+}

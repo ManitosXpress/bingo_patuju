@@ -607,7 +607,7 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
                     // Lista de ganadores
                     if (_winners.isNotEmpty)
                       Container(
-                        height: 80,
+                        height: 160, // Aumentado más para asegurar que se vean 2 líneas completas
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.1),
@@ -627,29 +627,35 @@ class _PrizeWheelWidgetState extends State<PrizeWheelWidget>
                             ),
                             const SizedBox(height: 4),
                             Expanded(
-                              child: SingleChildScrollView(
-                                child: Wrap(
-                                  spacing: 8.0, // Espacio horizontal entre los elementos
-                                  runSpacing: 4.0, // Espacio vertical entre las líneas
-                                  children: _winners.map((winner) {
-                                    return Container(
-                                      margin: const EdgeInsets.only(bottom: 4), // Margen inferior para cada elemento
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange.withOpacity(0.8),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        'Cartilla $winner',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
+                              child: GridView.builder(
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 10, // 10 ganadores por fila
+                                  childAspectRatio: 2.5, // Ajustar proporción para que se vea bien
+                                  crossAxisSpacing: 4,
+                                  mainAxisSpacing: 4,
                                 ),
+                                itemCount: _winners.length,
+                                itemBuilder: (context, index) {
+                                  final winner = _winners[index];
+                                  return Container(
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withOpacity(0.8),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Cartilla $winner',
+                                      style: const TextStyle(
+                                        fontSize: 10, // Reducido un poco para que quepa
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                           ],
