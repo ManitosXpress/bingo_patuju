@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import '../models/block_assignment_config.dart';
+import '../models/block_assignment_models.dart';
 
 class BlockAssignmentSummaryWidget extends StatelessWidget {
   final Map<String, dynamic> result;
@@ -63,6 +66,16 @@ class BlockAssignmentSummaryWidget extends StatelessWidget {
                   ],
                 ),
               ),
+              if (isSuccess)
+                ElevatedButton.icon(
+                  onPressed: () => _exportToCsv(context),
+                  icon: const Icon(Icons.download),
+                  label: const Text('Exportar CSV'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.green,
+                  ),
+                ),
             ],
           ),
         ),
@@ -261,5 +274,123 @@ class BlockAssignmentSummaryWidget extends StatelessWidget {
     final data = result['data'] as Map<String, dynamic>? ?? {};
     final alreadyAssigned = data['alreadyAssignedBlocksExcluded'] ?? 0;
     return (config.availableBlocks - alreadyAssigned).toInt();
+  }
+
+  void _exportToCsv(BuildContext context) {
+    try {
+      final data = result['data'] as Map<String, dynamic>? ?? {};
+      final results = data['results'] as List<dynamic>? ?? [];
+      
+      // 1. Definición de Cabeceras (Headers) - ORDEN ESTRICTO
+      final headers = [
+        'Nombre Vendedor',
+        'Números Asignados',
+        'Números Vendidos', // <--- ESTA COLUMNA ES OBLIGATORIA AQUI
+        'Total Vendidos',
+        'Total Asignadas',
+        'Bloques',
+      ];
+
+      // Filas
+      final rows = <List<String>>[];
+      
+      // Si es asignación múltiple
+      if (config.assignToAllVendors && results.isNotEmpty) {
+        for (final item in results) {
+          final vendorData = VendorBlockAssignment.fromJson(item as Map<String, dynamic>);
+          
+          // Formatear rangos de cartillas asignadas
+          String assignedRange = '';
+          if (vendorData.assignedCards.isNotEmpty) {
+            vendorData.assignedCards.sort();
+            if (vendorData.assignedCards.length > 5) {
+              assignedRange = '${vendorData.assignedCards.first}-${vendorData.assignedCards.last}';
+            } else {
+              assignedRange = vendorData.assignedCards.join(', ');
+            }
+          }
+
+          // 2. Mapeo de Filas (Rows) - ORDEN ESTRICTO
+          rows.add([
+            vendorData.vendorName,
+            assignedRange,
+            // LOGICA CRITICA PARA NUMEROS VENDIDOS:
+            (vendorData.soldCartillas.isNotEmpty) 
+                ? vendorData.soldCartillas.join('; ') 
+                : '0', // Si está vacío, pon '0'
+            vendorData.soldCount.toString(),
+            vendorData.assignedCards.length.toString(),
+            (vendorData.assignedCards.length / config.blockSize).toStringAsFixed(1),
+          ]);
+        }
+      } else {
+        // Asignación individual
+        final assignedCards = result['assignedCards'] as List<int>? ?? [];
+        assignedCards.sort();
+        
+        String assignedRange = '';
+        if (assignedCards.isNotEmpty) {
+          if (assignedCards.length > 5) {
+            assignedRange = '${assignedCards.first}-${assignedCards.last}';
+          } else {
+            assignedRange = assignedCards.join(', ');
+          }
+        }
+
+        // Para asignación individual, intentamos sacar datos del result si existen
+        // Si no, usamos valores por defecto pero MANTENIENDO EL ORDEN DE COLUMNAS
+        rows.add([
+          vendorName,
+          assignedRange,
+          '0', // No tenemos info de vendidos en asignación individual inmediata
+          '0',
+          assignedCards.length.toString(),
+          (assignedCards.length / config.blockSize).toStringAsFixed(1),
+        ]);
+      }
+
+      // Generar CSV
+      final csvContent = StringBuffer();
+      csvContent.writeln(headers.join(','));
+      
+      for (final row in rows) {
+        // Escapar comas en los valores
+        final escapedRow = row.map((field) {
+          if (field.contains(',') || field.contains('"') || field.contains('\n')) {
+            return '"${field.replaceAll('"', '""')}"';
+          }
+          return field;
+        }).toList();
+        csvContent.writeln(escapedRow.join(','));
+      }
+
+      // Descargar archivo
+      final bytes = utf8.encode(csvContent.toString());
+      final blob = html.Blob([bytes]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute('download', 'asignacion_bloques_${DateTime.now().millisecondsSinceEpoch}.csv')
+        ..style.display = 'none';
+      
+      html.document.body?.children.add(anchor);
+      anchor.click();
+      html.document.body?.children.remove(anchor);
+      html.Url.revokeObjectUrl(url);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('CSV exportado exitosamente'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al exportar CSV: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

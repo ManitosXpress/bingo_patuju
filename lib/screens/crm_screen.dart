@@ -203,7 +203,7 @@ class _CrmScreenState extends State<CrmScreen> {
       
       await loadCardsPage();
     } catch (e) {
-      debugPrint('Error loading cards: $e');
+      // debugPrint('Error loading cards: $e');
     } finally {
       Navigator.pop(context); // Cerrar loading
     }
@@ -523,7 +523,7 @@ class _CrmScreenState extends State<CrmScreen> {
 
       return imageBytes;
     } catch (e) {
-      debugPrint('Error capturando cartilla: $e');
+      // debugPrint('Error capturando cartilla: $e');
       return null;
     }
   }
@@ -699,7 +699,7 @@ class _CrmScreenState extends State<CrmScreen> {
       await Future.delayed(const Duration(milliseconds: 100));
       
     } catch (e) {
-      debugPrint('Error al guardar imagen: $e');
+      // debugPrint('Error al guardar imagen: $e');
       rethrow;
     }
   }
@@ -746,7 +746,7 @@ class _CrmScreenState extends State<CrmScreen> {
       
       await loadCardsPage();
     } catch (e) {
-      debugPrint('Error loading cards for sell all: $e');
+      // debugPrint('Error loading cards for sell all: $e');
     } finally {
       Navigator.pop(context); // Cerrar loading
     }
@@ -831,68 +831,76 @@ class _CrmScreenState extends State<CrmScreen> {
     if (confirm != true) return;
 
     final double finalPrice = double.tryParse(priceCtrl.text) ?? 20.0;
-    int ok = 0, fail = 0, done = 0;
     
-    // Dialogo de progreso
+    // Dialogo de progreso (Indeterminado porque es una sola petición)
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) {
-        return StatefulBuilder(builder: (context, setSt) {
-          final progress = done / count;
-          return AlertDialog(
-            title: const Text('Procesando ventas...'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                LinearProgressIndicator(value: progress == 0 ? null : progress),
-                const SizedBox(height: 8),
-                Text('Completadas: $done / $count  •  OK: $ok  •  Error: $fail'),
-              ],
-            ),
-          );
-        });
+        return const AlertDialog(
+          title: Text('Procesando venta masiva...'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Por favor espere, esto puede tomar unos segundos...'),
+            ],
+          ),
+        );
       },
     );
 
-    for (final c in cards) {
-      try {
-        final resp = await http.post(
-          Uri.parse('$_apiBase/sales'),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'cardId': c['id'],
-            'sellerId': sellerId,
-            'amount': finalPrice,
-            'date': selectedDate,
-          }),
-        );
-        if (resp.statusCode < 300) {
-          ok++;
-        } else {
-          fail++;
+    try {
+      final salesData = cards.map((c) => {
+        'cardId': c['id'],
+        'sellerId': sellerId,
+        'amount': finalPrice,
+        'date': selectedDate,
+      }).toList();
+
+      final resp = await http.post(
+        Uri.parse('$_apiBase/sales/bulk'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'sales': salesData}),
+      );
+
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+
+      if (resp.statusCode < 300) {
+        final body = json.decode(resp.body);
+        final successCount = body['success'] ?? 0;
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Venta masiva exitosa: $successCount cartillas vendidas'),
+              backgroundColor: Colors.green,
+            )
+          );
         }
-      } catch (e) {
-        fail++;
+        setState(() { _refreshTick++; });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error en venta masiva: ${resp.body}'),
+              backgroundColor: Colors.red,
+            )
+          );
+        }
       }
-      
-      done++;
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
       if (mounted) {
-        // Redibujar el diálogo con los nuevos valores (hacky pero funciona si el contexto es válido)
-        // En una app real usaríamos un ValueNotifier
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error de conexión: $e'),
+            backgroundColor: Colors.red,
+          )
+        );
       }
     }
-    
-    if (mounted) Navigator.of(context, rootNavigator: true).pop();
-    if (!mounted) return;
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Ventas completadas: $ok ok, $fail error(es)'),
-        backgroundColor: fail > 0 ? Colors.orange : Colors.green,
-      )
-    );
-    setState(() { _refreshTick++; });
   }
 
   // Método para ELIMINAR TODOS LOS DATOS de sales y balances
@@ -1824,18 +1832,32 @@ class _CrmScreenState extends State<CrmScreen> {
                     runSpacing: 8,
                     children: (summary?['assigned'] as List<dynamic>? ?? []).map((cardNo) {
                       return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        width: 60,
+                        height: 60,
                         decoration: BoxDecoration(
                           color: Colors.green.shade100,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: Colors.green.shade300),
                         ),
-                        child: Text(
-                          'Cartilla $cardNo',
-                          style: TextStyle(
-                            color: Colors.green.shade800,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '$cardNo',
+                              style: TextStyle(
+                                color: Colors.green.shade800,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              'Cartilla',
+                              style: TextStyle(
+                                color: Colors.green.shade600,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     }).toList(),
@@ -3103,14 +3125,14 @@ class _CrmScreenState extends State<CrmScreen> {
                                             const SizedBox(width: 16),
                                             _modernStatCompact(
                                               'Ingreso',
-                                              '${((leader['totalAmount'] ?? 0) * 0.75).toStringAsFixed(0)} Bs',
+                                              '${((leader['totalAmount'] ?? 0) * 0.75).toStringAsFixed(2)} Bs',
                                               icon: Icons.monetization_on_outlined,
                                               color: Colors.green,
                                             ),
                                             const SizedBox(width: 16),
                                             _modernStatCompact(
                                               'Comisión',
-                                              '${(((leader['totalAmount'] ?? 0) * 0.25) + (sellerObjs.fold<double>(0.0, (sum, s) => sum + (s['totalAmount'] ?? 0)) * 0.10)).toStringAsFixed(0)} Bs',
+                                              '${(((leader['totalAmount'] ?? 0) * 0.25) + (sellerObjs.fold<double>(0.0, (sum, s) => sum + (s['totalAmount'] ?? 0)) * 0.10)).toStringAsFixed(2)} Bs',
                                               icon: Icons.account_balance_wallet_outlined,
                                               color: Colors.purple,
                                             ),
@@ -3621,13 +3643,13 @@ class _CrmScreenState extends State<CrmScreen> {
                     ),
                     _modernStatCompact(
                       'Ingreso',
-                      '${((seller['totalAmount'] ?? 0) * 0.65).toStringAsFixed(0)} Bs',
+                      '${((seller['totalAmount'] ?? 0) * 0.65).toStringAsFixed(2)} Bs',
                       icon: Icons.monetization_on_outlined,
                       color: Colors.green,
                     ),
                     _modernStatCompact(
                       'Comisión',
-                      '${((seller['totalAmount'] ?? 0) * 0.25).toStringAsFixed(0)} Bs',
+                      '${((seller['totalAmount'] ?? 0) * 0.25).toStringAsFixed(2)} Bs',
                       icon: Icons.account_balance_wallet_outlined,
                       color: Colors.purple,
                     ),
@@ -4801,13 +4823,13 @@ class _CrmScreenState extends State<CrmScreen> {
     data.add([
       'Nombre',
       'Rol',
-      'Líder',
+      'Lider',
       'Cartillas Asignadas',
-      'Números de Cartillas',
-      'Cartillas Vendidas',
+      'Numeros de Cartillas',
+      'Cartillas Vendidas', // Cantidad
       'Ingresos (Bs)',
-      'Comisión (Bs)',
-      'Fecha Última Venta',
+      'Comision (Bs)',
+      'Fecha Ultima Venta',
       'Estado'
     ]);
     
@@ -4829,21 +4851,19 @@ class _CrmScreenState extends State<CrmScreen> {
         }
       }
       
-      // Obtener números específicos de cartillas asignadas
+      final vendorId = vendor['vendorId'] ?? vendor['id'];
+      final appProvider = Provider.of<AppProvider>(context, listen: false);
+      final selectedDate = appProvider.selectedDate;
+
+      // Obtener números específicos de cartillas asignadas (sold=false)
       String assignedCardNumbers = '';
       try {
-        final vendorId = vendor['vendorId'] ?? vendor['id'];
-        final appProvider = Provider.of<AppProvider>(context, listen: false);
-        final selectedDate = appProvider.selectedDate;
-        
         final assignedResp = await http.get(
           Uri.parse('$_apiBase/cards?assignedTo=$vendorId&date=$selectedDate&sold=false')
         );
         
         if (assignedResp.statusCode < 300) {
           final responseBody = assignedResp.body;
-          
-          // El endpoint puede retornar un array directamente o un objeto con 'cards'
           dynamic parsedData = json.decode(responseBody);
           List<Map<String, dynamic>> assignedCards;
           
@@ -4861,7 +4881,6 @@ class _CrmScreenState extends State<CrmScreen> {
               .where((cardNum) => cardNum.isNotEmpty)
               .toList();
             
-            // Ordenar números para mejor legibilidad
             cardNumbers.sort((a, b) {
               final aNum = int.tryParse(a) ?? 0;
               final bNum = int.tryParse(b) ?? 0;
@@ -4874,6 +4893,8 @@ class _CrmScreenState extends State<CrmScreen> {
       } catch (e) {
         assignedCardNumbers = 'Error: $e';
       }
+
+
       
       // Estado del vendedor
       String status = 'Activo';
@@ -4881,6 +4902,44 @@ class _CrmScreenState extends State<CrmScreen> {
         status = 'Con Ventas';
       } else if (vendor['assignedCount'] != null && vendor['assignedCount'] > 0) {
         status = 'Con Cartillas Asignadas';
+      }
+
+      // Calcular Ingresos y Comisión según fórmula del UI
+      double ingreso = 0.0;
+      double comision = 0.0;
+      final double totalAmount = (vendor['totalAmount'] ?? 0).toDouble();
+
+      if (isLeader) {
+        // Fórmula Líder UI: 
+        // Ingreso: totalAmount * 0.75
+        // Comisión: (totalAmount * 0.25) + (10% de ventas de sus vendedores)
+        
+        ingreso = totalAmount * 0.75;
+        
+        // Calcular 10% de ventas de sus vendedores
+        double sellersTotalAmount = 0.0;
+        final rawChildren = (vendor['children'] as List?) ?? [];
+        
+        if (rawChildren.isNotEmpty && rawChildren.first is String) {
+           final ids = rawChildren.cast<String>();
+           final mySellers = vendors.where((s) => (s['role'] ?? '') != 'LEADER' && ids.contains((s['vendorId'] ?? s['id']).toString()));
+           sellersTotalAmount = mySellers.fold<double>(0.0, (sum, s) => sum + ((s['totalAmount'] ?? 0).toDouble()));
+        } else if (rawChildren.isNotEmpty && rawChildren.first is Map) {
+           sellersTotalAmount = rawChildren.fold<double>(0.0, (sum, s) => sum + ((s['totalAmount'] ?? 0).toDouble()));
+        } else {
+           // Fallback: buscar por leaderId
+           final mySellers = vendors.where((s) => (s['role'] ?? '') != 'LEADER' && (s['leaderId'] == vendorId));
+           sellersTotalAmount = mySellers.fold<double>(0.0, (sum, s) => sum + ((s['totalAmount'] ?? 0).toDouble()));
+        }
+
+        comision = (totalAmount * 0.25) + (sellersTotalAmount * 0.10);
+
+      } else {
+        // Fórmula Vendedor UI:
+        // Ingreso: totalAmount * 0.65
+        // Comisión: totalAmount * 0.25
+        ingreso = totalAmount * 0.65;
+        comision = totalAmount * 0.25;
       }
       
       data.add([
@@ -4890,8 +4949,8 @@ class _CrmScreenState extends State<CrmScreen> {
         (vendor['assignedCount'] ?? 0).toString(),
         assignedCardNumbers,
         (vendor['soldCount'] ?? 0).toString(),
-        (vendor['revenueBs'] ?? 0).toString(),
-        (vendor['commissionsBs'] ?? 0).toString(),
+        ingreso.toStringAsFixed(2),
+        comision.toStringAsFixed(2),
         vendor['lastSaleDate'] ?? '',
         status
       ]);

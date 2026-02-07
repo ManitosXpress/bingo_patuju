@@ -280,8 +280,8 @@ class PdfGenerator {
                 pw.Text('FECHA:', style: pw.TextStyle(fontSize: 11 * scale, fontWeight: pw.FontWeight.bold)),
                 pw.Text(date, style: pw.TextStyle(fontSize: 10 * scale)),
                 pw.SizedBox(height: 8 * scale),
-                pw.Text('PRECIO:', style: pw.TextStyle(fontSize: 11 * scale, fontWeight: pw.FontWeight.bold)),
-                pw.Text(price, style: pw.TextStyle(fontSize: 10 * scale)),
+                pw.SizedBox(height: 8 * scale),
+
               ],
             ),
           ),

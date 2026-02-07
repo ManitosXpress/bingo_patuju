@@ -514,11 +514,15 @@ router.post('/bulk-assign', async (req: any, res: any) => {
       assignedCount,
       vendorId,
       role: vendorData.role,
-      warning: warningMessage || undefined
+      warning: warningMessage || undefined,
+      summary: {
+        assigned: docsToAssign.map(d => d.data().cardNo).filter(n => n != null).sort((a, b) => a - b),
+        notFound: []
+      }
     });
 
   } catch (e: any) {
-    console.error('Error en bulk-assign:', e);
+    // console.error('Error en bulk-assign:', e);
     return res.status(500).json({ error: 'Internal server error: ' + e.message });
   }
 });

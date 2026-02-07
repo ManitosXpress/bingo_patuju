@@ -320,22 +320,7 @@ class CartillaWidget extends StatelessWidget {
                     color: Colors.black87,
                   ),
                 ),
-                SizedBox(height: spacing / 3),
-                Text(
-                  "PRECIO:",
-                  style: TextStyle(
-                    fontSize: infoLabelFont,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                Text(
-                  price ?? "N/A",
-                  style: TextStyle(
-                    fontSize: infoValueFont,
-                    color: Colors.black87,
-                  ),
-                ),
+             
               ],
             ),
           ),
